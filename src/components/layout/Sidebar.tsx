@@ -78,14 +78,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="nav-label">Grouped List View</span>
         </button>
 
-        <button
-          className={`nav-item ${currentTab === 'security' ? 'active' : ''}`}
-          onClick={() => onSelectTab('security')}
-          id="nav-security-assurance"
-        >
-          <span className="nav-icon">🛡️</span>
-          <span className="nav-label">Assurance & RBAC</span>
-        </button>
+        {currentUser?.role === 'workspace_admin' && (
+          <button
+            className={`nav-item ${currentTab === 'security' ? 'active' : ''}`}
+            onClick={() => onSelectTab('security')}
+            id="nav-security-assurance"
+          >
+            <span className="nav-icon">🛡️</span>
+            <span className="nav-label">Assurance & RBAC</span>
+          </button>
+        )}
       </nav>
 
       <div className="sidebar-projects-section">

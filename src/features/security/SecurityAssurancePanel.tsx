@@ -129,17 +129,24 @@ export const SecurityAssurancePanel: React.FC = () => {
     }
 
     // NEG-05: Double-mutation idempotency lock
-    const p1 = storageEngine.executeIdempotent('test-key', async () => {
+    const testKey = `test-idempotency-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    let executionCount = 0;
+    const p1 = storageEngine.executeIdempotent(testKey, async () => {
+      executionCount++;
       return 'created-once';
     });
-    const p2 = storageEngine.executeIdempotent('test-key', async () => {
+    const p2 = storageEngine.executeIdempotent(testKey, async () => {
+      executionCount++;
       return 'created-twice';
     });
-    if (p1 === p2) {
+
+    const [res1, res2] = await Promise.all([p1, p2]);
+
+    if (p1 === p2 && executionCount === 1 && res1 === 'created-once' && res2 === 'created-once') {
       newResults[4].actual = 'Second duplicate mutation locked and reused identical promise without creating duplicate record.';
       newResults[4].status = 'passed';
     } else {
-      newResults[4].actual = 'FAIL: In-flight mutation returned separate promise.';
+      newResults[4].actual = `FAIL: Idempotency lock failed. executionCount=${executionCount}, samePromise=${p1 === p2}`;
       newResults[4].status = 'failed';
     }
 

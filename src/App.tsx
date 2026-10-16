@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ToastProvider } from './hooks/useToast';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useProjects } from './hooks/useProjects';
@@ -57,6 +57,12 @@ const MainApp: React.FC = () => {
   const handleSelectTaskFromDashboard = (_task: Task) => {
     setCurrentTab('kanban');
   };
+
+  useEffect(() => {
+    if (currentTab === 'security' && currentUser?.role !== 'workspace_admin') {
+      setCurrentTab('kanban');
+    }
+  }, [currentUser, currentTab]);
 
   return (
     <div className="app-container">
@@ -172,7 +178,13 @@ const MainApp: React.FC = () => {
           )}
 
           {currentTab === 'security' && (
-            <SecurityAssurancePanel />
+            currentUser?.role === 'workspace_admin' ? (
+              <SecurityAssurancePanel />
+            ) : (
+              <div className="empty-panel-state">
+                <p>Access Restricted: Only Workspace Admins can access the Assurance & RBAC panel.</p>
+              </div>
+            )
           )}
         </main>
       </div>

@@ -295,5 +295,28 @@ describe('Security & RBAC Boundary Enforcement', () => {
       const sarahNoticesAfter = projectService.getDeletionNotices(leadUser);
       expect(sarahNoticesAfter.some(n => n.projectId === sharedProj.id)).toBe(true);
     });
+
+    it('NEG-05: Double-Submit Idempotency Lock returns identical in-flight promise and prevents duplicate execution', async () => {
+      const testKey = `test-idempotency-${Date.now()}`;
+      let executionCount = 0;
+
+      const p1 = storageEngine.executeIdempotent(testKey, async () => {
+        executionCount++;
+        return 'created-once';
+      });
+
+      const p2 = storageEngine.executeIdempotent(testKey, async () => {
+        executionCount++;
+        return 'created-twice';
+      });
+
+      // Strict promise identity check
+      expect(p1).toBe(p2);
+
+      const [res1, res2] = await Promise.all([p1, p2]);
+      expect(executionCount).toBe(1);
+      expect(res1).toBe('created-once');
+      expect(res2).toBe('created-once');
+    });
   });
 });

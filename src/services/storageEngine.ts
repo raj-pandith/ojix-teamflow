@@ -72,7 +72,7 @@ class ReactiveStorageEngine {
   }
 
   // Idempotency execution wrapper per DEC-007
-  public async executeIdempotent<T>(key: string, mutationFn: () => Promise<T>): Promise<T> {
+  public executeIdempotent<T>(key: string, mutationFn: () => Promise<T>): Promise<T> {
     if (this.inFlightMutations.has(key)) {
       return this.inFlightMutations.get(key) as Promise<T>;
     }
