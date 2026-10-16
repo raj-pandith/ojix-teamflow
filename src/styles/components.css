@@ -643,6 +643,24 @@
   cursor: grabbing;
 }
 
+.task-card-locked {
+  cursor: pointer;
+}
+
+.task-card-locked:hover {
+  transform: none;
+}
+
+.task-card-locked:active {
+  cursor: pointer;
+}
+
+.task-lock-indicator {
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+
 .task-card-overdue {
   border-left: 3px solid var(--status-overdue);
 }

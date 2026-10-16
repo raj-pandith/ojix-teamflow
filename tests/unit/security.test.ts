@@ -54,6 +54,41 @@ describe('Security & RBAC Boundary Enforcement', () => {
     ).rejects.toThrow(/Permission denied: Viewers cannot update task status/);
   });
 
+  it('Member CAN transition tasks assigned to them', async () => {
+    // task-102 is assigned to Marcus, status is todo -> transition to in_progress
+    const updated = await taskService.transitionStatus('task-102', 'in_progress', undefined, memberUser);
+    expect(updated.status).toBe('in_progress');
+  });
+
+  it('Member CANNOT transition unassigned tasks', async () => {
+    // task-101 is in backlog and unassigned
+    await expect(
+      taskService.transitionStatus('task-101', 'todo', undefined, memberUser)
+    ).rejects.toThrow(/Unassigned task: Only the Project Lead or Workspace Admin can move unassigned tasks/);
+  });
+
+  it('Member CANNOT transition tasks assigned to other members', async () => {
+    // task-105 is assigned to Sarah Chen
+    await expect(
+      taskService.transitionStatus('task-105', 'in_progress', undefined, memberUser)
+    ).rejects.toThrow(/Members can only drag and move tasks assigned directly to them/);
+  });
+
+  it('Project Lead CAN transition unassigned tasks and tasks assigned to other members', async () => {
+    // task-101 is unassigned -> Lead moves to todo
+    const updatedUnassigned = await taskService.transitionStatus('task-101', 'todo', undefined, leadUser);
+    expect(updatedUnassigned.status).toBe('todo');
+
+    // task-103 is assigned to Marcus -> Lead moves to in_progress
+    const updatedMemberTask = await taskService.transitionStatus('task-103', 'in_progress', undefined, leadUser);
+    expect(updatedMemberTask.status).toBe('in_progress');
+  });
+
+  it('Workspace Admin CAN override and transition any task', async () => {
+    const updated = await taskService.transitionStatus('task-101', 'todo', undefined, adminUser);
+    expect(updated.status).toBe('todo');
+  });
+
   it('NEG-02c: Viewer cannot delete any task', async () => {
     await expect(
       taskService.deleteTask('task-102', viewerUser)

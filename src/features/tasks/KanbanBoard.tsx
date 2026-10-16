@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus } from '../../types/task';
 import { UserProfile } from '../../types/auth';
+import { Project } from '../../types/project';
 import { TaskCard } from '../../components/tasks/TaskCard';
 import { BlockerModal } from '../../components/tasks/BlockerModal';
 import { TaskDetailModal } from '../../components/tasks/TaskDetailModal';
 import { storageEngine } from '../../services/storageEngine';
+import { canUserMoveTask } from '../../domain/taskStateMachine';
 
 interface KanbanBoardProps {
   tasks: Task[];
   canMutate: boolean;
   currentUser: UserProfile | null;
+  project?: Project | null;
   onTransitionStatus: (taskId: string, status: TaskStatus, blockerReason?: string) => Promise<unknown>;
   onUpdateTask?: (taskId: string, updates: { assigneeId: string | null }) => Promise<unknown>;
   onDeleteTask: (taskId: string) => Promise<unknown>;
@@ -28,6 +31,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   tasks,
   canMutate,
   currentUser,
+  project,
   onTransitionStatus,
   onUpdateTask,
   onDeleteTask,
@@ -60,6 +64,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const task = tasks.find(t => t.id === taskId);
     if (!task || task.status === targetStatus) return;
 
+    const moveAuth = canUserMoveTask(task, currentUser, project);
+    if (!moveAuth.allowed) return;
+
     if (targetStatus === 'blocked') {
       setPendingBlockerTask(task);
       return;
@@ -73,6 +80,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   const handleQuickMove = async (task: Task, targetStatus: TaskStatus) => {
+    const moveAuth = canUserMoveTask(task, currentUser, project);
+    if (!moveAuth.allowed) return;
+
     if (targetStatus === 'blocked') {
       setPendingBlockerTask(task);
       return;
@@ -119,6 +129,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               <div className="kanban-cards-list">
                 {colTasks.map(task => {
                   const assignee = users.find(u => u.uid === task.assigneeId);
+                  const moveAuth = canUserMoveTask(task, currentUser, project);
+                  const canMove = canMutate && moveAuth.allowed;
+
                   return (
                     <TaskCard
                       key={task.id}
@@ -130,6 +143,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       }}
                       onQuickMove={status => handleQuickMove(task, status)}
                       canMutate={canMutate}
+                      canMove={canMove}
+                      lockReason={moveAuth.reason}
                     />
                   );
                 })}

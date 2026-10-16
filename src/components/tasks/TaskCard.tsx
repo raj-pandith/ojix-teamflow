@@ -10,6 +10,8 @@ interface TaskCardProps {
   onClick: () => void;
   onQuickMove: (targetStatus: TaskStatus) => void;
   canMutate: boolean;
+  canMove: boolean;
+  lockReason?: string;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -18,12 +20,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onClick,
   onQuickMove,
   canMutate,
+  canMove,
+  lockReason,
 }) => {
   const isOverdue = isTaskOverdue(task.dueDate, task.status);
   const allowedMoves = ALLOWED_TRANSITIONS[task.status] || [];
 
   const handleDragStart = (e: React.DragEvent) => {
-    if (!canMutate) {
+    if (!canMutate || !canMove) {
       e.preventDefault();
       return;
     }
@@ -33,12 +37,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   return (
     <div
-      className={`task-card ${isOverdue ? 'task-card-overdue' : ''} ${task.status === 'blocked' ? 'task-card-blocked' : ''}`}
-      draggable={canMutate}
+      className={`task-card ${isOverdue ? 'task-card-overdue' : ''} ${task.status === 'blocked' ? 'task-card-blocked' : ''} ${!canMove ? 'task-card-locked' : ''}`}
+      draggable={canMutate && canMove}
       onDragStart={handleDragStart}
       onClick={onClick}
       role="button"
       tabIndex={0}
+      title={!canMove && lockReason ? lockReason : undefined}
       onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') {
           onClick();
@@ -46,7 +51,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       }}
     >
       <div className="task-card-header">
-        <Badge type="priority" value={task.priority} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Badge type="priority" value={task.priority} />
+          {!canMove && (
+            <span
+              className="task-lock-indicator"
+              title={lockReason || 'Locked: Only the assigned member or Project Lead can move this task'}
+              style={{ fontSize: '11px', opacity: 0.65 }}
+            >
+              🔒
+            </span>
+          )}
+        </div>
         {isOverdue && <Badge type="overdue" value="OVERDUE" />}
       </div>
 
@@ -72,7 +88,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         </div>
 
         {/* Click-to-Move Menu per DEC-010 */}
-        {canMutate && allowedMoves.length > 0 && (
+        {canMutate && canMove && allowedMoves.length > 0 && (
           <div className="task-quick-move" onClick={e => e.stopPropagation()}>
             <select
               className="quick-move-select"

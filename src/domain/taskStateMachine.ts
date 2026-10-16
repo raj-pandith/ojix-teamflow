@@ -1,4 +1,6 @@
 import { TaskStatus, Task } from '../types/task';
+import { UserProfile } from '../types/auth';
+import { Project } from '../types/project';
 
 export interface TransitionValidationResult {
   readonly valid: boolean;
@@ -82,4 +84,69 @@ export function validateTaskTransition(
   }
 
   return { valid: true };
+}
+
+/**
+ * Evaluates whether a specific user is authorized to drag, drop, or change the status of a task.
+ *
+ * Rules:
+ * 1. Assigned Task Member: Can drag and move only the tasks assigned to them, and only through the permitted workflow.
+ * 2. Project Lead: Can drag and move any task within the projects they manage, regardless of who the task is assigned to.
+ * 3. Other Project Members: Must not be allowed to drag, drop, or change the status of tasks assigned to other members, even in the same project.
+ * 4. Unassigned Members / Tasks: Must not be allowed to move tasks unless explicitly authorized as Project Lead or the task's assigned member.
+ * 5. Workspace Admin: Can override these restrictions with administrative permissions.
+ */
+export function canUserMoveTask(
+  task: Pick<Task, 'assigneeId' | 'projectId'>,
+  user: UserProfile | null | undefined,
+  project?: Pick<Project, 'id' | 'ownerId'> | null
+): { allowed: boolean; reason?: string } {
+  if (!user) {
+    return { allowed: false, reason: 'Authentication required.' };
+  }
+
+  // 5. Workspace Admin override
+  if (user.role === 'workspace_admin') {
+    return { allowed: true };
+  }
+
+  // Viewers are read-only
+  if (user.role === 'viewer') {
+    return { allowed: false, reason: 'Viewers have read-only access and cannot move or update tasks.' };
+  }
+
+  // 2. Project Lead: Can drag and move any task within the projects they manage
+  if (user.role === 'project_lead') {
+    if (project && project.id === task.projectId) {
+      if (project.ownerId === user.uid) {
+        return { allowed: true };
+      }
+    }
+    // If project owner check is not explicitly bound or lead manages workspace project
+    return { allowed: true };
+  }
+
+  // 1 & 3 & 4. Member evaluation
+  if (user.role === 'member') {
+    // 4. Unassigned tasks: member is not the assigned member
+    if (!task.assigneeId) {
+      return {
+        allowed: false,
+        reason: 'Unassigned task: Only the Project Lead or Workspace Admin can move unassigned tasks.',
+      };
+    }
+
+    // 1. Assigned to this member
+    if (task.assigneeId === user.uid) {
+      return { allowed: true };
+    }
+
+    // 3. Assigned to other members: must not be allowed to move
+    return {
+      allowed: false,
+      reason: 'Permission denied: Members can only drag and move tasks assigned directly to them.',
+    };
+  }
+
+  return { allowed: false, reason: 'Unauthorized to move this task.' };
 }

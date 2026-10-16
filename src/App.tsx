@@ -81,6 +81,7 @@ const MainApp: React.FC = () => {
                 tasks={tasks}
                 canMutate={canMutate}
                 currentUser={currentUser}
+                project={activeProject}
                 onTransitionStatus={transitionStatus}
                 onUpdateTask={updateTask}
                 onDeleteTask={deleteTask}
@@ -102,6 +103,7 @@ const MainApp: React.FC = () => {
                 onFilterChange={setFilters}
                 canMutate={canMutate}
                 currentUser={currentUser}
+                project={activeProject}
                 onTransitionStatus={transitionStatus}
                 onUpdateTask={updateTask}
                 onDeleteTask={deleteTask}

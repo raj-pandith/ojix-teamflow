@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Task, TaskStatus, TaskPriority, TaskFilterOptions } from '../../types/task';
 import { UserProfile } from '../../types/auth';
+import { Project } from '../../types/project';
 import { Badge } from '../../components/common/Badge';
 import { TaskDetailModal } from '../../components/tasks/TaskDetailModal';
 import { BlockerModal } from '../../components/tasks/BlockerModal';
 import { storageEngine } from '../../services/storageEngine';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
-import { ALLOWED_TRANSITIONS } from '../../domain/taskStateMachine';
+import { ALLOWED_TRANSITIONS, canUserMoveTask } from '../../domain/taskStateMachine';
 
 interface GroupedListViewProps {
   tasks: Task[];
@@ -14,6 +15,7 @@ interface GroupedListViewProps {
   onFilterChange: (filters: TaskFilterOptions) => void;
   canMutate: boolean;
   currentUser: UserProfile | null;
+  project?: Project | null;
   onTransitionStatus: (taskId: string, status: TaskStatus, blockerReason?: string) => Promise<unknown>;
   onUpdateTask?: (taskId: string, updates: { assigneeId: string | null }) => Promise<unknown>;
   onDeleteTask: (taskId: string) => Promise<unknown>;
@@ -25,6 +27,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
   onFilterChange,
   canMutate,
   currentUser,
+  project,
   onTransitionStatus,
   onUpdateTask,
   onDeleteTask,
@@ -168,6 +171,8 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
               const assignee = users.find(u => u.uid === task.assigneeId);
               const isOverdue = isTaskOverdue(task.dueDate, task.status);
               const allowedMoves = ALLOWED_TRANSITIONS[task.status] || [];
+              const moveAuth = canUserMoveTask(task, currentUser, project);
+              const canMove = canMutate && moveAuth.allowed;
 
               return (
                 <tr
@@ -179,11 +184,12 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
                   }}
                 >
                   <td className="td-status" onClick={e => e.stopPropagation()}>
-                    {canMutate && allowedMoves.length > 0 ? (
+                    {canMove && allowedMoves.length > 0 ? (
                       <select
                         className="status-dropdown-cell"
                         value={task.status}
                         onChange={e => handleStatusChange(task, e.target.value as TaskStatus)}
+                        title="Click to advance status"
                       >
                         <option value={task.status}>
                           {task.status.replace('_', ' ').toUpperCase()}

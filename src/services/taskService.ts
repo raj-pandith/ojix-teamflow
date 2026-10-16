@@ -2,7 +2,7 @@ import { Task, TaskFormData, TaskStatus } from '../types/task';
 import { UserProfile } from '../types/auth';
 import { storageEngine } from './storageEngine';
 import { validateTaskForm } from '../domain/validation';
-import { validateTaskTransition } from '../domain/taskStateMachine';
+import { validateTaskTransition, canUserMoveTask } from '../domain/taskStateMachine';
 import { auditService } from './auditService';
 
 class TaskService {
@@ -89,6 +89,12 @@ class TaskService {
     const existing = storageEngine.getTaskById(taskId, user);
     if (!existing) {
       throw new Error(`Task ${taskId} not found.`);
+    }
+
+    const project = storageEngine.getProjectById(existing.projectId, user);
+    const moveAuth = canUserMoveTask(existing, user, project);
+    if (!moveAuth.allowed) {
+      throw new Error(moveAuth.reason || 'Permission denied: You are not authorized to move this task.');
     }
 
     const transitionResult = validateTaskTransition(existing, targetStatus, blockerReason);
