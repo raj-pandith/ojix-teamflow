@@ -197,15 +197,15 @@ class ReactiveStorageEngine {
   }
 
   public deleteTask(taskId: string, user: UserProfile): void {
-    if (user.role === 'viewer') {
-      throw new Error('Permission denied: Viewers cannot delete tasks.');
+    if (user.role !== 'workspace_admin' && user.role !== 'project_lead') {
+      throw new Error('Permission denied: Only Workspace Admins and Project Leads can delete tasks.');
     }
     const task = this.tasks.find(t => t.id === taskId);
     if (!task) return;
 
     const project = this.getProjectById(task.projectId, user);
-    if (user.role !== 'workspace_admin' && project?.ownerId !== user.uid && task.createdBy !== user.uid) {
-      throw new Error('Permission denied: Insufficient privileges to delete task.');
+    if (user.role !== 'workspace_admin' && project?.ownerId !== user.uid) {
+      throw new Error('Permission denied: Project Leads can only delete tasks in projects they own.');
     }
 
     this.tasks = this.tasks.filter(t => t.id !== taskId);

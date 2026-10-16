@@ -57,7 +57,18 @@ describe('Security & RBAC Boundary Enforcement', () => {
   it('NEG-02c: Viewer cannot delete any task', async () => {
     await expect(
       taskService.deleteTask('task-102', viewerUser)
-    ).rejects.toThrow(/Permission denied: Viewers cannot delete tasks/);
+    ).rejects.toThrow(/Permission denied: Only Workspace Admins and Project Leads can delete tasks/);
+  });
+
+  it('NEG-02d: Member cannot delete any task', async () => {
+    await expect(
+      taskService.deleteTask('task-102', memberUser)
+    ).rejects.toThrow(/Permission denied: Only Workspace Admins and Project Leads can delete tasks/);
+  });
+
+  it('Project Lead and Workspace Admin can delete tasks', async () => {
+    // Project Lead Sarah can delete task in her project proj-infra-01
+    await expect(taskService.deleteTask('task-102', leadUser)).resolves.not.toThrow();
   });
 
   it('NEG-06: Repeated submission is protected against duplicate mutation', async () => {

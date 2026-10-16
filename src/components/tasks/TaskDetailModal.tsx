@@ -76,6 +76,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
+  // Only Workspace Admin and Project Lead can delete tasks per RBAC specification
+  const canDelete = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={task.title} maxWidth="720px">
       <div className="task-detail-container">
@@ -205,7 +208,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
         {/* Footer Actions */}
         <div className="modal-actions task-detail-footer">
-          {canMutate && (
+          {canDelete && (
             <Button
               variant="danger"
               size="sm"
@@ -215,6 +218,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   onClose();
                 }
               }}
+              id="delete-task-modal-btn"
             >
               Delete Task
             </Button>

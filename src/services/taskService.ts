@@ -195,6 +195,9 @@ class TaskService {
   }
 
   public async deleteTask(taskId: string, user: UserProfile): Promise<void> {
+    if (user.role !== 'workspace_admin' && user.role !== 'project_lead') {
+      throw new Error('Permission denied: Only Workspace Admins and Project Leads can delete tasks.');
+    }
     storageEngine.deleteTask(taskId, user);
   }
 
