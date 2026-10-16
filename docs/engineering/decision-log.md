@@ -165,3 +165,112 @@ Implement a **multi-tiered idempotency control**:
 
 ### Trade-offs Acknowledged
 - Requires client-side ID generation, but modern browsers natively support `crypto.randomUUID()`.
+
+---
+
+## DEC-008 — Hybrid Local Persistence Engine
+
+**Date:** 2026-10-16  
+**Status:** Finalized  
+
+### Context
+Running the Firebase Emulator Suite locally requires a Java JRE. To ensure seamless evaluation across any testing environment without prerequisite setup barriers while preserving real Firestore compatibility, an adaptive persistence strategy is needed.
+
+### Decision
+Implement a **hybrid data access layer**:
+1. Connect to the Firebase Emulator Suite if it is running locally.
+2. If the emulator is unreachable, seamlessly fall back to an in-memory/localStorage reactive store that faithfully mimics Firestore collections (`users`, `projects`, `tasks`, `activity_logs`), query operators, and `onSnapshot` subscriptions.
+
+### Rationale
+- Zero-friction demo setup: running `npm run dev` works instantly in any modern browser without requiring Java or external services.
+- Evaluators with Firebase CLI installed can still run full emulator-backed testing.
+
+### Trade-offs Acknowledged
+- Maintaining a mock storage adapter with identical query semantics requires rigorous domain tests. Mitigated by sharing domain validators and state machine logic between both engines.
+
+---
+
+## DEC-009 — Evaluation Ergonomics: Persistent Topbar Persona Quick-Switcher
+
+**Date:** 2026-10-16  
+**Status:** Finalized  
+
+### Context
+Testing role-based access control (Admin, Project Lead, Member, Viewer) requires repeatedly switching accounts. Forcing evaluators to manually sign out, navigate to `/login`, and type or select credentials creates unnecessary friction.
+
+### Decision
+Provide a **persistent "Persona Switcher" dropdown widget in the Topbar**, allowing 1-click role swapping on the fly, while preserving the full standard `/login` route and route guards.
+
+### Rationale
+- Dramatically accelerates verification of role differences (e.g. switching from Lead to Viewer to see mutation controls instantly lock).
+- Explicit visual badge always displays the current active role and user profile.
+
+### Trade-offs Acknowledged
+- The quick-switcher is an evaluation feature for sandbox environments; it is clearly labeled as a Demo Evaluation Tool.
+
+---
+
+## DEC-010 — Dual Kanban Interaction Model (Native Drag-and-Drop + Click-to-Move Controls)
+
+**Date:** 2026-10-16  
+**Status:** Finalized  
+
+### Context
+Drag-and-drop offers high visual satisfaction, but can be cumbersome on touch devices, small viewports, or for keyboard-only accessibility.
+
+### Decision
+Implement a **dual interaction model**:
+1. Native HTML5 drag-and-drop between Kanban columns with visual drop-target indicators and smooth release transitions.
+2. An accessible quick-action menu / status transition dropdown on every task card for 1-click status changes without dragging.
+
+### Rationale
+- Maximum ergonomics for mouse, trackpad, touch, and keyboard users.
+- No heavy external drag-and-drop library required, keeping bundle size minimal.
+
+### Trade-offs Acknowledged
+- Requires dual event wiring, but shares the same underlying domain state machine transition function (`taskStateMachine.ts`).
+
+---
+
+## DEC-011 — Rich Synthetic Seed Dataset & Reset Facility
+
+**Date:** 2026-10-16  
+**Status:** Finalized  
+
+### Context
+Evaluators testing dashboards, overdue metrics, and blocker workflows should not have to manually enter dozens of tasks to see a populated system.
+
+### Decision
+1. Automatically populate the application with a realistic synthetic dataset on first load:
+   - 4 users across the 4 roles.
+   - 2 active projects (one collaborative, one confidential for boundary testing).
+   - Tasks in all 6 lifecycle statuses (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Blocked` with reasons).
+   - High, Medium, Low, and Urgent tasks, including items deliberately past due for overdue metric verification.
+   - Initial activity log entries.
+2. Provide a **"Reset Demo Data"** action in the workspace settings/topbar to restore pristine seed state at any time.
+
+### Rationale
+- Immediate visual impact upon launch.
+- Predictable states for manual and automated acceptance tests.
+
+---
+
+## DEC-012 — In-App Integration for Triage and Assurance Skills
+
+**Date:** 2026-10-16  
+**Status:** Finalized  
+
+### Context
+`ASSIGNMENT.md` specifies three required skills: Orchestrator, Work Triage Accelerator, and Workspace Production Assurance. In addition to being documented as skills and test suites, making these capabilities accessible in the UI enhances transparency and demo value.
+
+### Decision
+1. **Work Triage Drawer:** Add an in-app slide-over panel that allows users to run:
+   - Due-date & Overdue triage.
+   - Blocker bottleneck analysis.
+   - Meeting notes to action items extraction (with sample text provided).
+2. **Security & Assurance Panel:** Add a live diagnostic panel in the Admin view that runs live RBAC checks and displays pass/fail indicators directly in the browser, complementing the automated terminal test suites.
+
+### Rationale
+- Proves domain logic execution live in front of evaluators.
+- Fully grounds the required skills in the functional product experience.
+
