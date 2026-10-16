@@ -182,4 +182,118 @@ describe('Security & RBAC Boundary Enforcement', () => {
     const newMemberProj = storageEngine.getProjectById('proj-secret-02', newUser);
     expect(newMemberProj).toBeDefined();
   });
+
+  describe('Project Deletion Permissions', () => {
+    it('Project Lead CAN delete projects they own', async () => {
+      // Create a project owned by Sarah Chen
+      const leadProj = await projectService.createProject(
+        {
+          name: 'Sarah Deletable Project',
+          objective: 'Test lead deletion',
+          status: 'active',
+          startDate: '2026-10-01',
+          dueDate: '2026-11-01',
+          memberIds: [leadUser.uid],
+        },
+        leadUser
+      );
+
+      expect(storageEngine.getProjectById(leadProj.id, leadUser)).toBeDefined();
+      await projectService.deleteProject(leadProj.id, leadUser);
+      expect(storageEngine.getProjectById(leadProj.id, adminUser)).toBeUndefined();
+    });
+
+    it('Project Lead CAN delete projects they manage', async () => {
+      // Create project owned by Alex Morgan with Sarah as lead member
+      const adminProj = await projectService.createProject(
+        {
+          name: 'Alex Executive Project',
+          objective: 'Testing project lead deletion permissions',
+          status: 'active',
+          startDate: '2026-10-01',
+          dueDate: '2026-11-01',
+          memberIds: [adminUser.uid, leadUser.uid],
+        },
+        adminUser
+      );
+
+      await expect(
+        projectService.deleteProject(adminProj.id, leadUser)
+      ).resolves.not.toThrow();
+
+      expect(storageEngine.getProjectById(adminProj.id, adminUser)).toBeUndefined();
+    });
+
+    it('Workspace Admin CAN delete any project', async () => {
+      // proj-infra-01 is owned by Sarah Chen, Admin deletes it
+      await expect(
+        projectService.deleteProject('proj-infra-01', adminUser)
+      ).resolves.not.toThrow();
+
+      expect(storageEngine.getProjectById('proj-infra-01', adminUser)).toBeUndefined();
+    });
+
+    it('Member CANNOT delete projects', async () => {
+      await expect(
+        projectService.deleteProject('proj-infra-01', memberUser)
+      ).rejects.toThrow(/Permission denied: Only Workspace Admins and Project Leads can delete projects/);
+    });
+
+    it('Viewer CANNOT delete projects', async () => {
+      await expect(
+        projectService.deleteProject('proj-infra-01', viewerUser)
+      ).rejects.toThrow(/Permission denied: Only Workspace Admins and Project Leads can delete projects/);
+    });
+
+    it('Project deletion creates sticky notification for all project members with who, project and when', async () => {
+      // Create a project with Sarah (Lead), Marcus (Member), and Alex (Admin) as members. Elena (Viewer) is NOT a member.
+      const sharedProj = await projectService.createProject(
+        {
+          name: 'Mobile App Redesign',
+          objective: 'Test deletion notification distribution',
+          status: 'active',
+          startDate: '2026-10-01',
+          dueDate: '2026-11-01',
+          memberIds: [leadUser.uid, memberUser.uid, adminUser.uid],
+        },
+        leadUser
+      );
+
+      // Verify no deletion notices initially
+      expect(projectService.getDeletionNotices(memberUser)).toHaveLength(0);
+      expect(projectService.getDeletionNotices(leadUser)).toHaveLength(0);
+
+      // Sarah (Project Lead) deletes the project
+      await projectService.deleteProject(sharedProj.id, leadUser);
+
+      // Verify Marcus (Member of the deleted project) receives the sticky notice
+      const marcusNotices = projectService.getDeletionNotices(memberUser);
+      expect(marcusNotices.length).toBeGreaterThanOrEqual(1);
+      const noticeForMarcus = marcusNotices.find(n => n.projectId === sharedProj.id);
+      expect(noticeForMarcus).toBeDefined();
+      expect(noticeForMarcus?.projectName).toBe('Mobile App Redesign');
+      expect(noticeForMarcus?.deletedByName).toBe(leadUser.displayName);
+      expect(noticeForMarcus?.deletedByRole).toBe('project_lead');
+      expect(noticeForMarcus?.deletedAt).toBeDefined();
+
+      // Verify Sarah (also a member) receives the notice
+      const sarahNotices = projectService.getDeletionNotices(leadUser);
+      expect(sarahNotices.some(n => n.projectId === sharedProj.id)).toBe(true);
+
+      // Verify Elena (NOT in memberIds of Mobile App Redesign) does NOT receive the notice
+      const elenaNotices = projectService.getDeletionNotices(viewerUser);
+      expect(elenaNotices.some(n => n.projectId === sharedProj.id)).toBe(false);
+
+      // Marcus dismisses the notice
+      projectService.dismissDeletionNotice(noticeForMarcus!.id, memberUser);
+
+      // Marcus should no longer see it
+      const marcusNoticesAfter = projectService.getDeletionNotices(memberUser);
+      expect(marcusNoticesAfter.some(n => n.projectId === sharedProj.id)).toBe(false);
+
+      // But Sarah still sees it until she dismisses it
+      const sarahNoticesAfter = projectService.getDeletionNotices(leadUser);
+      expect(sarahNoticesAfter.some(n => n.projectId === sharedProj.id)).toBe(true);
+    });
+  });
 });

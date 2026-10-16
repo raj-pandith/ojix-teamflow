@@ -11,6 +11,8 @@ interface SidebarProps {
   activeProjectId: string;
   onSelectProject: (projectId: string) => void;
   onOpenNewProject: () => void;
+  onDeleteProject?: (projectId: string) => void;
+  onRequestDelete?: (projectId: string, projectName: string) => void;
   currentUser: UserProfile | null;
 }
 
@@ -21,6 +23,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeProjectId,
   onSelectProject,
   onOpenNewProject,
+  onDeleteProject,
+  onRequestDelete,
   currentUser,
 }) => {
   const canCreateProject =
@@ -100,18 +104,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="project-list-scroll">
-          {projects.map(proj => (
-            <button
-              key={proj.id}
-              className={`project-nav-item ${proj.id === activeProjectId ? 'active' : ''}`}
-              onClick={() => onSelectProject(proj.id)}
-            >
-              <span className={`status-indicator status-${proj.status}`} />
-              <span className="project-nav-name" title={proj.name}>
-                {proj.name}
-              </span>
-            </button>
-          ))}
+          {projects.map(proj => {
+            const canDelete =
+              currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+            const isActive = proj.id === activeProjectId;
+
+            return (
+              <div
+                key={proj.id}
+                className={`project-nav-item-row ${isActive ? 'active' : ''}`}
+              >
+                <button
+                  className={`project-nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => onSelectProject(proj.id)}
+                >
+                  <span className={`status-indicator status-${proj.status}`} />
+                  <span className="project-nav-name" title={proj.name}>
+                    {proj.name}
+                  </span>
+                </button>
+                {canDelete && (
+                  <button
+                    className="btn-delete-project"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (onRequestDelete) {
+                        onRequestDelete(proj.id, proj.name);
+                      } else if (onDeleteProject) {
+                        onDeleteProject(proj.id);
+                      }
+                    }}
+                    title={`Delete project "${proj.name}"`}
+                    aria-label={`Delete project ${proj.name}`}
+                    id={`sidebar-delete-project-${proj.id}`}
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
+            );
+          })}
           {projects.length === 0 && (
             <div className="empty-projects-note">No permitted projects found.</div>
           )}

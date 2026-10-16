@@ -1,6 +1,7 @@
 import React from 'react';
 import { Project } from '../../types/project';
 import { Task } from '../../types/task';
+import { UserProfile } from '../../types/auth';
 import { Badge } from '../../components/common/Badge';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
 import { storageEngine } from '../../services/storageEngine';
@@ -10,6 +11,9 @@ interface ProjectDashboardProps {
   tasks: Task[];
   onSelectTask: (task: Task) => void;
   onGoToKanban: () => void;
+  onDeleteProject?: (projectId: string) => void;
+  onRequestDelete?: (projectId: string, projectName: string) => void;
+  currentUser?: UserProfile | null;
 }
 
 export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
@@ -17,6 +21,9 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   tasks,
   onSelectTask,
   onGoToKanban,
+  onDeleteProject,
+  onRequestDelete,
+  currentUser,
 }) => {
   if (!project) {
     return (
@@ -35,6 +42,9 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
 
   const completionPercentage = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
 
+  const canDelete =
+    currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+
   return (
     <div className="dashboard-container">
       {/* Project Banner & Overall Progress */}
@@ -50,9 +60,27 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
             <h2 className="project-hero-title">{project.name}</h2>
             <p className="project-hero-desc">{project.objective}</p>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={onGoToKanban}>
-            Open Project Board ➔
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button className="btn btn-primary btn-sm" onClick={onGoToKanban}>
+              Open Project Board ➔
+            </button>
+            {canDelete && (
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => {
+                  if (onRequestDelete) {
+                    onRequestDelete(project.id, project.name);
+                  } else if (onDeleteProject) {
+                    onDeleteProject(project.id);
+                  }
+                }}
+                id="delete-project-dashboard-btn"
+                title="Delete this project"
+              >
+                🗑️ Delete Project
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Progress Bar */}

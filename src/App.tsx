@@ -13,13 +13,24 @@ import { SecurityAssurancePanel } from './features/security/SecurityAssurancePan
 import { WorkTriageDrawer } from './features/triage/WorkTriageDrawer';
 import { TaskCreateModal } from './components/tasks/TaskCreateModal';
 import { ProjectCreateModal } from './components/projects/ProjectCreateModal';
+import { ProjectDeleteModal } from './components/projects/ProjectDeleteModal';
 import { UserInviteModal } from './components/users/UserInviteModal';
+import { StickyDeletionBanner } from './components/layout/StickyDeletionBanner';
 import { Task } from './types/task';
 import './styles/global.css';
 
 const MainApp: React.FC = () => {
   const { currentUser } = useAuth();
-  const { projects, activeProject, activeProjectId, setActiveProjectId, createProject } = useProjects();
+  const {
+    projects,
+    activeProject,
+    activeProjectId,
+    setActiveProjectId,
+    deletionNotices,
+    dismissNotice,
+    createProject,
+    deleteProject,
+  } = useProjects();
   const {
     tasks,
     filteredTasks,
@@ -37,8 +48,11 @@ const MainApp: React.FC = () => {
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const canMutate = currentUser?.role !== 'viewer';
+  const canDeleteProject =
+    currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
   const handleSelectTaskFromDashboard = (_task: Task) => {
     setCurrentTab('kanban');
@@ -56,11 +70,14 @@ const MainApp: React.FC = () => {
           setActiveProjectId(id);
         }}
         onOpenNewProject={() => setIsCreateProjectOpen(true)}
+        onDeleteProject={deleteProject}
+        onRequestDelete={(id, name) => setProjectToDelete({ id, name })}
         currentUser={currentUser}
       />
 
       {/* Main Shell */}
       <div className="main-layout">
+        <StickyDeletionBanner notices={deletionNotices} onDismiss={dismissNotice} />
         <Topbar
           onOpenTriage={() => setIsTriageOpen(true)}
           onOpenNewTask={() => setIsCreateTaskOpen(true)}
@@ -76,6 +93,16 @@ const MainApp: React.FC = () => {
                   <h1 className="view-title">{activeProject?.name || 'Project Execution Board'}</h1>
                   <p className="view-subtitle">{activeProject?.objective || 'Active Project Board'}</p>
                 </div>
+                {canDeleteProject && activeProject && (
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => setProjectToDelete({ id: activeProject.id, name: activeProject.name })}
+                    id="header-delete-project-btn"
+                    title={`Delete project "${activeProject.name}"`}
+                  >
+                    🗑️ Delete Project
+                  </button>
+                )}
               </div>
               <KanbanBoard
                 tasks={tasks}
@@ -93,9 +120,21 @@ const MainApp: React.FC = () => {
             <div className="tab-view-list">
               <div className="view-header">
                 <div>
-                  <h1 className="view-title">Grouped Task Directory</h1>
+                  <h1 className="view-title">
+                    {activeProject?.name ? `${activeProject.name} — Tasks` : 'Grouped Task Directory'}
+                  </h1>
                   <p className="view-subtitle">Faceted filter search, status groupings, and inline transitions.</p>
                 </div>
+                {canDeleteProject && activeProject && (
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => setProjectToDelete({ id: activeProject.id, name: activeProject.name })}
+                    id="header-list-delete-project-btn"
+                    title={`Delete project "${activeProject.name}"`}
+                  >
+                    🗑️ Delete Project
+                  </button>
+                )}
               </div>
               <GroupedListView
                 tasks={filteredTasks}
@@ -117,6 +156,9 @@ const MainApp: React.FC = () => {
               tasks={tasks}
               onSelectTask={handleSelectTaskFromDashboard}
               onGoToKanban={() => setCurrentTab('kanban')}
+              onDeleteProject={deleteProject}
+              onRequestDelete={(id, name) => setProjectToDelete({ id, name })}
+              currentUser={currentUser}
             />
           )}
 
@@ -173,6 +215,18 @@ const MainApp: React.FC = () => {
           activeProjectName={activeProject?.name}
         />
       )}
+
+      {/* Project Deletion Confirmation Modal */}
+      <ProjectDeleteModal
+        isOpen={!!projectToDelete}
+        projectId={projectToDelete?.id || ''}
+        projectName={projectToDelete?.name || ''}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={async id => {
+          await deleteProject(id);
+          setProjectToDelete(null);
+        }}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { Project, ProjectFormData } from '../types/project';
+import { Project, ProjectFormData, ProjectDeletionNotice } from '../types/project';
 import { UserProfile } from '../types/auth';
 import { storageEngine } from './storageEngine';
 import { validateProjectForm } from '../domain/validation';
@@ -73,6 +73,18 @@ class ProjectService {
 
     storageEngine.saveProject(updated, user);
     return updated;
+  }
+
+  public async deleteProject(projectId: string, user: UserProfile): Promise<void> {
+    storageEngine.deleteProject(projectId, user);
+  }
+
+  public getDeletionNotices(user: UserProfile): ProjectDeletionNotice[] {
+    return storageEngine.getDeletionNotices(user);
+  }
+
+  public dismissDeletionNotice(noticeId: string, user: UserProfile): void {
+    storageEngine.dismissDeletionNotice(noticeId, user);
   }
 
   public subscribe(user: UserProfile, listener: (projects: Project[]) => void): () => void {

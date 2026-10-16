@@ -22,3 +22,14 @@ export interface ProjectFormData {
   dueDate: string;
   memberIds: string[];
 }
+
+export interface ProjectDeletionNotice {
+  readonly id: string;
+  readonly projectId: string;
+  readonly projectName: string;
+  readonly deletedByUid: string;
+  readonly deletedByName: string;
+  readonly deletedByRole: string;
+  readonly memberIds: readonly string[];
+  readonly deletedAt: string; // ISO date-time string
+}

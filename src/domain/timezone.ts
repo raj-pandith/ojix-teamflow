@@ -74,3 +74,20 @@ export function formatDisplayDate(dateStr: string): string {
     year: 'numeric',
   });
 }
+
+/**
+ * Formats an ISO datetime string into human-readable timestamp e.g. "Oct 16, 2026, 9:15 PM"
+ */
+export function formatDisplayDateTime(isoStr: string): string {
+  if (!isoStr) return '';
+  const date = new Date(isoStr);
+  if (isNaN(date.getTime())) return isoStr;
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}

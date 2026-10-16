@@ -1,4 +1,93 @@
-/* Components Stylesheet for OJIX TeamFlow */
+/* Sticky Project Deletion Notification Banner */
+.sticky-deletion-banners-container {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.sticky-deletion-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.22) 0%, rgba(185, 28, 28, 0.16) 100%);
+  background-color: #1a1616;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.45);
+  border-left: 5px solid var(--status-overdue);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.banner-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.banner-headline {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--status-overdue);
+}
+
+.banner-body {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.banner-highlight {
+  color: #fff;
+  font-weight: 600;
+}
+
+.banner-time {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.btn-dismiss-banner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-left: var(--space-4);
+  flex-shrink: 0;
+}
+
+.btn-dismiss-banner:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fff;
+  transform: scale(1.1);
+}
 
 /* Topbar */
 .topbar {
@@ -218,6 +307,44 @@
   flex-direction: column;
   gap: 2px;
   margin-top: var(--space-2);
+}
+
+.project-nav-item-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.project-nav-item-row .project-nav-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-delete-project {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 13px;
+  opacity: 0.4;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.project-nav-item-row:hover .btn-delete-project,
+.project-nav-item-row.active .btn-delete-project {
+  opacity: 0.9;
+}
+
+.btn-delete-project:hover {
+  opacity: 1 !important;
+  background: rgba(239, 68, 68, 0.25);
 }
 
 .project-nav-item {

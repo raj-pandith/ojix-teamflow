@@ -1,5 +1,5 @@
 import { UserProfile } from '../types/auth';
-import { Project } from '../types/project';
+import { Project, ProjectDeletionNotice } from '../types/project';
 import { Task } from '../types/task';
 import { ActivityLogEntry } from '../types/audit';
 import { INITIAL_USERS, INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_ACTIVITY_LOGS } from './mockData';
@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   LOGS: 'ojix_teamflow_logs',
   SESSION: 'ojix_teamflow_session',
   INITIALIZED: 'ojix_teamflow_initialized',
+  NOTICES: 'ojix_teamflow_deletion_notices',
 };
 
 type Listener = () => void;
@@ -20,6 +21,7 @@ class ReactiveStorageEngine {
   private projects: Project[] = [];
   private tasks: Task[] = [];
   private logs: ActivityLogEntry[] = [];
+  private deletionNotices: ProjectDeletionNotice[] = [];
   private listeners: Set<Listener> = new Set();
   private inFlightMutations: Map<string, Promise<unknown>> = new Map();
 
@@ -33,6 +35,7 @@ class ReactiveStorageEngine {
       this.projects = [...INITIAL_PROJECTS];
       this.tasks = [...INITIAL_TASKS];
       this.logs = [...INITIAL_ACTIVITY_LOGS];
+      this.deletionNotices = [];
       this.persist();
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     } else {
@@ -41,6 +44,7 @@ class ReactiveStorageEngine {
         this.projects = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROJECTS) || '[]') || INITIAL_PROJECTS;
         this.tasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.TASKS) || '[]') || INITIAL_TASKS;
         this.logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGS) || '[]') || INITIAL_ACTIVITY_LOGS;
+        this.deletionNotices = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTICES) || '[]');
       } catch {
         this.initialize(true);
       }
@@ -53,6 +57,7 @@ class ReactiveStorageEngine {
     localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(this.projects));
     localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(this.tasks));
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(this.logs));
+    localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(this.deletionNotices));
   }
 
   public subscribe(listener: Listener): () => void {
@@ -156,6 +161,69 @@ class ReactiveStorageEngine {
       this.projects.push(project);
     }
     this.persist();
+    this.notify();
+  }
+
+  public deleteProject(projectId: string, user: UserProfile): void {
+    if (user.role !== 'workspace_admin' && user.role !== 'project_lead') {
+      throw new Error('Permission denied: Only Workspace Admins and Project Leads can delete projects.');
+    }
+    const index = this.projects.findIndex(p => p.id === projectId);
+    if (index === -1) return;
+
+    const project = this.projects[index];
+
+    // Create deletion notification record for all project members
+    const notice: ProjectDeletionNotice = {
+      id: `notice-del-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
+      projectId: project.id,
+      projectName: project.name,
+      deletedByUid: user.uid,
+      deletedByName: user.displayName,
+      deletedByRole: user.role,
+      memberIds: [...project.memberIds],
+      deletedAt: new Date().toISOString(),
+    };
+    this.deletionNotices.unshift(notice);
+
+    // Remove project
+    this.projects.splice(index, 1);
+    // Cascade delete associated tasks and activity logs for clean state
+    this.tasks = this.tasks.filter(t => t.projectId !== projectId);
+    this.logs = this.logs.filter(l => l.projectId !== projectId);
+
+    this.persist();
+    this.notify();
+  }
+
+  // ---- Project Deletion Notices for Members ----
+  public getDeletionNotices(user: UserProfile): ProjectDeletionNotice[] {
+    const dismissedKey = `ojix_dismissed_notices_${user.uid}`;
+    let dismissedIds: string[] = [];
+    try {
+      dismissedIds = JSON.parse(localStorage.getItem(dismissedKey) || '[]');
+    } catch {
+      dismissedIds = [];
+    }
+    const dismissedSet = new Set(dismissedIds);
+
+    return this.deletionNotices.filter(
+      n => n.memberIds.includes(user.uid) && !dismissedSet.has(n.id)
+    );
+  }
+
+  public dismissDeletionNotice(noticeId: string, user: UserProfile): void {
+    const dismissedKey = `ojix_dismissed_notices_${user.uid}`;
+    let dismissedIds: string[] = [];
+    try {
+      dismissedIds = JSON.parse(localStorage.getItem(dismissedKey) || '[]');
+    } catch {
+      dismissedIds = [];
+    }
+    if (!dismissedIds.includes(noticeId)) {
+      dismissedIds.push(noticeId);
+      localStorage.setItem(dismissedKey, JSON.stringify(dismissedIds));
+    }
     this.notify();
   }
 

@@ -55,7 +55,7 @@ service cloud.firestore {
       allow read: if isProjectMember(projectId);
       allow create: if isWorkspaceAdmin() || isProjectLead();
       allow update: if isWorkspaceAdmin() || isProjectOwner(projectId);
-      allow delete: if isWorkspaceAdmin();
+      allow delete: if isWorkspaceAdmin() || isProjectLead();
     }
 
     // Collection: Tasks
