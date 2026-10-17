@@ -11,21 +11,16 @@ interface UserInviteModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile;
-  activeProjectId?: string;
-  activeProjectName?: string;
 }
 
 export const UserInviteModal: React.FC<UserInviteModalProps> = ({
   isOpen,
   onClose,
   currentUser,
-  activeProjectId,
-  activeProjectName,
 }) => {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('member');
-  const [addToActiveProject, setAddToActiveProject] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const { showToast } = useToast();
@@ -57,13 +52,8 @@ export const UserInviteModal: React.FC<UserInviteModalProps> = ({
         updatedAt: new Date().toISOString(),
       };
 
-      const targetProjectEnrollment = (addToActiveProject && activeProjectId) ? activeProjectId : undefined;
-      storageEngine.addUser(newUser, currentUser, targetProjectEnrollment);
-      
-      const enrolledMsg = targetProjectEnrollment && activeProjectName
-        ? ` and added to "${activeProjectName}"`
-        : '';
-      showToast('success', 'User Added to Workspace', `${trimmedName} (${role.toUpperCase()}) is now active${enrolledMsg}.`);
+      storageEngine.addUser(newUser, currentUser);
+      showToast('success', 'User Added to Workspace', `${trimmedName} (${role.toUpperCase()}) is now active in workspace.`);
       setDisplayName('');
       setEmail('');
       setRole('member');
@@ -112,20 +102,6 @@ export const UserInviteModal: React.FC<UserInviteModalProps> = ({
           ]}
           id="invite-user-role"
         />
-
-        {activeProjectName && (
-          <div className="form-group" style={{ marginTop: 'var(--space-2)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-              <input
-                type="checkbox"
-                checked={addToActiveProject}
-                onChange={e => setAddToActiveProject(e.target.checked)}
-                id="invite-user-add-to-project-checkbox"
-              />
-              <span>Add to active project: <strong style={{ color: 'var(--color-text-primary)' }}>{activeProjectName}</strong></span>
-            </label>
-          </div>
-        )}
 
         <div className="modal-actions">
           <Button variant="secondary" type="button" onClick={onClose}>

@@ -221,8 +221,6 @@ const MainApp: React.FC = () => {
           isOpen={isInviteUserOpen}
           onClose={() => setIsInviteUserOpen(false)}
           currentUser={currentUser}
-          activeProjectId={activeProjectId}
-          activeProjectName={activeProject?.name}
         />
       )}
 
