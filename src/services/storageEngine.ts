@@ -347,6 +347,10 @@ class ReactiveStorageEngine {
     const targetUser = this.users.find(u => u.uid === uid);
     const targetName = targetUser?.displayName || uid;
 
+    if (caller.role === 'project_lead' && targetUser?.role === 'workspace_admin') {
+      throw new Error('Permission denied: Project Leads cannot remove a Workspace Admin from the project team.');
+    }
+
     this.projects[pIndex] = {
       ...project,
       memberIds: project.memberIds.filter(id => id !== uid),

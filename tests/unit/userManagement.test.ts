@@ -255,6 +255,12 @@ describe('User Management, Team Membership & Assignment Validation', () => {
         storageEngine.removeTeamMember('proj-infra-01', leadUser.uid, leadUser);
       }).toThrow(/Project owner cannot remove themselves/i);
     });
+
+    it('Project Lead cannot remove a Workspace Admin from their project team', () => {
+      expect(() => {
+        storageEngine.removeTeamMember('proj-infra-01', adminUser.uid, leadUser);
+      }).toThrow(/Project Leads cannot remove a Workspace Admin/i);
+    });
   });
 
   // ==========================================

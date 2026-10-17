@@ -80,6 +80,11 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
       showToast('error', 'Operation Denied', 'Project owner cannot be removed from their own team.');
       return;
     }
+    const targetMember = users.find(u => u.uid === userId);
+    if (currentUser.role === 'project_lead' && targetMember?.role === 'workspace_admin') {
+      showToast('error', 'Operation Denied', 'Project Leads cannot remove Workspace Admins from the project team.');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to remove "${userName}" from project team "${project.name}"? Historical tasks and contributions will be preserved.`)) {
       return;
     }
@@ -144,6 +149,7 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
               <tbody>
                 {currentMembers.map(member => {
                   const isOwner = member.uid === project.ownerId;
+                  const isProtectedAdmin = currentUser.role === 'project_lead' && member.role === 'workspace_admin';
                   const isBlocked = member.status === 'blocked';
                   const isTerminated = member.status === 'terminated';
                   return (
@@ -175,10 +181,14 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
                           <Button
                             variant="danger"
                             size="sm"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isProtectedAdmin}
                             onClick={() => handleRemoveMember(member.uid, member.displayName)}
                             id={`remove-member-btn-${member.uid}`}
-                            title="Remove from project team (preserves workspace account)"
+                            title={
+                              isProtectedAdmin
+                                ? 'Project Leads cannot remove Workspace Admins from the project team'
+                                : 'Remove from project team (preserves workspace account)'
+                            }
                           >
                             Remove
                           </Button>
