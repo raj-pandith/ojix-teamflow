@@ -12,6 +12,7 @@ interface WorkTriageDrawerProps {
   tasks: Task[];
   currentUser: UserProfile;
   onCreateTask: (projectId: string, data: { title: string; description: string; priority: TaskPriority; status: 'todo'; dueDate: string; assigneeId: string | null }) => Promise<unknown>;
+  onSelectTask?: (task: Task) => void;
 }
 
 export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
@@ -21,6 +22,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
   tasks,
   currentUser,
   onCreateTask,
+  onSelectTask,
 }) => {
   const [activeTab, setActiveTab] = useState<'overdue' | 'blockers' | 'extraction'>('overdue');
   const [meetingNotes, setMeetingNotes] = useState('');
@@ -149,7 +151,13 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
               </p>
               <div className="triage-items-list">
                 {blocked.map(t => (
-                  <div key={t.id} className="triage-card triage-card-blocked">
+                  <div
+                    key={t.id}
+                    className="triage-card triage-card-blocked"
+                    onClick={() => onSelectTask?.(t)}
+                    style={{ cursor: onSelectTask ? 'pointer' : 'default' }}
+                    title={onSelectTask ? 'Click to navigate to Kanban and emphasize task' : undefined}
+                  >
                     <div className="triage-card-header">
                       <span className="badge badge-status-blocked">BLOCKED</span>
                       <span className="badge badge-urgent">{t.priority.toUpperCase()}</span>

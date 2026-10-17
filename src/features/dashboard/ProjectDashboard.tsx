@@ -154,10 +154,12 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                   key={task.id}
                   className="action-item-card action-item-blocked"
                   onClick={() => onSelectTask(task)}
+                  title="Click to navigate to Kanban board and highlight this task"
                 >
                   <div className="action-item-header">
                     <Badge type="priority" value={task.priority} />
                     <span className="action-assignee">👤 {assignee?.displayName || 'Unassigned'}</span>
+                    <span className="action-goto-link" style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--accent-primary)', fontWeight: 600 }}>View on Board ➔</span>
                   </div>
                   <h4 className="action-item-title">{task.title}</h4>
                   <div className="blocker-reason-highlight">

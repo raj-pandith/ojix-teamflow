@@ -16,6 +16,8 @@ interface KanbanBoardProps {
   onTransitionStatus: (taskId: string, status: TaskStatus, blockerReason?: string) => Promise<unknown>;
   onUpdateTask?: (taskId: string, updates: { assigneeId: string | null }) => Promise<unknown>;
   onDeleteTask: (taskId: string) => Promise<unknown>;
+  highlightedTaskId?: string | null;
+  onClearHighlight?: () => void;
 }
 
 const COLUMNS: Array<{ status: TaskStatus; label: string; icon: string }> = [
@@ -35,11 +37,40 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onTransitionStatus,
   onUpdateTask,
   onDeleteTask,
+  highlightedTaskId,
+  onClearHighlight,
 }) => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [pendingBlockerTask, setPendingBlockerTask] = useState<Task | null>(null);
   const [activeDragOverCol, setActiveDragOverCol] = useState<TaskStatus | null>(null);
+
+  // Auto-scroll and emphasize highlighted task (DEC-013)
+  React.useEffect(() => {
+    if (!highlightedTaskId) return;
+
+    const scrollTimer = setTimeout(() => {
+      const cardElement = document.getElementById(`task-card-${highlightedTaskId}`);
+      if (cardElement) {
+        cardElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'center',
+        });
+      }
+    }, 120);
+
+    const clearTimer = setTimeout(() => {
+      if (onClearHighlight) {
+        onClearHighlight();
+      }
+    }, 3400);
+
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [highlightedTaskId, onClearHighlight]);
 
   const users = storageEngine.getUsers();
 
@@ -145,6 +176,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       canMutate={canMutate}
                       canMove={canMove}
                       lockReason={moveAuth.reason}
+                      isHighlighted={task.id === highlightedTaskId}
                     />
                   );
                 })}

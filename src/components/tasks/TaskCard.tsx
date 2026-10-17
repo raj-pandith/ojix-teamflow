@@ -12,6 +12,7 @@ interface TaskCardProps {
   canMutate: boolean;
   canMove: boolean;
   lockReason?: string;
+  isHighlighted?: boolean;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -22,6 +23,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   canMutate,
   canMove,
   lockReason,
+  isHighlighted = false,
 }) => {
   const isOverdue = isTaskOverdue(task.dueDate, task.status);
   const allowedMoves = ALLOWED_TRANSITIONS[task.status] || [];
@@ -37,7 +39,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   return (
     <div
-      className={`task-card ${isOverdue ? 'task-card-overdue' : ''} ${task.status === 'blocked' ? 'task-card-blocked' : ''} ${!canMove ? 'task-card-locked' : ''}`}
+      id={`task-card-${task.id}`}
+      data-task-id={task.id}
+      className={`task-card ${isOverdue ? 'task-card-overdue' : ''} ${task.status === 'blocked' ? 'task-card-blocked' : ''} ${!canMove ? 'task-card-locked' : ''} ${isHighlighted ? 'task-card-highlighted' : ''}`}
       draggable={canMutate && canMove}
       onDragStart={handleDragStart}
       onClick={onClick}

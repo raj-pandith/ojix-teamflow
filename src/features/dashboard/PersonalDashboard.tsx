@@ -82,6 +82,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                 key={task.id}
                 className="action-item-card action-item-overdue"
                 onClick={() => onSelectTask(task)}
+                title="Click to view and emphasize on Kanban Board"
               >
                 <div className="action-item-header">
                   <Badge type="priority" value={task.priority} />
@@ -110,6 +111,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                 key={task.id}
                 className="action-item-card"
                 onClick={() => onSelectTask(task)}
+                title="Click to view and emphasize on Kanban Board"
               >
                 <div className="action-item-header">
                   <Badge type="priority" value={task.priority} />

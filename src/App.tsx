@@ -49,13 +49,18 @@ const MainApp: React.FC = () => {
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
 
   const canMutate = currentUser?.role !== 'viewer';
   const canDeleteProject =
     currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
-  const handleSelectTaskFromDashboard = (_task: Task) => {
+  const handleSelectTaskFromDashboard = (task: Task) => {
+    if (task.projectId && task.projectId !== activeProjectId) {
+      setActiveProjectId(task.projectId);
+    }
     setCurrentTab('kanban');
+    setHighlightedTaskId(task.id);
   };
 
   useEffect(() => {
@@ -115,6 +120,8 @@ const MainApp: React.FC = () => {
                 onTransitionStatus={transitionStatus}
                 onUpdateTask={updateTask}
                 onDeleteTask={deleteTask}
+                highlightedTaskId={highlightedTaskId}
+                onClearHighlight={() => setHighlightedTaskId(null)}
               />
             </div>
           )}
@@ -195,6 +202,10 @@ const MainApp: React.FC = () => {
         tasks={tasks}
         currentUser={currentUser!}
         onCreateTask={(projId, data) => createTask(projId, data)}
+        onSelectTask={task => {
+          setIsTriageOpen(false);
+          handleSelectTaskFromDashboard(task);
+        }}
       />
 
       {/* Task Creation Modal */}
