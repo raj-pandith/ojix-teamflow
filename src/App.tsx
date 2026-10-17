@@ -96,12 +96,6 @@ const MainApp: React.FC = () => {
         <main className="content-viewport animate-fade-in">
           {currentTab === 'kanban' && (
             <div className="tab-view-kanban">
-              <div className="view-header">
-                <div>
-                  <h1 className="view-title">{activeProject?.name || 'Project Operations'}</h1>
-                  <p className="view-subtitle">{activeProject?.objective || 'Real-time pipeline and status transitions across this project.'}</p>
-                </div>
-              </div>
               <KanbanBoard
                 tasks={tasks}
                 canMutate={canMutate}
@@ -112,6 +106,8 @@ const MainApp: React.FC = () => {
                 onDeleteTask={deleteTask}
                 highlightedTaskId={highlightedTaskId}
                 onClearHighlight={() => setHighlightedTaskId(null)}
+                onOpenNewTask={() => setIsCreateTaskOpen(true)}
+                onSwitchToListView={() => setCurrentTab('list')}
               />
             </div>
           )}

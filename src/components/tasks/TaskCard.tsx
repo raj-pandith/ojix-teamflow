@@ -34,6 +34,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  const getInitials = (name?: string) => {
+    if (!name) return '?';
+    return name
+      .split(' ')
+      .map(part => part.charAt(0))
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+  };
+
   return (
     <div
       id={`task-card-${task.id}`}
@@ -51,26 +61,27 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         }
       }}
     >
-      <div className="task-card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Badge type="priority" value={task.priority} />
-          {!canMove && (
-            <span
-              className="task-lock-indicator"
-              title={lockReason || 'Locked: Only the assigned member or Project Lead can move this task'}
-              style={{ fontSize: '11px', opacity: 0.65 }}
-            >
-              🔒
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {isOverdue && <Badge type="overdue" value="OVERDUE" />}
-        </div>
+      {/* 1. Task Title */}
+      <h4 className="task-card-title">{task.title}</h4>
+
+      {/* 2. Priority Badge, 3. Category/Milestone, 7. Overdue/Restricted Indicator */}
+      <div className="task-card-badges-row">
+        <Badge type="priority" value={task.priority} />
+        {task.milestoneId && (
+          <span className="task-category-pill">{task.milestoneId}</span>
+        )}
+        {isOverdue && <Badge type="overdue" value="OVERDUE" />}
+        {!canMove && (
+          <span
+            className="task-lock-indicator"
+            title={lockReason || 'Locked: Only the assigned member or Project Lead can move this task'}
+          >
+            🔒
+          </span>
+        )}
       </div>
 
-      <h3 className="task-card-title">{task.title}</h3>
-
+      {/* 6. Optional Blocker Information */}
       {task.status === 'blocked' && task.blockerReason && (
         <div className="task-blocker-banner">
           <span className="blocker-icon">⚠️</span>
@@ -78,17 +89,21 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         </div>
       )}
 
+      {/* 4. Due Date & 5. Assignee Avatar and Name */}
       <div className="task-card-footer">
-        <div className="task-meta-left">
-          <span className="task-due-date" title={`Due Date: ${task.dueDate}`}>
-            Due {formatDisplayDate(task.dueDate)}
-          </span>
-          {assigneeName && (
-            <span className="task-assignee" title={`Assigned to ${assigneeName}`}>
-              {assigneeName}
-            </span>
-          )}
+        <div className="task-due-date" title={`Due Date: ${task.dueDate}`}>
+          <span className="due-date-icon">📅</span>
+          <span>{formatDisplayDate(task.dueDate)}</span>
         </div>
+
+        {assigneeName ? (
+          <div className="task-assignee-chip" title={`Assigned to ${assigneeName}`}>
+            <span className="assignee-avatar-sm">{getInitials(assigneeName)}</span>
+            <span className="assignee-name-sm">{assigneeName}</span>
+          </div>
+        ) : (
+          <span className="task-unassigned-chip">Unassigned</span>
+        )}
       </div>
     </div>
   );
