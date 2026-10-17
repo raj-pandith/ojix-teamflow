@@ -32,19 +32,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="brand-logo">OJIX</div>
         <div className="brand-text">
           <span className="brand-name">TeamFlow</span>
-          <span className="brand-tagline">Execution OS</span>
+          <span className="brand-tagline">Project OS</span>
         </div>
       </div>
 
       <nav className="sidebar-nav">
-        <div className="nav-section-title">Navigation</div>
+        <div className="nav-section-title">Views</div>
         <button
           className={`nav-item ${currentTab === 'dashboard' ? 'active' : ''}`}
           onClick={() => onSelectTab('dashboard')}
           id="nav-project-dashboard"
         >
           <span className="nav-icon">📊</span>
-          <span className="nav-label">Project Dashboard</span>
+          <span className="nav-label">Dashboard</span>
         </button>
 
         <button
@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id="nav-my-tasks"
         >
           <span className="nav-icon">👤</span>
-          <span className="nav-label">My Work & Tasks</span>
+          <span className="nav-label">My Queue</span>
         </button>
 
         <button
@@ -62,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id="nav-kanban-board"
         >
           <span className="nav-icon">📋</span>
-          <span className="nav-label">Kanban Board</span>
+          <span className="nav-label">Board</span>
         </button>
 
         <button
@@ -71,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id="nav-list-view"
         >
           <span className="nav-icon">📑</span>
-          <span className="nav-label">Grouped List View</span>
+          <span className="nav-label">Task List</span>
         </button>
 
         {currentUser?.role === 'workspace_admin' && (
@@ -81,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             id="nav-manage-users"
           >
             <span className="nav-icon">👥</span>
-            <span className="nav-label">Manage Users</span>
+            <span className="nav-label">Members</span>
           </button>
         )}
 
@@ -92,19 +92,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             id="nav-security-assurance"
           >
             <span className="nav-icon">🛡️</span>
-            <span className="nav-label">Assurance & RBAC</span>
+            <span className="nav-label">Security & Access</span>
           </button>
         )}
       </nav>
 
       <div className="sidebar-projects-section">
         <div className="projects-header">
-          <span className="nav-section-title">Permitted Projects ({projects.length})</span>
+          <span className="nav-section-title">Projects ({projects.length})</span>
           {canCreateProject && (
             <button
               className="btn-add-project"
               onClick={onOpenNewProject}
-              title="Create new project"
+              title="Add new project"
               id="create-project-sidebar-btn"
             >
               +
@@ -134,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
           {projects.length === 0 && (
-            <div className="empty-projects-note">No permitted projects found.</div>
+            <div className="empty-projects-note">No active projects.</div>
           )}
         </div>
       </div>

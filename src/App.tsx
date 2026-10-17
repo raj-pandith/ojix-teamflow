@@ -98,8 +98,8 @@ const MainApp: React.FC = () => {
             <div className="tab-view-kanban">
               <div className="view-header">
                 <div>
-                  <h1 className="view-title">{activeProject?.name || 'Project Execution Board'}</h1>
-                  <p className="view-subtitle">{activeProject?.objective || 'Active Project Board'}</p>
+                  <h1 className="view-title">{activeProject?.name || 'Project Operations'}</h1>
+                  <p className="view-subtitle">{activeProject?.objective || 'Real-time pipeline and status transitions across this project.'}</p>
                 </div>
               </div>
               <KanbanBoard
@@ -121,9 +121,9 @@ const MainApp: React.FC = () => {
               <div className="view-header">
                 <div>
                   <h1 className="view-title">
-                    {activeProject?.name ? `${activeProject.name} — Tasks` : 'Grouped Task Directory'}
+                    {activeProject?.name ? `${activeProject.name} — All Tasks` : 'Task Directory'}
                   </h1>
-                  <p className="view-subtitle">Faceted filter search, status groupings, and inline transitions.</p>
+                  <p className="view-subtitle">Filter by assignee, milestone, or urgency. Update status inline.</p>
                 </div>
               </div>
               <GroupedListView
@@ -166,7 +166,7 @@ const MainApp: React.FC = () => {
               <SecurityAssurancePanel />
             ) : (
               <div className="empty-panel-state">
-                <p>Access Restricted: Only Workspace Admins can access the Assurance & RBAC panel.</p>
+                <p>Access restricted: Workspace Admins only.</p>
               </div>
             )
           )}
@@ -176,7 +176,7 @@ const MainApp: React.FC = () => {
               <UserManagementView currentUser={currentUser} />
             ) : (
               <div className="empty-panel-state">
-                <p>Access Restricted: Only Workspace Admins can access User Management.</p>
+                <p>Access restricted: Workspace Admins only.</p>
               </div>
             )
           )}

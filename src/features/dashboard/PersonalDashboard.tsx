@@ -27,46 +27,46 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
     <div className="dashboard-container">
       <div className="dashboard-header">
         <div className="dashboard-header-text">
-          <h2 className="dashboard-title">Personal Execution Hub</h2>
+          <h2 className="dashboard-title">My Queue</h2>
           <p className="dashboard-subtitle">
-            Welcome back, {currentUser.displayName}. Here is your prioritized workstream across permitted projects.
+            {currentUser.displayName} — Current task queue across active projects.
           </p>
         </div>
         <button className="btn btn-secondary btn-sm" onClick={onGoToBoard}>
-          View Kanban Board ➔
+          Open Board
         </button>
       </div>
 
-      {/* Metric Cards Row */}
+      {/* Metric Cards Row with Asymmetric Hierarchy */}
       <div className="metrics-grid">
         <div className="metric-card metric-card-primary">
-          <div className="metric-label">Assigned Work</div>
+          <div className="metric-label">Assigned Queue</div>
           <div className="metric-value">{myTasks.length}</div>
-          <div className="metric-meta">{openTasks.length} pending action</div>
+          <div className="metric-meta">{openTasks.length} open</div>
         </div>
 
         <div className={`metric-card ${overdueTasks.length > 0 ? 'metric-card-danger' : ''}`}>
-          <div className="metric-label">Overdue Tasks</div>
+          <div className="metric-label">Overdue</div>
           <div className="metric-value">{overdueTasks.length}</div>
-          <div className="metric-meta">Past local midnight deadline</div>
+          <div className="metric-meta">Requires attention</div>
         </div>
 
         <div className="metric-card metric-card-info">
           <div className="metric-label">In Progress</div>
           <div className="metric-value">{inProgressTasks.length}</div>
-          <div className="metric-meta">Active execution</div>
+          <div className="metric-meta">In flight</div>
         </div>
 
         <div className={`metric-card ${blockedTasks.length > 0 ? 'metric-card-warning' : ''}`}>
-          <div className="metric-label">Blocked Items</div>
+          <div className="metric-label">Blocked</div>
           <div className="metric-value">{blockedTasks.length}</div>
-          <div className="metric-meta">Require escalation</div>
+          <div className="metric-meta">Needs unblocking</div>
         </div>
 
         <div className="metric-card metric-card-success">
           <div className="metric-label">Completed</div>
           <div className="metric-value">{completedTasks.length}</div>
-          <div className="metric-meta">Closed deliverables</div>
+          <div className="metric-meta">Finished</div>
         </div>
       </div>
 
@@ -74,7 +74,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
       <div className="dashboard-sections-grid">
         <div className="dashboard-panel">
           <div className="panel-header">
-            <h3 className="panel-title">🔥 Urgent & At-Risk Tasks ({overdueTasks.length})</h3>
+            <h3 className="panel-title">Urgent & Overdue ({overdueTasks.length})</h3>
           </div>
           <div className="panel-body">
             {overdueTasks.map(task => (
@@ -87,15 +87,15 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                 <div className="action-item-header">
                   <Badge type="priority" value={task.priority} />
                   <Badge type="overdue" value="OVERDUE" />
-                  <span className="action-due-date">📅 Due: {formatDisplayDate(task.dueDate)}</span>
+                  <span className="action-due-date">Due: {formatDisplayDate(task.dueDate)}</span>
                 </div>
                 <h4 className="action-item-title">{task.title}</h4>
               </div>
             ))}
             {overdueTasks.length === 0 && (
               <div className="empty-panel-state">
-                <span className="empty-panel-icon">🎉</span>
-                <p>No overdue tasks! You are completely on schedule.</p>
+                <span className="empty-panel-icon">🟢</span>
+                <p>All clear. No overdue items on your plate.</p>
               </div>
             )}
           </div>
@@ -103,7 +103,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
 
         <div className="dashboard-panel">
           <div className="panel-header">
-            <h3 className="panel-title">⚡ In Progress Workstream ({inProgressTasks.length})</h3>
+            <h3 className="panel-title">In Progress ({inProgressTasks.length})</h3>
           </div>
           <div className="panel-body">
             {inProgressTasks.map(task => (
@@ -115,7 +115,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
               >
                 <div className="action-item-header">
                   <Badge type="priority" value={task.priority} />
-                  <span className="action-due-date">📅 Due: {formatDisplayDate(task.dueDate)}</span>
+                  <span className="action-due-date">Due: {formatDisplayDate(task.dueDate)}</span>
                 </div>
                 <h4 className="action-item-title">{task.title}</h4>
                 <p className="action-item-desc">{task.description}</p>
@@ -124,7 +124,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
             {inProgressTasks.length === 0 && (
               <div className="empty-panel-state">
                 <span className="empty-panel-icon">☕</span>
-                <p>No tasks currently in progress. Pick an item from To Do to get started.</p>
+                <p>Nothing active right now. Pick an item from To Do to begin.</p>
               </div>
             )}
           </div>

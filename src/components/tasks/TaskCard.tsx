@@ -84,11 +84,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       <div className="task-card-footer">
         <div className="task-meta-left">
           <span className="task-due-date" title={`Due Date: ${task.dueDate}`}>
-            📅 {formatDisplayDate(task.dueDate)}
+            Due {formatDisplayDate(task.dueDate)}
           </span>
           {assigneeName && (
             <span className="task-assignee" title={`Assigned to ${assigneeName}`}>
-              👤 {assigneeName}
+              {assigneeName}
             </span>
           )}
         </div>

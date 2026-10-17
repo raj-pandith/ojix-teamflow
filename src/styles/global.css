@@ -24,11 +24,13 @@
   outline-offset: 2px;
 }
 
-/* Base Layout Classes */
+/* Base Layout Classes with Subtle Architectural Textural Contrast */
 .app-container {
   display: flex;
   min-height: 100vh;
   background-color: var(--bg-canvas);
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.035) 1px, transparent 0);
+  background-size: 24px 24px;
 }
 
 .main-layout {
@@ -42,10 +44,35 @@
 
 .content-viewport {
   flex: 1;
-  padding: var(--space-6);
-  max-width: 1600px;
+  padding: var(--space-6) var(--space-8);
+  max-width: 1680px;
   width: 100%;
   margin: 0 auto;
+}
+
+/* Editorial Typography & Dramatic Hierarchy Contrast */
+.view-header {
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.view-title {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.view-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 72ch;
+  margin: 0;
 }
 
 /* Badges */

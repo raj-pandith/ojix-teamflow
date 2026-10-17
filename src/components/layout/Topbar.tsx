@@ -35,21 +35,21 @@ export const Topbar: React.FC<TopbarProps> = ({
             size="sm"
             onClick={onOpenAddUser}
             id="add-user-topbar-btn"
-            title="Add a new member to the workspace"
+            title="Invite a new member to the workspace"
           >
-            👥 + Add User
+            + Invite Member
           </Button>
         )}
 
-        {/* Triage Assistant Quick-Trigger (DEC-012) */}
+        {/* Triage Assistant Quick-Trigger */}
         <Button
           variant="secondary"
           size="sm"
           onClick={onOpenTriage}
           className="triage-trigger-btn"
-          title="Open Work Triage Accelerator drawer"
+          title="Open Work Triage to resolve blockers and parse notes"
         >
-          ⚡ Work Triage AI
+          ⚡ Work Triage
         </Button>
 
         {/* Create Task Button (Disabled for Viewers) */}
@@ -60,14 +60,14 @@ export const Topbar: React.FC<TopbarProps> = ({
             onClick={onOpenNewTask}
             id="create-task-topbar-btn"
           >
-            + Create Task
+            + New Task
           </Button>
         )}
 
-        {/* Demo Persona Quick-Switcher (DEC-009) */}
+        {/* Demo Persona Quick-Switcher */}
         <div className="persona-switcher-container">
           <label htmlFor="persona-select" className="persona-label">
-            Role Persona:
+            Persona:
           </label>
           <select
             id="persona-select"
@@ -88,13 +88,13 @@ export const Topbar: React.FC<TopbarProps> = ({
           <Badge type="role" value={currentUser.role} className="role-pill" />
         )}
 
-        {/* Reset Demo Data (DEC-011) */}
+        {/* Reset Demo Data */}
         <button
           className="btn-reset-demo"
           onClick={resetDemoData}
-          title="Reset back to clean synthetic seed dataset"
+          title="Reset to clean baseline dataset"
         >
-          ↻ Reset Seed
+          ↻ Reset Data
         </button>
       </div>
     </header>

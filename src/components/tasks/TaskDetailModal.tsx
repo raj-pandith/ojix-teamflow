@@ -109,11 +109,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
           <div className="meta-item">
             <span className="meta-label">Due Date</span>
-            <span className="meta-value">📅 {formatDisplayDate(activeTask.dueDate)}</span>
+            <span className="meta-value">{formatDisplayDate(activeTask.dueDate)}</span>
           </div>
           <div className="meta-item">
             <span className="meta-label">Assignee</span>
-            <span className="meta-value">👤 {assignee?.displayName || 'Unassigned'}</span>
+            <span className="meta-value">{assignee?.displayName || 'Unassigned'}</span>
           </div>
         </div>
 
@@ -137,7 +137,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
         {/* Activity & Comments Timeline */}
         <div className="task-detail-section">
-          <h4 className="section-heading">Activity & Discussion Notes ({logs.length})</h4>
+          <h4 className="section-heading">Activity & Comments ({logs.length})</h4>
 
           {/* Comment Input */}
           {canMutate && (
@@ -145,7 +145,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <textarea
                 className="form-textarea"
                 rows={2}
-                placeholder="Post a progress note or team comment..."
+                placeholder="Write an update or comment..."
                 value={newComment}
                 onChange={e => setNewComment(e.target.value)}
                 id="task-comment-input"
@@ -159,7 +159,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   disabled={!newComment.trim()}
                   id="submit-comment-btn"
                 >
-                  Post Note
+                  Post Comment
                 </Button>
               </div>
             </form>

@@ -160,9 +160,9 @@ export const SecurityAssurancePanel: React.FC = () => {
     <div className="security-panel-container">
       <div className="security-panel-header">
         <div>
-          <h2 className="security-title">Workspace Production Assurance Engine</h2>
+          <h2 className="security-title">Security & Policy Verification</h2>
           <p className="security-subtitle">
-            Autonomous verification of tenant isolation boundaries, state machine transition guards, and anti-tamper RBAC rules.
+            Direct tests verifying project isolation, state transition guards, and role permissions.
           </p>
         </div>
         <Button
@@ -171,20 +171,20 @@ export const SecurityAssurancePanel: React.FC = () => {
           isLoading={isRunning}
           id="run-security-checks-btn"
         >
-          🛡️ Run Live Assurance Checks
+          Run Policy Checks
         </Button>
       </div>
 
       <div className="assurance-score-card">
         <div className="score-main">
           <span className="score-num">{passedCount} / {results.length}</span>
-          <span className="score-label">Active Security & Boundary Checks Passed</span>
+          <span className="score-label">Security & boundary checks passing</span>
         </div>
         <div className="score-status-tag">
           {passedCount === results.length ? (
-            <span className="badge badge-status-done">100% SECURE & ISOLATED</span>
+            <span className="badge badge-status-done">ALL CHECKS PASSING</span>
           ) : (
-            <span className="badge badge-urgent">CHECKS PENDING</span>
+            <span className="badge badge-urgent">PENDING VERIFICATION</span>
           )}
         </div>
       </div>

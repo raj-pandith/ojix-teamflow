@@ -22,7 +22,7 @@ export const StickyDeletionBanner: React.FC<StickyDeletionBannerProps> = ({
               ⚠️
             </span>
             <div className="banner-content">
-              <span className="banner-headline">Project Deleted Notification</span>
+              <span className="banner-headline">Project Deleted</span>
               <p className="banner-body">
                 Project <strong className="banner-highlight">"{notice.projectName}"</strong> was deleted by{' '}
                 <strong className="banner-highlight">

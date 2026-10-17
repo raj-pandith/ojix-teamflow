@@ -195,13 +195,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       {/* View Header */}
       <div className="view-header" style={{ marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <div>
-          <h1 className="view-title">👥 Workspace User Management</h1>
+          <h1 className="view-title">Member Directory</h1>
           <p className="view-subtitle">
-            Administer workspace user identities, roles, contact details, account access, and termination.
+            Manage member profiles, roles, and workspace access permissions.
           </p>
         </div>
         <Button variant="primary" onClick={handleOpenCreate} id="admin-create-user-btn">
-          ➕ Create Workspace User
+          + Add Member
         </Button>
       </div>
 

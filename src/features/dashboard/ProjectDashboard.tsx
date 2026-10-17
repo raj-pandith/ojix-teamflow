@@ -31,7 +31,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   if (!project) {
     return (
       <div className="empty-panel-state">
-        <p>Please select a project to view its executive dashboard.</p>
+        <p>Select a project from the sidebar to inspect progress and workload.</p>
       </div>
     );
   }
@@ -70,7 +70,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button className="btn btn-primary btn-sm" onClick={onGoToKanban}>
-              Open Project Board ➔
+              Open Board
             </button>
             {canDelete && (
               <button
@@ -85,7 +85,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                 id="delete-project-dashboard-btn"
                 title="Delete this project"
               >
-                🗑️ Delete Project
+                Delete Project
               </button>
             )}
           </div>
@@ -94,7 +94,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
         {/* Progress Bar */}
         <div className="progress-section">
           <div className="progress-labels">
-            <span>Overall Milestone Completion</span>
+            <span>Milestone Progress</span>
             <span className="progress-pct">{completionPercentage}%</span>
           </div>
           <div className="progress-bar-track">
@@ -110,36 +110,36 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
         </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* Metrics Row with Asymmetrical Hierarchy */}
       <div className="metrics-grid">
-        <div className="metric-card">
+        <div className="metric-card metric-card-primary">
           <div className="metric-label">Total Scope</div>
           <div className="metric-value">{totalTasks}</div>
-          <div className="metric-meta">Active tasks</div>
+          <div className="metric-meta">Active tasks in pipeline</div>
         </div>
 
         <div className={`metric-card ${overdueTasks.length > 0 ? 'metric-card-danger' : ''}`}>
-          <div className="metric-label">Overdue Tasks</div>
+          <div className="metric-label">Overdue</div>
           <div className="metric-value">{overdueTasks.length}</div>
-          <div className="metric-meta">Schedule risk</div>
+          <div className="metric-meta">Past due date</div>
         </div>
 
         <div className="metric-card metric-card-info">
           <div className="metric-label">In Progress</div>
           <div className="metric-value">{inProgressTasks.length}</div>
-          <div className="metric-meta">Work underway</div>
+          <div className="metric-meta">In flight</div>
         </div>
 
         <div className={`metric-card ${blockedTasks.length > 0 ? 'metric-card-warning' : ''}`}>
-          <div className="metric-label">Blocked Work</div>
+          <div className="metric-label">Blocked</div>
           <div className="metric-value">{blockedTasks.length}</div>
-          <div className="metric-meta">Bottlenecks identified</div>
+          <div className="metric-meta">Needs resolution</div>
         </div>
 
         <div className="metric-card metric-card-success">
           <div className="metric-label">Completed</div>
           <div className="metric-value">{doneTasks.length}</div>
-          <div className="metric-meta">Deliverables verified</div>
+          <div className="metric-meta">Finished deliverables</div>
         </div>
       </div>
 
@@ -147,7 +147,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
       <div className="dashboard-sections-grid">
         <div className="dashboard-panel">
           <div className="panel-header">
-            <h3 className="panel-title">⚠️ Active Blockers & Dependencies ({blockedTasks.length})</h3>
+            <h3 className="panel-title">Active Blockers ({blockedTasks.length})</h3>
           </div>
           <div className="panel-body">
             {blockedTasks.map(task => {
@@ -162,7 +162,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                   <div className="action-item-header">
                     <Badge type="priority" value={task.priority} />
                     <span className="action-assignee">👤 {assignee?.displayName || 'Unassigned'}</span>
-                    <span className="action-goto-link" style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--accent-primary)', fontWeight: 600 }}>View on Board ➔</span>
+                    <span className="action-goto-link" style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--accent-primary)', fontWeight: 600 }}>Inspect on Board</span>
                   </div>
                   <h4 className="action-item-title">{task.title}</h4>
                   <div className="blocker-reason-highlight">
@@ -174,7 +174,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
             {blockedTasks.length === 0 && (
               <div className="empty-panel-state">
                 <span className="empty-panel-icon">🟢</span>
-                <p>No blocked tasks in this project. Work is flowing smoothly.</p>
+                <p>No blockers reported. Everything is moving on schedule.</p>
               </div>
             )}
           </div>
@@ -182,7 +182,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
 
         <div className="dashboard-panel">
           <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 className="panel-title">👥 Team Workload & Allocation ({project.memberIds.length} Members)</h3>
+            <h3 className="panel-title">Team Allocation ({project.memberIds.length} Members)</h3>
             {canManageTeam && (
               <button
                 className="btn btn-primary btn-sm"

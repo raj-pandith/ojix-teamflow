@@ -64,7 +64,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
       const today = new Date().toISOString().slice(0, 10);
       await onCreateTask(project.id, {
         title: task.title,
-        description: 'Extracted automatically from team meeting notes via Work Triage Accelerator.',
+        description: 'Imported from team notes.',
         priority: task.priority,
         status: 'todo',
         dueDate: today,
@@ -83,8 +83,8 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
           <div className="drawer-title-group">
             <span className="drawer-icon">⚡</span>
             <div>
-              <h3 className="drawer-title">Work Triage Accelerator</h3>
-              <p className="drawer-subtitle">Algorithmic workload analysis, blocker triage, & note parsing</p>
+              <h3 className="drawer-title">Work Triage</h3>
+              <p className="drawer-subtitle">Unblock bottlenecks, clear overdue tasks, and parse meeting notes into work items.</p>
             </div>
           </div>
           <button className="drawer-close-btn" onClick={onClose} aria-label="Close drawer">
@@ -98,19 +98,19 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
             className={`drawer-tab-btn ${activeTab === 'overdue' ? 'active' : ''}`}
             onClick={() => setActiveTab('overdue')}
           >
-            Overdue Triage ({overdue.length})
+            Overdue ({overdue.length})
           </button>
           <button
             className={`drawer-tab-btn ${activeTab === 'blockers' ? 'active' : ''}`}
             onClick={() => setActiveTab('blockers')}
           >
-            Blocker Analysis ({blocked.length})
+            Blockers ({blocked.length})
           </button>
           <button
             className={`drawer-tab-btn ${activeTab === 'extraction' ? 'active' : ''}`}
             onClick={() => setActiveTab('extraction')}
           >
-            Notes ➔ Tasks
+            Notes to Tasks
           </button>
         </div>
 
@@ -119,7 +119,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
           {activeTab === 'overdue' && (
             <div className="triage-section">
               <p className="triage-lead">
-                Identifies tasks that have exceeded local midnight deadlines. Prioritize schedule adjustments or workload rebalancing.
+                Tasks past deadline. Rebalance assignments or update milestone schedules.
               </p>
               <div className="triage-items-list">
                 {overdue.map(t => (
@@ -130,7 +130,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
                     </div>
                     <h4 className="triage-card-title">{t.title}</h4>
                     <p className="triage-recommendation">
-                      💡 <strong>Recommendation:</strong> Reschedule to active milestone or assign co-owner to unblock progress.
+                      💡 <strong>Action:</strong> Adjust due date or reassign to keep momentum.
                     </p>
                   </div>
                 ))}
@@ -147,7 +147,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
           {activeTab === 'blockers' && (
             <div className="triage-section">
               <p className="triage-lead">
-                Analyzes stalled work and surfaces underlying dependency patterns across the project.
+                Active bottlenecks slowing down deliverables.
               </p>
               <div className="triage-items-list">
                 {blocked.map(t => (
@@ -164,7 +164,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
                     </div>
                     <h4 className="triage-card-title">{t.title}</h4>
                     <div className="triage-blocker-text">
-                      <strong>Root Cause:</strong> {t.blockerReason}
+                      <strong>Reason:</strong> {t.blockerReason}
                     </div>
                   </div>
                 ))}
@@ -181,7 +181,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
           {activeTab === 'extraction' && (
             <div className="triage-section">
               <p className="triage-lead">
-                Paste meeting or incident notes below. The triage engine extracts structured tasks with priority classifications.
+                Paste notes or bullet points below to convert them directly into tasks.
               </p>
               <div className="notes-input-group">
                 <div className="notes-header-actions">
@@ -208,7 +208,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
                   disabled={!meetingNotes.trim()}
                   className="btn-extract-actions"
                 >
-                  ⚡ Extract Action Items
+                  ⚡ Parse Action Items
                 </Button>
               </div>
 
