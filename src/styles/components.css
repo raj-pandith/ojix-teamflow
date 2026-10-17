@@ -1625,24 +1625,26 @@
 .dashboard-panel {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-sm);
 }
 
 .panel-header {
-  padding: var(--space-4) var(--space-6);
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border-subtle);
-  background: #141a27;
+  background: #F8FAFC;
 }
 
 .panel-title {
   font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.015em;
+  margin: 0;
 }
 
 .panel-body {
