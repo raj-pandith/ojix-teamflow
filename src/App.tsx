@@ -50,6 +50,7 @@ const MainApp: React.FC = () => {
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
 
   const canMutate = currentUser?.role !== 'viewer';
@@ -81,6 +82,8 @@ const MainApp: React.FC = () => {
         }}
         onOpenNewProject={() => setIsCreateProjectOpen(true)}
         currentUser={currentUser}
+        isMobileOpen={isMobileNavOpen}
+        onCloseMobile={() => setIsMobileNavOpen(false)}
       />
 
       {/* Main Shell */}
@@ -91,6 +94,7 @@ const MainApp: React.FC = () => {
           onOpenNewTask={() => setIsCreateTaskOpen(true)}
           onOpenAddUser={() => setIsInviteUserOpen(true)}
           canMutate={canMutate}
+          onToggleMobileNav={() => setIsMobileNavOpen(prev => !prev)}
         />
 
         <main className="content-viewport animate-fade-in">

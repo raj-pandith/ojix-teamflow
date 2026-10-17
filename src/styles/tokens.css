@@ -36,15 +36,23 @@
   --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  /* Typography Scale */
-  --text-xs: 0.75rem;    /* 12px */
-  --text-sm: 0.875rem;   /* 14px */
-  --text-base: 0.9375rem; /* 15px */
-  --text-lg: 1.125rem;   /* 18px */
-  --text-xl: 1.25rem;    /* 20px */
-  --text-2xl: 1.5rem;    /* 24px */
-  --text-3xl: 1.875rem;  /* 30px */
-  --text-4xl: 2.25rem;   /* 36px */
+  /* Responsive Breakpoint Scale (per responsive-design skill) */
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+  --bp-2xl: 1536px;
+  --touch-target-min: 44px;
+
+  /* Typography Scale (Fluid with clamp for headings) */
+  --text-xs: 0.75rem;                                           /* 12px */
+  --text-sm: 0.875rem;                                          /* 14px */
+  --text-base: 0.9375rem;                                       /* 15px */
+  --text-lg: 1.125rem;                                          /* 18px */
+  --text-xl: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);        /* 18-20px */
+  --text-2xl: clamp(1.25rem, 1.125rem + 0.6vw, 1.5rem);         /* 20-24px */
+  --text-3xl: clamp(1.5rem, 1.35rem + 0.8vw, 1.875rem);         /* 24-30px */
+  --text-4xl: clamp(1.75rem, 1.5rem + 1.2vw, 2.25rem);          /* 28-36px */
 
   /* Text Contrast Hierarchy */
   --text-primary: #17243A;

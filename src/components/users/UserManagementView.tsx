@@ -277,8 +277,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       </div>
 
       {/* Users Table */}
-      <div className="table-container" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-        <table className="tasks-table" style={{ width: '100%' }}>
+      <div className="table-container" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table className="tasks-table" style={{ width: '100%', minWidth: '720px' }}>
           <thead>
             <tr>
               <th>User</th>
