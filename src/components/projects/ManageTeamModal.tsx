@@ -85,6 +85,10 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
       showToast('error', 'Operation Denied', 'Project Leads cannot remove Workspace Admins from the project team.');
       return;
     }
+    if (currentUser.role === 'workspace_admin' && userId === currentUser.uid) {
+      showToast('error', 'Safety Restriction', 'Workspace Admins cannot remove themselves from the project team.');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to remove "${userName}" from project team "${project.name}"? Historical tasks and contributions will be preserved.`)) {
       return;
     }
@@ -150,6 +154,7 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
                 {currentMembers.map(member => {
                   const isOwner = member.uid === project.ownerId;
                   const isProtectedAdmin = currentUser.role === 'project_lead' && member.role === 'workspace_admin';
+                  const isSelfAdmin = currentUser.role === 'workspace_admin' && member.uid === currentUser.uid;
                   const isBlocked = member.status === 'blocked';
                   const isTerminated = member.status === 'terminated';
                   return (
@@ -181,11 +186,13 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
                           <Button
                             variant="danger"
                             size="sm"
-                            disabled={isSubmitting || isProtectedAdmin}
+                            disabled={isSubmitting || isProtectedAdmin || isSelfAdmin}
                             onClick={() => handleRemoveMember(member.uid, member.displayName)}
                             id={`remove-member-btn-${member.uid}`}
                             title={
-                              isProtectedAdmin
+                              isSelfAdmin
+                                ? 'Workspace Admins cannot remove themselves from the project team'
+                                : isProtectedAdmin
                                 ? 'Project Leads cannot remove Workspace Admins from the project team'
                                 : 'Remove from project team (preserves workspace account)'
                             }

@@ -344,6 +344,10 @@ class ReactiveStorageEngine {
       throw new Error('Project owner cannot remove themselves from their project team.');
     }
 
+    if (caller.role === 'workspace_admin' && caller.uid === uid) {
+      throw new Error('Safety restriction: Workspace Admins cannot remove themselves from the project team.');
+    }
+
     const targetUser = this.users.find(u => u.uid === uid);
     const targetName = targetUser?.displayName || uid;
 
