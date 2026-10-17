@@ -2,13 +2,12 @@ import React from 'react';
 import { Task, TaskStatus } from '../../types/task';
 import { Badge } from '../common/Badge';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
-import { ALLOWED_TRANSITIONS } from '../../domain/taskStateMachine';
 
 interface TaskCardProps {
   task: Task;
   assigneeName?: string;
   onClick: () => void;
-  onQuickMove: (targetStatus: TaskStatus) => void;
+  onQuickMove?: (targetStatus: TaskStatus) => void;
   canMutate: boolean;
   canMove: boolean;
   lockReason?: string;
@@ -19,14 +18,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   task,
   assigneeName,
   onClick,
-  onQuickMove,
   canMutate,
   canMove,
   lockReason,
   isHighlighted = false,
 }) => {
   const isOverdue = isTaskOverdue(task.dueDate, task.status);
-  const allowedMoves = ALLOWED_TRANSITIONS[task.status] || [];
 
   const handleDragStart = (e: React.DragEvent) => {
     if (!canMutate || !canMove) {
@@ -92,30 +89,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             </span>
           )}
         </div>
-
-        {/* Click-to-Move Menu per DEC-010 */}
-        {canMutate && canMove && allowedMoves.length > 0 && (
-          <div className="task-quick-move" onClick={e => e.stopPropagation()}>
-            <select
-              className="quick-move-select"
-              value=""
-              onChange={e => {
-                if (e.target.value) {
-                  onQuickMove(e.target.value as TaskStatus);
-                }
-              }}
-              title="Quick status change (Click-to-Move)"
-              aria-label="Change status"
-            >
-              <option value="" disabled>Move ▾</option>
-              {allowedMoves.map(st => (
-                <option key={st} value={st}>
-                  ➔ {st.replace('_', ' ').toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
     </div>
   );
