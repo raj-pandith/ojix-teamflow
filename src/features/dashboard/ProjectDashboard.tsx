@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Project } from '../../types/project';
+import { Project, ProjectFormData, ProjectStatus } from '../../types/project';
 import { Task } from '../../types/task';
 import { UserProfile } from '../../types/auth';
 import { Badge } from '../../components/common/Badge';
 import { ManageTeamModal } from '../../components/projects/ManageTeamModal';
+import { ProjectEditModal } from '../../components/projects/ProjectEditModal';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
 import { storageEngine } from '../../services/storageEngine';
 
@@ -12,6 +13,7 @@ interface ProjectDashboardProps {
   tasks: Task[];
   onSelectTask: (task: Task) => void;
   onGoToKanban: () => void;
+  onUpdateProject?: (projectId: string, updates: Partial<ProjectFormData>) => Promise<unknown>;
   onDeleteProject?: (projectId: string) => void;
   onRequestDelete?: (projectId: string, projectName: string) => void;
   currentUser?: UserProfile | null;
@@ -22,11 +24,13 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   tasks,
   onSelectTask,
   onGoToKanban,
+  onUpdateProject,
   onDeleteProject,
   onRequestDelete,
   currentUser,
 }) => {
   const [isManageTeamOpen, setIsManageTeamOpen] = useState(false);
+  const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
 
   if (!project) {
     return (
@@ -59,8 +63,29 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
       <div className="project-hero-card">
         <div className="project-hero-top">
           <div>
-            <div className="project-status-row">
+            <div className="project-status-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <Badge type="status" value={project.status} />
+              {canManageTeam && onUpdateProject && (
+                <div className="project-status-quick-switch">
+                  <select
+                    className="project-status-select-control"
+                    value={project.status}
+                    onChange={async e => {
+                      const nextStatus = e.target.value as ProjectStatus;
+                      await onUpdateProject(project.id, { status: nextStatus });
+                    }}
+                    title="Change project status"
+                    aria-label="Change project status"
+                    id="project-status-quick-select"
+                  >
+                    <option value="planning">📋 Planning</option>
+                    <option value="active">⚡ Active</option>
+                    <option value="on_hold">⏸️ On Hold</option>
+                    <option value="completed">✅ Completed</option>
+                    <option value="archived">📦 Archived</option>
+                  </select>
+                </div>
+              )}
               <span className="project-date-range">
                 🗓️ {formatDisplayDate(project.startDate)} ➔ {formatDisplayDate(project.dueDate)}
               </span>
@@ -68,10 +93,20 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
             <h2 className="project-hero-title">{project.name}</h2>
             <p className="project-hero-desc">{project.objective}</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <button className="btn btn-primary btn-sm" onClick={onGoToKanban}>
               Open Board
             </button>
+            {canManageTeam && onUpdateProject && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setIsEditProjectOpen(true)}
+                id="edit-project-dashboard-btn"
+                title="Edit project details and status"
+              >
+                ✏️ Edit Project
+              </button>
+            )}
             {canDelete && (
               <button
                 className="btn btn-danger btn-sm"
@@ -278,6 +313,15 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
         project={project}
         currentUser={currentUser || null}
       />
+
+      {onUpdateProject && (
+        <ProjectEditModal
+          isOpen={isEditProjectOpen}
+          onClose={() => setIsEditProjectOpen(false)}
+          project={project}
+          onUpdateProject={onUpdateProject}
+        />
+      )}
     </div>
   );
 };

@@ -30,6 +30,7 @@ const MainApp: React.FC = () => {
     deletionNotices,
     dismissNotice,
     createProject,
+    updateProject,
     deleteProject,
   } = useProjects();
   const {
@@ -146,6 +147,7 @@ const MainApp: React.FC = () => {
               tasks={tasks}
               onSelectTask={handleSelectTaskFromDashboard}
               onGoToKanban={() => setCurrentTab('kanban')}
+              onUpdateProject={updateProject}
               onDeleteProject={deleteProject}
               onRequestDelete={(id, name) => setProjectToDelete({ id, name })}
               currentUser={currentUser}
