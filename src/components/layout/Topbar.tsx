@@ -10,6 +10,7 @@ interface TopbarProps {
   onOpenMessages?: () => void;
   unreadMessagesCount?: number;
   canMutate: boolean;
+  onToggleMobileNav?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -19,15 +20,29 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenMessages,
   unreadMessagesCount,
   canMutate,
+  onToggleMobileNav,
 }) => {
   const { currentUser, personas, switchPersona, resetDemoData } = useAuth();
 
   return (
     <header className="topbar">
       <div className="topbar-left">
+        {onToggleMobileNav && (
+          <button
+            className="mobile-nav-toggle"
+            onClick={onToggleMobileNav}
+            aria-label="Toggle navigation menu"
+            id="mobile-nav-toggle-btn"
+          >
+            <span className="hamburger-line" />
+            <span className="hamburger-line" />
+            <span className="hamburger-line" />
+          </button>
+        )}
         <div className="workspace-badge">
           <span className="workspace-dot" />
           <span className="workspace-title">OJIX TeamFlow Workspace</span>
+          <span className="workspace-title-mobile">OJIX TeamFlow</span>
         </div>
       </div>
 

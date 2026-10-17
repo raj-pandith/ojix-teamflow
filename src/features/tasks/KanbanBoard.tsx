@@ -54,6 +54,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
   const [sortBy, setSortBy] = useState<'due_date' | 'priority' | 'title'>('due_date');
+  const [mobileActiveColumn, setMobileActiveColumn] = useState<TaskStatus | 'all'>('all');
 
   // Auto-scroll and emphasize highlighted task (DEC-013)
   React.useEffect(() => {
@@ -332,7 +333,37 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
       {/* B. Board Columns Container */}
       <div className="kanban-board-container">
-        <div className="kanban-grid">
+        {/* Mobile Column Quick Switcher */}
+        <div className="kanban-mobile-tabs" role="tablist" aria-label="Columns">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileActiveColumn === 'all'}
+            className={`mobile-tab-btn ${mobileActiveColumn === 'all' ? 'active' : ''}`}
+            onClick={() => setMobileActiveColumn('all')}
+          >
+            All Columns ({sortedTasks.length})
+          </button>
+          {COLUMNS.map(c => {
+            const count = sortedTasks.filter(t =>
+              c.status === 'todo' ? (t.status === 'todo' || t.status === 'backlog') : t.status === c.status
+            ).length;
+            return (
+              <button
+                key={c.status}
+                type="button"
+                role="tab"
+                aria-selected={mobileActiveColumn === c.status}
+                className={`mobile-tab-btn ${mobileActiveColumn === c.status ? 'active' : ''}`}
+                onClick={() => setMobileActiveColumn(c.status)}
+              >
+                {c.icon} {c.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        <div className={`kanban-grid ${mobileActiveColumn !== 'all' ? 'has-single-active-column' : ''}`}>
           {COLUMNS.map(col => {
             // In To Do column, show both 'todo' and legacy/seeded 'backlog' tasks so none are hidden
             const colTasks = sortedTasks.filter(t => {
@@ -342,11 +373,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               return t.status === col.status;
             });
             const isDragOver = activeDragOverCol === col.status;
+            const isMobileHidden = mobileActiveColumn !== 'all' && mobileActiveColumn !== col.status;
 
             return (
               <div
                 key={col.status}
-                className={`kanban-column ${isDragOver ? 'kanban-column-dragover' : ''} col-${col.status}`}
+                className={`kanban-column ${isDragOver ? 'kanban-column-dragover' : ''} col-${col.status} ${isMobileHidden ? 'kanban-col-mobile-hidden' : ''}`}
                 onDragOver={e => handleDragOver(e, col.status)}
                 onDragLeave={handleDragLeave}
                 onDrop={e => handleDrop(e, col.status)}

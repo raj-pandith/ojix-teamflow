@@ -13,6 +13,8 @@ interface SidebarProps {
   onOpenNewProject: () => void;
   currentUser: UserProfile | null;
   unreadMessagesCount?: number;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -24,25 +26,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenNewProject,
   currentUser,
   unreadMessagesCount,
+  isMobileOpen = false,
+  onCloseMobile,
 }) => {
   const canCreateProject =
     currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
+  const handleSelectTab = (tab: ActiveNavTab) => {
+    onSelectTab(tab);
+    onCloseMobile?.();
+  };
+
+  const handleSelectProject = (projectId: string) => {
+    onSelectProject(projectId);
+    onCloseMobile?.();
+  };
+
+  const handleOpenNewProject = () => {
+    onOpenNewProject();
+    onCloseMobile?.();
+  };
+
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-logo">OJIX</div>
-        <div className="brand-text">
-          <span className="brand-name">TeamFlow</span>
-          <span className="brand-tagline">Project OS</span>
+    <>
+      {isMobileOpen && (
+        <div
+          className="sidebar-mobile-backdrop"
+          onClick={onCloseMobile}
+          aria-hidden="true"
+        />
+      )}
+      <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-brand">
+          <div className="brand-logo">OJIX</div>
+          <div className="brand-text">
+            <span className="brand-name">TeamFlow</span>
+            <span className="brand-tagline">Project OS</span>
+          </div>
+          {onCloseMobile && (
+            <button
+              className="sidebar-close-btn"
+              onClick={onCloseMobile}
+              aria-label="Close sidebar navigation"
+            >
+              ✕
+            </button>
+          )}
         </div>
-      </div>
 
       <nav className="sidebar-nav">
         <div className="nav-section-title">Views</div>
         <button
           className={`nav-item ${currentTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => onSelectTab('dashboard')}
+          onClick={() => handleSelectTab('dashboard')}
           id="nav-project-dashboard"
         >
           <span className="nav-icon">📊</span>
@@ -51,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           className={`nav-item ${currentTab === 'my-tasks' ? 'active' : ''}`}
-          onClick={() => onSelectTab('my-tasks')}
+          onClick={() => handleSelectTab('my-tasks')}
           id="nav-my-tasks"
         >
           <span className="nav-icon">👤</span>
@@ -60,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           className={`nav-item ${currentTab === 'kanban' ? 'active' : ''}`}
-          onClick={() => onSelectTab('kanban')}
+          onClick={() => handleSelectTab('kanban')}
           id="nav-kanban-board"
         >
           <span className="nav-icon">📋</span>
@@ -69,7 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           className={`nav-item ${currentTab === 'list' ? 'active' : ''}`}
-          onClick={() => onSelectTab('list')}
+          onClick={() => handleSelectTab('list')}
           id="nav-list-view"
         >
           <span className="nav-icon">📑</span>
@@ -78,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           className={`nav-item ${currentTab === 'messages' ? 'active' : ''}`}
-          onClick={() => onSelectTab('messages')}
+          onClick={() => handleSelectTab('messages')}
           id="nav-message-center"
         >
           <span className="nav-icon">💬</span>
@@ -105,7 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {currentUser?.role === 'workspace_admin' && (
           <button
             className={`nav-item ${currentTab === 'users' ? 'active' : ''}`}
-            onClick={() => onSelectTab('users')}
+            onClick={() => handleSelectTab('users')}
             id="nav-manage-users"
           >
             <span className="nav-icon">👥</span>
@@ -116,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {currentUser?.role === 'workspace_admin' && (
           <button
             className={`nav-item ${currentTab === 'security' ? 'active' : ''}`}
-            onClick={() => onSelectTab('security')}
+            onClick={() => handleSelectTab('security')}
             id="nav-security-assurance"
           >
             <span className="nav-icon">🛡️</span>
@@ -131,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {canCreateProject && (
             <button
               className="btn-add-project"
-              onClick={onOpenNewProject}
+              onClick={handleOpenNewProject}
               title="Add new project"
               id="create-project-sidebar-btn"
             >
@@ -151,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <button
                   className={`project-nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => onSelectProject(proj.id)}
+                  onClick={() => handleSelectProject(proj.id)}
                 >
                   <span className={`status-indicator status-${proj.status}`} />
                   <span className="project-nav-name" title={proj.name}>
@@ -181,5 +217,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </aside>
+    </>
   );
 };

@@ -37,6 +37,7 @@ const MainApp: React.FC = () => {
     deletionNotices,
     dismissNotice,
     createProject,
+    updateProject,
     deleteProject,
   } = useProjects();
   const {
@@ -58,6 +59,7 @@ const MainApp: React.FC = () => {
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [inspectedTask, setInspectedTask] = useState<{ task: Task; commentId?: string | null } | null>(null);
   const [deletionSummaryNotif, setDeletionSummaryNotif] = useState<AppNotification | null>(null);
@@ -110,6 +112,8 @@ const MainApp: React.FC = () => {
         onOpenNewProject={() => setIsCreateProjectOpen(true)}
         currentUser={currentUser}
         unreadMessagesCount={totalUnreadCount}
+        isMobileOpen={isMobileNavOpen}
+        onCloseMobile={() => setIsMobileNavOpen(false)}
       />
 
       {/* Main Shell */}
@@ -122,6 +126,7 @@ const MainApp: React.FC = () => {
           onOpenMessages={() => setCurrentTab('messages')}
           unreadMessagesCount={totalUnreadCount}
           canMutate={canMutate}
+          onToggleMobileNav={() => setIsMobileNavOpen(prev => !prev)}
         />
 
         <main className="content-viewport animate-fade-in">
@@ -173,6 +178,7 @@ const MainApp: React.FC = () => {
               tasks={tasks}
               onSelectTask={handleSelectTaskFromDashboard}
               onGoToKanban={() => setCurrentTab('kanban')}
+              onUpdateProject={updateProject}
               onDeleteProject={deleteProject}
               onRequestDelete={(id, name) => setProjectToDelete({ id, name })}
               currentUser={currentUser}
