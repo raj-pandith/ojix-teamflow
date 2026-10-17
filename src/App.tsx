@@ -85,7 +85,6 @@ const MainApp: React.FC = () => {
         <Topbar
           onOpenTriage={() => setIsTriageOpen(true)}
           onOpenNewTask={() => setIsCreateTaskOpen(true)}
-          onOpenAddUser={() => setIsInviteUserOpen(true)}
           canMutate={canMutate}
         />
 
@@ -162,6 +161,7 @@ const MainApp: React.FC = () => {
               onGoToKanban={() => setCurrentTab('kanban')}
               onDeleteProject={deleteProject}
               onRequestDelete={(id, name) => setProjectToDelete({ id, name })}
+              onOpenAddUser={() => setIsInviteUserOpen(true)}
               currentUser={currentUser}
             />
           )}

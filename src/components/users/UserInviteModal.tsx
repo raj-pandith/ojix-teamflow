@@ -103,12 +103,20 @@ export const UserInviteModal: React.FC<UserInviteModalProps> = ({
           label="Workspace Role"
           value={role}
           onChange={e => setRole(e.target.value as UserRole)}
-          options={[
-            { value: 'member', label: 'Member (Active Contributor)' },
-            { value: 'project_lead', label: 'Project Lead (Creates & Manages Projects)' },
-            { value: 'viewer', label: 'Viewer (Read-Only Observer)' },
-            { value: 'workspace_admin', label: 'Workspace Admin (Full Governance)' },
-          ]}
+          options={
+            currentUser.role === 'workspace_admin'
+              ? [
+                  { value: 'member', label: 'Member (Active Contributor)' },
+                  { value: 'project_lead', label: 'Project Lead (Creates & Manages Projects)' },
+                  { value: 'viewer', label: 'Viewer (Read-Only Observer)' },
+                  { value: 'workspace_admin', label: 'Workspace Admin (Full Governance)' },
+                ]
+              : [
+                  { value: 'member', label: 'Member (Active Contributor)' },
+                  { value: 'viewer', label: 'Viewer (Read-Only Observer)' },
+                  { value: 'project_lead', label: 'Project Lead (Creates & Manages Projects)' },
+                ]
+          }
           id="invite-user-role"
         />
 

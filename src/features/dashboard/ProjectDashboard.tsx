@@ -13,6 +13,7 @@ interface ProjectDashboardProps {
   onGoToKanban: () => void;
   onDeleteProject?: (projectId: string) => void;
   onRequestDelete?: (projectId: string, projectName: string) => void;
+  onOpenAddUser?: () => void;
   currentUser?: UserProfile | null;
 }
 
@@ -23,6 +24,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   onGoToKanban,
   onDeleteProject,
   onRequestDelete,
+  onOpenAddUser,
   currentUser,
 }) => {
   if (!project) {
@@ -44,6 +46,8 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   const completionPercentage = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
 
   const canDelete =
+    currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+  const canAddUser =
     currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
   return (
@@ -172,8 +176,19 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
         </div>
 
         <div className="dashboard-panel">
-          <div className="panel-header">
+          <div className="panel-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
             <h3 className="panel-title">👥 Team Workload & Allocation ({project.memberIds.length} Members)</h3>
+            {canAddUser && onOpenAddUser && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onOpenAddUser}
+                id="dashboard-add-user-btn"
+                title="Add or invite a new member to this project and workspace"
+                style={{ fontSize: 'var(--text-xs)', padding: '4px 10px' }}
+              >
+                👥 + Add User
+              </button>
+            )}
           </div>
           <div className="panel-body">
             <div className="team-allocations-list">

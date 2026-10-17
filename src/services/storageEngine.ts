@@ -95,8 +95,8 @@ class ReactiveStorageEngine {
   }
 
   public addUser(user: UserProfile, caller: UserProfile, addToProjectId?: string): void {
-    if (caller.role !== 'workspace_admin') {
-      throw new Error('Permission denied: Only Workspace Admins can add or invite new members.');
+    if (caller.role !== 'workspace_admin' && caller.role !== 'project_lead') {
+      throw new Error('Permission denied: Only Workspace Admins and Project Leads can add or invite new members.');
     }
     const exists = this.users.some(u => u.email.toLowerCase() === user.email.toLowerCase());
     if (exists) {
