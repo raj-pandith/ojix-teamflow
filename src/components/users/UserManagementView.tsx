@@ -25,6 +25,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [terminatingUser, setTerminatingUser] = useState<UserProfile | null>(null);
+  const [pendingBlockUser, setPendingBlockUser] = useState<UserProfile | null>(null);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -150,26 +151,33 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   };
 
   const handleToggleBlock = (user: UserProfile) => {
-    const isCurrentlyBlocked = user.status === 'blocked';
-    const newStatus: UserStatus = isCurrentlyBlocked ? 'active' : 'blocked';
-    const actionLabel = isCurrentlyBlocked ? 'Unblock' : 'Block';
-
     if (user.uid === currentUser.uid) {
       showToast('error', 'Safety Restriction', 'You cannot block your own administrative account.');
       return;
     }
+    setPendingBlockUser(user);
+  };
 
-    if (!window.confirm(`Are you sure you want to ${actionLabel.toLowerCase()} user "${user.displayName}"? ${newStatus === 'blocked' ? 'They will immediately be prevented from logging in or receiving new task assignments.' : 'Their workspace login access will be restored.'}`)) {
+  const handleConfirmToggleBlock = () => {
+    if (!pendingBlockUser) return;
+    const isCurrentlyBlocked = pendingBlockUser.status === 'blocked';
+    const newStatus: UserStatus = isCurrentlyBlocked ? 'active' : 'blocked';
+    const actionLabel = isCurrentlyBlocked ? 'Unblock' : 'Block';
+
+    if (pendingBlockUser.uid === currentUser.uid) {
+      showToast('error', 'Safety Restriction', 'You cannot block your own administrative account.');
+      setPendingBlockUser(null);
       return;
     }
 
     try {
-      storageEngine.setUserStatus(user.uid, newStatus, currentUser);
+      storageEngine.setUserStatus(pendingBlockUser.uid, newStatus, currentUser);
       showToast(
         newStatus === 'blocked' ? 'warning' : 'success',
         `User ${actionLabel}ed`,
-        `"${user.displayName}" is now ${newStatus.toUpperCase()}.`
+        `"${pendingBlockUser.displayName}" is now ${newStatus.toUpperCase()}.`
       );
+      setPendingBlockUser(null);
     } catch (err: unknown) {
       showToast('error', `Failed to ${actionLabel}`, err instanceof Error ? err.message : 'Error');
     }
@@ -543,6 +551,80 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Block / Unblock User Confirmation Modal */}
+      <Modal
+        isOpen={!!pendingBlockUser}
+        onClose={() => setPendingBlockUser(null)}
+        title={pendingBlockUser?.status === 'blocked' ? '🔓 Restore Member Access' : '🔒 Suspend & Block Member'}
+        maxWidth="520px"
+      >
+        <div style={{ lineHeight: 1.6 }}>
+          {pendingBlockUser?.status === 'blocked' ? (
+            <div>
+              <p style={{ color: 'var(--status-done)', fontWeight: 600, marginBottom: '12px' }}>
+                Restore workspace access for "{pendingBlockUser?.displayName}"?
+              </p>
+              <ul style={{ fontSize: '13px', color: 'var(--color-text-secondary)', paddingLeft: '20px', margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <li>Member can log in and access workspace projects again.</li>
+                <li>They can receive new task assignments across their project teams.</li>
+                <li>Their active role as <strong>{pendingBlockUser?.role.replace('_', ' ').toUpperCase()}</strong> will be restored.</li>
+              </ul>
+
+              <div className="modal-actions" style={{ marginTop: '20px' }}>
+                <Button variant="secondary" onClick={() => setPendingBlockUser(null)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={handleConfirmToggleBlock} id="confirm-unblock-user-btn">
+                  🔓 Confirm & Unblock Member
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p style={{ color: 'var(--status-blocked)', fontWeight: 600, marginBottom: '12px' }}>
+                Are you sure you want to block "{pendingBlockUser?.displayName}"?
+              </p>
+              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
+                <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>
+                  What happens when this member is blocked:
+                </strong>
+                <ul style={{ paddingLeft: '20px', margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <li>
+                    <strong>Immediate Access Revocation:</strong> The user is blocked from logging in and cannot switch into their persona.
+                  </li>
+                  <li>
+                    <strong>Task Assignment Lockdown:</strong> Project leads and team members cannot assign new tasks to this member.
+                  </li>
+                  <li>
+                    <strong>Mutation Prevention:</strong> The member cannot create, edit, or transition any project tasks.
+                  </li>
+                  <li>
+                    <strong>Project Team Restriction:</strong> The member cannot be added to any project teams while blocked.
+                  </li>
+                  <li>
+                    <strong>Audit & History Preserved:</strong> All past tasks, completed items, comments, and audit trail records remain 100% intact for compliance.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '20px' }}>
+                <Button variant="secondary" onClick={() => setPendingBlockUser(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="secondary"
+                  style={{ color: 'var(--status-blocked)', borderColor: 'var(--status-blocked)', fontWeight: 600 }}
+                  onClick={handleConfirmToggleBlock}
+                  id="confirm-block-user-btn"
+                >
+                  🔒 Confirm & Block Member
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </Modal>
 
       {/* Terminate User Confirmation Modal */}
