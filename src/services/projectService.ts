@@ -3,6 +3,7 @@ import { UserProfile } from '../types/auth';
 import { Task } from '../types/task';
 import { storageEngine } from './storageEngine';
 import { validateProjectForm } from '../domain/validation';
+import { notificationService } from './notificationService';
 
 class ProjectService {
   public getProjects(user: UserProfile): Project[] {
@@ -37,6 +38,20 @@ class ProjectService {
       };
 
       storageEngine.saveProject(newProject, user);
+
+      // Notify newly added members
+      try {
+        const otherMembers = newProject.memberIds.filter(mId => mId !== user.uid);
+        for (const mId of otherMembers) {
+          const mProfile = storageEngine.getUser(mId);
+          if (mProfile) {
+            notificationService.notifyProjectMembership(newProject, mProfile, 'added_member', user);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to notify project members on create:', err);
+      }
+
       return newProject;
     });
   }
@@ -73,6 +88,31 @@ class ProjectService {
     };
 
     storageEngine.saveProject(updated, user);
+
+    // Notify newly added or removed members
+    try {
+      const addedMembers = updated.memberIds.filter(id => !existing.memberIds.includes(id));
+      const removedMembers = existing.memberIds.filter(id => !updated.memberIds.includes(id));
+      for (const mId of addedMembers) {
+        if (mId !== user.uid) {
+          const mProfile = storageEngine.getUser(mId);
+          if (mProfile) {
+            notificationService.notifyProjectMembership(updated, mProfile, 'added_member', user);
+          }
+        }
+      }
+      for (const mId of removedMembers) {
+        if (mId !== user.uid) {
+          const mProfile = storageEngine.getUser(mId);
+          if (mProfile) {
+            notificationService.notifyProjectMembership(updated, mProfile, 'removed_member', user);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to notify member changes on update:', err);
+    }
+
     return updated;
   }
 

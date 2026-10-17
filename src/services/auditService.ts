@@ -1,6 +1,8 @@
 import { ActivityLogEntry } from '../types/audit';
 import { UserProfile } from '../types/auth';
 import { storageEngine } from './storageEngine';
+import { resolveCommentMentions } from '../domain/mentionParser';
+import { notificationService } from './notificationService';
 
 class AuditService {
   public getLogs(taskId: string, user: UserProfile): ActivityLogEntry[] {
@@ -39,6 +41,29 @@ class AuditService {
     };
 
     storageEngine.addActivityLog(entry, user);
+
+    // Process @mentions only after comment successfully saves
+    try {
+      const task = storageEngine.getTaskById(taskId, user);
+      const project = storageEngine.getProjectById(projectId, user);
+      const allUsers = storageEngine.getUsers();
+      if (task && project) {
+        const { resolvedUsers } = resolveCommentMentions(trimmed, allUsers, project, user);
+        for (const mentionedUser of resolvedUsers) {
+          notificationService.notifyTaskCommentMention(
+            task,
+            project,
+            trimmed,
+            entry.id,
+            mentionedUser,
+            user
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to dispatch comment mention notifications:', err);
+    }
+
     return entry;
   }
 

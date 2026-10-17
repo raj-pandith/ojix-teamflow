@@ -17,6 +17,10 @@ import { ProjectCreateModal } from './components/projects/ProjectCreateModal';
 import { ProjectDeleteModal } from './components/projects/ProjectDeleteModal';
 import { UserInviteModal } from './components/users/UserInviteModal';
 import { StickyDeletionBanner } from './components/layout/StickyDeletionBanner';
+import { MessageCenterView } from './features/messages/MessageCenterView';
+import { TaskDetailModal } from './components/tasks/TaskDetailModal';
+import { useMessages } from './hooks/useMessages';
+import { storageEngine } from './services/storageEngine';
 import { Task } from './types/task';
 import './styles/global.css';
 
@@ -44,6 +48,7 @@ const MainApp: React.FC = () => {
     deleteTask,
   } = useTasks(activeProjectId);
 
+  const { totalUnreadCount } = useMessages();
   const [currentTab, setCurrentTab] = useState<ActiveNavTab>('kanban');
   const [isTriageOpen, setIsTriageOpen] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
@@ -51,6 +56,7 @@ const MainApp: React.FC = () => {
   const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const [inspectedTask, setInspectedTask] = useState<{ task: Task; commentId?: string | null } | null>(null);
 
   const canMutate = currentUser?.role !== 'viewer';
 
@@ -60,6 +66,24 @@ const MainApp: React.FC = () => {
     }
     setCurrentTab('kanban');
     setHighlightedTaskId(task.id);
+  };
+
+  const handleNavigateToProject = (projectId: string) => {
+    setActiveProjectId(projectId);
+    setCurrentTab('kanban');
+  };
+
+  const handleNavigateToTask = (projectId: string, taskId: string, commentId?: string | null) => {
+    setActiveProjectId(projectId);
+    if (!currentUser) return;
+    try {
+      const target = storageEngine.getTaskById(taskId, currentUser);
+      if (target) {
+        setInspectedTask({ task: target, commentId });
+      }
+    } catch (e) {
+      console.warn('Failed to inspect task from notification:', e);
+    }
   };
 
   useEffect(() => {
@@ -81,6 +105,7 @@ const MainApp: React.FC = () => {
         }}
         onOpenNewProject={() => setIsCreateProjectOpen(true)}
         currentUser={currentUser}
+        unreadMessagesCount={totalUnreadCount}
       />
 
       {/* Main Shell */}
@@ -90,6 +115,8 @@ const MainApp: React.FC = () => {
           onOpenTriage={() => setIsTriageOpen(true)}
           onOpenNewTask={() => setIsCreateTaskOpen(true)}
           onOpenAddUser={() => setIsInviteUserOpen(true)}
+          onOpenMessages={() => setCurrentTab('messages')}
+          unreadMessagesCount={totalUnreadCount}
           canMutate={canMutate}
         />
 
@@ -176,6 +203,13 @@ const MainApp: React.FC = () => {
               </div>
             )
           )}
+
+          {currentTab === 'messages' && (
+            <MessageCenterView
+              onNavigateToProject={handleNavigateToProject}
+              onNavigateToTask={handleNavigateToTask}
+            />
+          )}
         </main>
       </div>
 
@@ -231,6 +265,21 @@ const MainApp: React.FC = () => {
           setProjectToDelete(null);
         }}
       />
+
+      {/* Task Inspection Modal (from notification click-through) */}
+      {inspectedTask && currentUser && (
+        <TaskDetailModal
+          task={inspectedTask.task}
+          isOpen={true}
+          onClose={() => setInspectedTask(null)}
+          currentUser={currentUser}
+          project={projects.find(p => p.id === inspectedTask.task.projectId) || activeProject}
+          onDeleteTask={deleteTask}
+          onUpdateTask={updateTask}
+          canMutate={canMutate}
+          highlightCommentId={inspectedTask.commentId}
+        />
+      )}
     </div>
   );
 };

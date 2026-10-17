@@ -7,6 +7,8 @@ interface TopbarProps {
   onOpenTriage: () => void;
   onOpenNewTask: () => void;
   onOpenAddUser?: () => void;
+  onOpenMessages?: () => void;
+  unreadMessagesCount?: number;
   canMutate: boolean;
 }
 
@@ -14,6 +16,8 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenTriage,
   onOpenNewTask,
   onOpenAddUser,
+  onOpenMessages,
+  unreadMessagesCount,
   canMutate,
 }) => {
   const { currentUser, personas, switchPersona, resetDemoData } = useAuth();
@@ -39,6 +43,51 @@ export const Topbar: React.FC<TopbarProps> = ({
           >
             + Invite Member
           </Button>
+        )}
+
+        {/* Notification Bell / Message Center Trigger */}
+        {onOpenMessages && (
+          <button
+            className="topbar-notif-btn"
+            onClick={onOpenMessages}
+            id="topbar-messages-btn"
+            title="Open Message Center & Notifications"
+            style={{
+              position: 'relative',
+              background: 'var(--surface-elevated, #21262d)',
+              border: '1px solid var(--border-default, #30363d)',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <span>🔔</span>
+            {typeof unreadMessagesCount === 'number' && unreadMessagesCount > 0 && (
+              <span
+                id="topbar-unread-badge"
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  background: 'var(--accent-primary, #6366f1)',
+                  color: '#fff',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  padding: '1px 5px',
+                  borderRadius: '10px',
+                  minWidth: '16px',
+                  textAlign: 'center',
+                  boxShadow: '0 0 4px rgba(0,0,0,0.5)',
+                }}
+              >
+                {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+              </span>
+            )}
+          </button>
         )}
 
         {/* Triage Assistant Quick-Trigger */}

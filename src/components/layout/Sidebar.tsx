@@ -2,7 +2,7 @@ import React from 'react';
 import { Project } from '../../types/project';
 import { UserProfile } from '../../types/auth';
 
-export type ActiveNavTab = 'kanban' | 'list' | 'dashboard' | 'my-tasks' | 'security' | 'projects' | 'users';
+export type ActiveNavTab = 'kanban' | 'list' | 'dashboard' | 'my-tasks' | 'messages' | 'security' | 'projects' | 'users';
 
 interface SidebarProps {
   currentTab: ActiveNavTab;
@@ -12,6 +12,7 @@ interface SidebarProps {
   onSelectProject: (projectId: string) => void;
   onOpenNewProject: () => void;
   currentUser: UserProfile | null;
+  unreadMessagesCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -22,6 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectProject,
   onOpenNewProject,
   currentUser,
+  unreadMessagesCount,
 }) => {
   const canCreateProject =
     currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
@@ -72,6 +74,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <span className="nav-icon">📑</span>
           <span className="nav-label">Task List</span>
+        </button>
+
+        <button
+          className={`nav-item ${currentTab === 'messages' ? 'active' : ''}`}
+          onClick={() => onSelectTab('messages')}
+          id="nav-message-center"
+        >
+          <span className="nav-icon">💬</span>
+          <span className="nav-label">Messages</span>
+          {typeof unreadMessagesCount === 'number' && unreadMessagesCount > 0 && (
+            <span
+              className="nav-unread-badge"
+              id="sidebar-unread-badge"
+              style={{
+                marginLeft: 'auto',
+                background: 'var(--accent-primary, #6366f1)',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '1px 6px',
+                borderRadius: '10px',
+              }}
+            >
+              {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+            </span>
+          )}
         </button>
 
         {currentUser?.role === 'workspace_admin' && (

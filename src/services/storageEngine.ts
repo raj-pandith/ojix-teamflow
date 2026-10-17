@@ -2,7 +2,20 @@ import { UserProfile, UserStatus } from '../types/auth';
 import { Project, ProjectDeletionNotice, TaskReassignmentDecision, RemoveMemberResult } from '../types/project';
 import { Task } from '../types/task';
 import { ActivityLogEntry, AuditAction } from '../types/audit';
-import { INITIAL_USERS, INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_ACTIVITY_LOGS } from './mockData';
+import {
+  AppNotification,
+  DirectMessage,
+  DirectConversation,
+  SendDirectMessageInput,
+} from '../types/message';
+import {
+  INITIAL_USERS,
+  INITIAL_PROJECTS,
+  INITIAL_TASKS,
+  INITIAL_ACTIVITY_LOGS,
+  INITIAL_NOTIFICATIONS,
+  INITIAL_DIRECT_MESSAGES,
+} from './mockData';
 import { validateAssigneeEligibility } from '../domain/validation';
 
 const STORAGE_KEYS = {
@@ -13,6 +26,8 @@ const STORAGE_KEYS = {
   SESSION: 'ojix_teamflow_session',
   INITIALIZED: 'ojix_teamflow_initialized',
   NOTICES: 'ojix_teamflow_deletion_notices',
+  NOTIFICATIONS: 'ojix_teamflow_notifications',
+  DIRECT_MESSAGES: 'ojix_teamflow_direct_messages',
 };
 
 type Listener = () => void;
@@ -23,6 +38,8 @@ class ReactiveStorageEngine {
   private tasks: Task[] = [];
   private logs: ActivityLogEntry[] = [];
   private deletionNotices: ProjectDeletionNotice[] = [];
+  private notifications: AppNotification[] = [];
+  private directMessages: DirectMessage[] = [];
   private listeners: Set<Listener> = new Set();
   private inFlightMutations: Map<string, Promise<unknown>> = new Map();
 
@@ -40,6 +57,8 @@ class ReactiveStorageEngine {
       this.tasks = [...INITIAL_TASKS];
       this.logs = [...INITIAL_ACTIVITY_LOGS];
       this.deletionNotices = [];
+      this.notifications = [...INITIAL_NOTIFICATIONS];
+      this.directMessages = [...INITIAL_DIRECT_MESSAGES];
       this.persist();
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     } else {
@@ -53,6 +72,8 @@ class ReactiveStorageEngine {
         this.tasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.TASKS) || '[]') || INITIAL_TASKS;
         this.logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGS) || '[]') || INITIAL_ACTIVITY_LOGS;
         this.deletionNotices = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTICES) || '[]');
+        this.notifications = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || 'null') ?? INITIAL_NOTIFICATIONS;
+        this.directMessages = JSON.parse(localStorage.getItem(STORAGE_KEYS.DIRECT_MESSAGES) || 'null') ?? INITIAL_DIRECT_MESSAGES;
       } catch {
         this.initialize(true);
       }
@@ -66,6 +87,8 @@ class ReactiveStorageEngine {
     localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(this.tasks));
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(this.logs));
     localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(this.deletionNotices));
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(this.notifications));
+    localStorage.setItem(STORAGE_KEYS.DIRECT_MESSAGES, JSON.stringify(this.directMessages));
   }
 
   public subscribe(listener: Listener): () => void {
@@ -271,6 +294,39 @@ class ReactiveStorageEngine {
       createdAt: new Date().toISOString(),
     });
 
+    if (status === 'blocked') {
+      this.notifications.unshift({
+        id: `notif-blk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        recipientUserId: uid,
+        actorUserId: caller.uid,
+        actorDisplayName: caller.displayName,
+        type: 'USER_BLOCKED',
+        title: 'Account access restricted',
+        body: 'Your workspace account has been blocked by an administrator. You can no longer access protected workspace features. Contact your administrator for assistance.',
+        entityType: 'user',
+        entityId: uid,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        deduplicationKey: `blk-${uid}-${new Date().toISOString().slice(0, 10)}`,
+      });
+
+      if (caller.uid !== uid) {
+        this.notifications.unshift({
+          id: `notif-blk-adm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+          recipientUserId: caller.uid,
+          actorUserId: caller.uid,
+          actorDisplayName: caller.displayName,
+          type: 'USER_BLOCKED',
+          title: 'User account blocked',
+          body: `Successfully blocked workspace account for "${existing.displayName}".`,
+          entityType: 'user',
+          entityId: uid,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
     this.persist();
     this.notify();
     return updatedUser;
@@ -328,6 +384,27 @@ class ReactiveStorageEngine {
       commentText: `${caller.displayName} added "${targetUser.displayName}" (${targetUser.role.replace('_', ' ').toUpperCase()}) to project team.`,
       createdAt: new Date().toISOString(),
     });
+
+    if (targetUser.uid !== caller.uid) {
+      const isViewer = targetUser.role === 'viewer';
+      this.notifications.unshift({
+        id: `notif-pmem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        recipientUserId: targetUser.uid,
+        actorUserId: caller.uid,
+        actorDisplayName: caller.displayName,
+        type: 'PROJECT_MEMBER_ADDED',
+        title: isViewer ? 'Project shared with you' : 'Added to project',
+        body: isViewer
+          ? `You have been added as a Viewer to "${project.name}". You have read-only access to this project.`
+          : `You have been added to "${project.name}" by ${caller.displayName}.`,
+        entityType: 'project',
+        entityId: project.id,
+        projectId: project.id,
+        projectName: project.name,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     this.persist();
     this.notify();
@@ -519,6 +596,26 @@ class ReactiveStorageEngine {
       createdAt: now,
     });
 
+    // 6. Notify removed member
+    if (targetUser.uid !== caller.uid) {
+      this.notifications.unshift({
+        id: `notif-pmem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        recipientUserId: targetUser.uid,
+        actorUserId: caller.uid,
+        actorDisplayName: caller.displayName,
+        type: 'PROJECT_MEMBER_REMOVED',
+        title: 'Project access updated',
+        body: `Your access to project "${project.name}" has been removed by ${caller.displayName}. Note that your workspace account remains active.`,
+        entityType: 'project',
+        entityId: project.id,
+        projectId: project.id,
+        projectName: project.name,
+        isRead: false,
+        createdAt: now,
+        deduplicationKey: `pmem-removed-${project.id}-${targetUser.uid}`,
+      });
+    }
+
     this.persist();
     this.notify();
 
@@ -616,6 +713,33 @@ class ReactiveStorageEngine {
       deletedAt: new Date().toISOString(),
     };
     this.deletionNotices.unshift(notice);
+
+    // Create persistent inbox notifications for affected members and project lead (excluding actor)
+    const now = new Date().toISOString();
+    const formattedDate = new Date().toLocaleString();
+    const affectedMembers = project.memberIds.filter(id => id !== user.uid);
+    const allRecipients = Array.from(
+      new Set([...affectedMembers, ...(project.ownerId !== user.uid ? [project.ownerId] : [])])
+    );
+
+    for (const recipientId of allRecipients) {
+      this.notifications.unshift({
+        id: `notif-pdel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        recipientUserId: recipientId,
+        actorUserId: user.uid,
+        actorDisplayName: user.displayName,
+        type: 'PROJECT_DELETED',
+        title: 'Project deleted',
+        body: `The project "${project.name}" has been deleted by ${user.displayName} on ${formattedDate}.`,
+        entityType: 'project',
+        entityId: project.id,
+        projectId: project.id,
+        projectName: project.name,
+        isRead: false,
+        createdAt: now,
+        deduplicationKey: `pdel-${project.id}-${recipientId}`,
+      });
+    }
 
     // Remove project
     this.projects.splice(index, 1);
@@ -745,6 +869,266 @@ class ReactiveStorageEngine {
     this.logs.unshift(log);
     this.persist();
     this.notify();
+  }
+
+  // ---- Notifications ----
+  public getNotifications(user: UserProfile): AppNotification[] {
+    // Strictly isolate notifications: user only sees notifications addressed to them
+    return this.notifications
+      .filter(n => n.recipientUserId === user.uid)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public addNotification(notification: AppNotification): void {
+    if (notification.deduplicationKey) {
+      const exists = this.notifications.some(n => n.deduplicationKey === notification.deduplicationKey);
+      if (exists) return;
+    }
+    this.notifications.unshift(notification);
+    this.persist();
+    this.notify();
+  }
+
+  public addNotifications(notifications: AppNotification[]): void {
+    let added = false;
+    for (const notif of notifications) {
+      if (notif.deduplicationKey) {
+        const exists = this.notifications.some(n => n.deduplicationKey === notif.deduplicationKey);
+        if (exists) continue;
+      }
+      this.notifications.unshift(notif);
+      added = true;
+    }
+    if (added) {
+      this.persist();
+      this.notify();
+    }
+  }
+
+  public markNotificationRead(notificationId: string, user: UserProfile): void {
+    const notif = this.notifications.find(n => n.id === notificationId);
+    if (!notif) return;
+    // Server-enforced authorization: users can only mark their own notifications as read
+    if (notif.recipientUserId !== user.uid) {
+      throw new Error('Permission denied: You can only update notifications in your own inbox.');
+    }
+    const idx = this.notifications.findIndex(n => n.id === notificationId);
+    if (idx !== -1) {
+      this.notifications[idx] = {
+        ...this.notifications[idx],
+        isRead: true,
+        readAt: new Date().toISOString(),
+      };
+      this.persist();
+      this.notify();
+    }
+  }
+
+  public markAllNotificationsRead(user: UserProfile): void {
+    const now = new Date().toISOString();
+    let updated = false;
+    this.notifications = this.notifications.map(n => {
+      if (n.recipientUserId === user.uid && !n.isRead) {
+        updated = true;
+        return {
+          ...n,
+          isRead: true,
+          readAt: now,
+        };
+      }
+      return n;
+    });
+    if (updated) {
+      this.persist();
+      this.notify();
+    }
+  }
+
+  public getUnreadNotificationCount(user: UserProfile): number {
+    return this.notifications.filter(n => n.recipientUserId === user.uid && !n.isRead).length;
+  }
+
+  // ---- Direct Messaging ----
+  public getDirectMessages(user: UserProfile, conversationId?: string): DirectMessage[] {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Message access revoked.`);
+    }
+
+    let messages = this.directMessages.filter(
+      m => m.senderId === user.uid || m.recipientId === user.uid
+    );
+
+    if (conversationId) {
+      messages = messages.filter(m => m.conversationId === conversationId);
+    }
+
+    return [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  public getDirectConversations(user: UserProfile): DirectConversation[] {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      return [];
+    }
+
+    const userMessages = this.directMessages.filter(
+      m => m.senderId === user.uid || m.recipientId === user.uid
+    );
+
+    const convMap = new Map<string, DirectMessage[]>();
+    for (const msg of userMessages) {
+      const list = convMap.get(msg.conversationId) || [];
+      list.push(msg);
+      convMap.set(msg.conversationId, list);
+    }
+
+    const conversations: DirectConversation[] = [];
+    for (const [convId, msgs] of convMap.entries()) {
+      const sorted = [...msgs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const last = sorted[0];
+      const otherUid = last.senderId === user.uid ? last.recipientId : last.senderId;
+      const otherUser = this.getUser(otherUid);
+      if (!otherUser) continue;
+
+      const unreadCount = msgs.filter(m => m.recipientId === user.uid && !m.isRead).length;
+      conversations.push({
+        id: convId,
+        participantIds: [user.uid, otherUid].sort() as unknown as [string, string],
+        otherUser,
+        lastMessage: last,
+        unreadCount,
+        updatedAt: last.createdAt,
+      });
+    }
+
+    return conversations.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }
+
+  public sendDirectMessage(data: SendDirectMessageInput, sender: UserProfile): DirectMessage {
+    if (sender.status === 'blocked' || sender.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${sender.status}. You cannot send messages.`);
+    }
+
+    const targetUser = this.getUser(data.recipientId);
+    if (!targetUser) {
+      throw new Error(`Recipient user "${data.recipientId}" does not exist in workspace.`);
+    }
+
+    if (targetUser.status === 'blocked' || targetUser.status === 'terminated') {
+      throw new Error(`Cannot send message to "${targetUser.displayName}": Recipient account is ${targetUser.status}.`);
+    }
+
+    const trimmedBody = data.body.trim();
+    if (!trimmedBody) {
+      throw new Error('Message body cannot be empty.');
+    }
+    if (trimmedBody.length > 2000) {
+      throw new Error('Message body cannot exceed 2000 characters.');
+    }
+
+    // Deterministic conversation ID for 1-on-1 chats
+    const conversationId = `conv-${[sender.uid, targetUser.uid].sort().join('-')}`;
+    const now = new Date().toISOString();
+
+    const newMsg: DirectMessage = {
+      id: `dm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      conversationId,
+      senderId: sender.uid,
+      senderDisplayName: sender.displayName,
+      recipientId: targetUser.uid,
+      recipientDisplayName: targetUser.displayName,
+      subject: data.subject?.trim() || undefined,
+      body: trimmedBody,
+      isRead: false,
+      createdAt: now,
+    };
+
+    this.directMessages.push(newMsg);
+
+    // Create a real-time inbox notification for recipient
+    const bodyPreview = trimmedBody.length > 100 ? `${trimmedBody.slice(0, 100)}...` : trimmedBody;
+    const notifTitle = data.subject?.trim()
+      ? `New message: ${data.subject.trim()}`
+      : `Message from ${sender.displayName}`;
+
+    this.addNotification({
+      id: `notif-dm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      recipientUserId: targetUser.uid,
+      actorUserId: sender.uid,
+      actorDisplayName: sender.displayName,
+      type: 'DIRECT_MESSAGE_RECEIVED',
+      title: notifTitle,
+      body: `${sender.displayName}: "${bodyPreview}"`,
+      entityType: 'conversation',
+      entityId: conversationId,
+      conversationId,
+      isRead: false,
+      createdAt: now,
+    });
+
+    this.persist();
+    this.notify();
+    return newMsg;
+  }
+
+  public markDirectMessageRead(messageId: string, user: UserProfile): void {
+    const idx = this.directMessages.findIndex(m => m.id === messageId);
+    if (idx !== -1) {
+      const msg = this.directMessages[idx];
+      if (msg.recipientId !== user.uid) {
+        throw new Error('Permission denied: You can only update messages in your own inbox.');
+      }
+      this.directMessages[idx] = {
+        ...msg,
+        isRead: true,
+        readAt: new Date().toISOString(),
+      };
+      this.persist();
+      this.notify();
+    }
+  }
+
+  public markConversationRead(conversationId: string, user: UserProfile): void {
+    const now = new Date().toISOString();
+    let updated = false;
+
+    this.directMessages = this.directMessages.map(m => {
+      if (m.conversationId === conversationId && m.recipientId === user.uid && !m.isRead) {
+        updated = true;
+        return {
+          ...m,
+          isRead: true,
+          readAt: now,
+        };
+      }
+      return m;
+    });
+
+    // Also mark related DIRECT_MESSAGE_RECEIVED notifications as read
+    this.notifications = this.notifications.map(n => {
+      if (n.conversationId === conversationId && n.recipientUserId === user.uid && !n.isRead) {
+        updated = true;
+        return {
+          ...n,
+          isRead: true,
+          readAt: now,
+        };
+      }
+      return n;
+    });
+
+    if (updated) {
+      this.persist();
+      this.notify();
+    }
+  }
+
+  public getUnreadMessageCount(user: UserProfile): number {
+    if (user.status === 'blocked' || user.status === 'terminated') return 0;
+    return this.directMessages.filter(m => m.recipientId === user.uid && !m.isRead).length;
+  }
+
+  public getTotalUnreadInboxCount(user: UserProfile): number {
+    return this.getUnreadNotificationCount(user) + this.getUnreadMessageCount(user);
   }
 }
 
