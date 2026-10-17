@@ -1,7 +1,7 @@
-import { UserProfile } from '../types/auth';
+import { UserProfile, UserStatus } from '../types/auth';
 import { Project, ProjectDeletionNotice } from '../types/project';
 import { Task } from '../types/task';
-import { ActivityLogEntry } from '../types/audit';
+import { ActivityLogEntry, AuditAction } from '../types/audit';
 import { INITIAL_USERS, INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_ACTIVITY_LOGS } from './mockData';
 
 const STORAGE_KEYS = {
@@ -40,7 +40,11 @@ class ReactiveStorageEngine {
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     } else {
       try {
-        this.users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]') || INITIAL_USERS;
+        const rawUsers: UserProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]') || INITIAL_USERS;
+        this.users = (rawUsers.length > 0 ? rawUsers : INITIAL_USERS).map(u => ({
+          ...u,
+          status: u.status || 'active',
+        }));
         this.projects = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROJECTS) || '[]') || INITIAL_PROJECTS;
         this.tasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.TASKS) || '[]') || INITIAL_TASKS;
         this.logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGS) || '[]') || INITIAL_ACTIVITY_LOGS;
@@ -94,27 +98,278 @@ class ReactiveStorageEngine {
     return this.users.find(u => u.uid === uid);
   }
 
-  public addUser(user: UserProfile, caller: UserProfile, addToProjectId?: string): void {
-    if (caller.role !== 'workspace_admin' && caller.role !== 'project_lead') {
-      throw new Error('Permission denied: Only Workspace Admins and Project Leads can add or invite new members.');
+  public addUser(user: Partial<UserProfile>, caller: UserProfile, addToProjectId?: string): UserProfile {
+    if (caller.role !== 'workspace_admin') {
+      throw new Error('Permission denied: Only Workspace Admins can add or invite new members.');
     }
-    const exists = this.users.some(u => u.email.toLowerCase() === user.email.toLowerCase());
+    if (!user.displayName || user.displayName.trim().length < 2) {
+      throw new Error('User full name must be at least 2 characters.');
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!user.email || !emailRegex.test(user.email.trim())) {
+      throw new Error('A valid email address is required.');
+    }
+    const exists = this.users.some(u => u.email.toLowerCase() === user.email!.trim().toLowerCase());
     if (exists) {
       throw new Error(`A user with email ${user.email} already exists.`);
     }
-    this.users.push(user);
+
+    const newUser: UserProfile = {
+      uid: user.uid || `user-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      displayName: user.displayName.trim(),
+      email: user.email.trim().toLowerCase(),
+      role: user.role || 'member',
+      phone: user.phone ? user.phone.trim() : undefined,
+      status: user.status || 'active',
+      createdAt: user.createdAt || new Date().toISOString(),
+      updatedAt: user.updatedAt || new Date().toISOString(),
+    };
+
+    this.users.push(newUser);
+
+    // Audit log entry for user creation
+    this.logs.unshift({
+      id: `log-user-${Date.now().toString(36)}-create`,
+      workspaceId: 'ws-ojix-main',
+      projectId: addToProjectId || 'workspace',
+      taskId: 'users',
+      userId: caller.uid,
+      userDisplayName: caller.displayName,
+      action: 'user_created',
+      fieldChanged: 'account',
+      newValue: `${newUser.displayName} (${newUser.role})`,
+      commentText: `${caller.displayName} created workspace account for "${newUser.displayName}" (${newUser.role.replace('_', ' ').toUpperCase()}).`,
+      createdAt: new Date().toISOString(),
+    });
+
     if (addToProjectId) {
       const pIndex = this.projects.findIndex(p => p.id === addToProjectId);
-      if (pIndex >= 0 && !this.projects[pIndex].memberIds.includes(user.uid)) {
+      if (pIndex >= 0 && !this.projects[pIndex].memberIds.includes(newUser.uid)) {
         this.projects[pIndex] = {
           ...this.projects[pIndex],
-          memberIds: [...this.projects[pIndex].memberIds, user.uid],
+          memberIds: [...this.projects[pIndex].memberIds, newUser.uid],
           updatedAt: new Date().toISOString(),
         };
       }
     }
     this.persist();
     this.notify();
+    return newUser;
+  }
+
+  public updateUser(uid: string, updates: Partial<UserProfile>, caller: UserProfile): UserProfile {
+    if (caller.role !== 'workspace_admin') {
+      throw new Error('Permission denied: Only Workspace Admins can update workspace users.');
+    }
+    const index = this.users.findIndex(u => u.uid === uid);
+    if (index === -1) {
+      throw new Error(`User ${uid} not found.`);
+    }
+    const existing = this.users[index];
+
+    if (updates.email && updates.email.trim().toLowerCase() !== existing.email.toLowerCase()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(updates.email.trim())) {
+        throw new Error('A valid email address is required.');
+      }
+      const duplicate = this.users.some(
+        u => u.uid !== uid && u.email.toLowerCase() === updates.email!.trim().toLowerCase()
+      );
+      if (duplicate) {
+        throw new Error(`A user with email ${updates.email} already exists.`);
+      }
+    }
+
+    if (updates.displayName && updates.displayName.trim().length < 2) {
+      throw new Error('User full name must be at least 2 characters.');
+    }
+
+    const updatedUser: UserProfile = {
+      ...existing,
+      displayName: updates.displayName ? updates.displayName.trim() : existing.displayName,
+      email: updates.email ? updates.email.trim().toLowerCase() : existing.email,
+      phone: updates.phone !== undefined ? updates.phone.trim() : existing.phone,
+      role: updates.role || existing.role,
+      status: updates.status || existing.status,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.users[index] = updatedUser;
+
+    this.logs.unshift({
+      id: `log-user-${Date.now().toString(36)}-update`,
+      workspaceId: 'ws-ojix-main',
+      projectId: 'workspace',
+      taskId: 'users',
+      userId: caller.uid,
+      userDisplayName: caller.displayName,
+      action: 'user_updated',
+      fieldChanged: 'profile',
+      oldValue: `${existing.displayName} (${existing.role})`,
+      newValue: `${updatedUser.displayName} (${updatedUser.role})`,
+      commentText: `${caller.displayName} updated account details for "${updatedUser.displayName}".`,
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persist();
+    this.notify();
+    return updatedUser;
+  }
+
+  public setUserStatus(uid: string, status: UserStatus, caller: UserProfile): UserProfile {
+    if (caller.role !== 'workspace_admin') {
+      throw new Error('Permission denied: Only Workspace Admins can change user account status.');
+    }
+    if (caller.uid === uid && (status === 'blocked' || status === 'terminated')) {
+      throw new Error('Safety restriction: You cannot block or terminate your own administrative account.');
+    }
+    const index = this.users.findIndex(u => u.uid === uid);
+    if (index === -1) {
+      throw new Error(`User ${uid} not found.`);
+    }
+    const existing = this.users[index];
+    const oldStatus = existing.status || 'active';
+
+    const updatedUser: UserProfile = {
+      ...existing,
+      status,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.users[index] = updatedUser;
+
+    const action: AuditAction =
+      status === 'blocked'
+        ? 'user_blocked'
+        : status === 'terminated'
+        ? 'user_terminated'
+        : 'user_unblocked';
+
+    this.logs.unshift({
+      id: `log-user-${Date.now().toString(36)}-status`,
+      workspaceId: 'ws-ojix-main',
+      projectId: 'workspace',
+      taskId: 'users',
+      userId: caller.uid,
+      userDisplayName: caller.displayName,
+      action,
+      fieldChanged: 'status',
+      oldValue: oldStatus.toUpperCase(),
+      newValue: status.toUpperCase(),
+      commentText: `${caller.displayName} ${
+        status === 'blocked' ? 'blocked' : status === 'terminated' ? 'permanently terminated' : 'unblocked'
+      } account for "${existing.displayName}".`,
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persist();
+    this.notify();
+    return updatedUser;
+  }
+
+  public terminateUser(uid: string, caller: UserProfile): UserProfile {
+    return this.setUserStatus(uid, 'terminated', caller);
+  }
+
+  // ---- Project Team Membership (Project Lead & Admin) ----
+  public addTeamMember(projectId: string, uid: string, caller: UserProfile): Project {
+    const pIndex = this.projects.findIndex(p => p.id === projectId);
+    if (pIndex === -1) {
+      throw new Error(`Project ${projectId} not found.`);
+    }
+    const project = this.projects[pIndex];
+
+    const isProjectManager =
+      caller.role === 'workspace_admin' ||
+      (caller.role === 'project_lead' && (project.ownerId === caller.uid || project.memberIds.includes(caller.uid)));
+
+    if (!isProjectManager) {
+      throw new Error('Permission denied: Only the Project Lead or Workspace Admin can manage team membership for this project.');
+    }
+
+    const targetUser = this.users.find(u => u.uid === uid);
+    if (!targetUser) {
+      throw new Error(`User ${uid} does not exist in workspace.`);
+    }
+
+    if (targetUser.status === 'blocked' || targetUser.status === 'terminated') {
+      throw new Error(`Cannot add user "${targetUser.displayName}": Account is ${targetUser.status}.`);
+    }
+
+    if (project.memberIds.includes(uid)) {
+      throw new Error(`User "${targetUser.displayName}" is already a member of this project team.`);
+    }
+
+    this.projects[pIndex] = {
+      ...project,
+      memberIds: [...project.memberIds, uid],
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.logs.unshift({
+      id: `log-team-${Date.now().toString(36)}-add`,
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      taskId: 'team',
+      userId: caller.uid,
+      userDisplayName: caller.displayName,
+      action: 'team_member_added',
+      fieldChanged: 'team',
+      newValue: targetUser.displayName,
+      commentText: `${caller.displayName} added "${targetUser.displayName}" (${targetUser.role.replace('_', ' ').toUpperCase()}) to project team.`,
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persist();
+    this.notify();
+    return this.projects[pIndex];
+  }
+
+  public removeTeamMember(projectId: string, uid: string, caller: UserProfile): Project {
+    const pIndex = this.projects.findIndex(p => p.id === projectId);
+    if (pIndex === -1) {
+      throw new Error(`Project ${projectId} not found.`);
+    }
+    const project = this.projects[pIndex];
+
+    const isProjectManager =
+      caller.role === 'workspace_admin' ||
+      (caller.role === 'project_lead' && (project.ownerId === caller.uid || project.memberIds.includes(caller.uid)));
+
+    if (!isProjectManager) {
+      throw new Error('Permission denied: Only the Project Lead or Workspace Admin can manage team membership for this project.');
+    }
+
+    if (project.ownerId === uid && caller.uid === uid) {
+      throw new Error('Project owner cannot remove themselves from their project team.');
+    }
+
+    const targetUser = this.users.find(u => u.uid === uid);
+    const targetName = targetUser?.displayName || uid;
+
+    this.projects[pIndex] = {
+      ...project,
+      memberIds: project.memberIds.filter(id => id !== uid),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.logs.unshift({
+      id: `log-team-${Date.now().toString(36)}-remove`,
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      taskId: 'team',
+      userId: caller.uid,
+      userDisplayName: caller.displayName,
+      action: 'team_member_removed',
+      fieldChanged: 'team',
+      oldValue: targetName,
+      commentText: `${caller.displayName} removed "${targetName}" from project team. Historical task records are preserved.`,
+      createdAt: new Date().toISOString(),
+    });
+
+    this.persist();
+    this.notify();
+    return this.projects[pIndex];
   }
 
   public addMemberToProject(projectId: string, uid: string): void {
@@ -128,6 +383,19 @@ class ReactiveStorageEngine {
       this.persist();
       this.notify();
     }
+  }
+
+  public getUserManagementLogs(): ActivityLogEntry[] {
+    return this.logs.filter(
+      l =>
+        l.action === 'user_created' ||
+        l.action === 'user_updated' ||
+        l.action === 'user_blocked' ||
+        l.action === 'user_unblocked' ||
+        l.action === 'user_terminated' ||
+        l.action === 'team_member_added' ||
+        l.action === 'team_member_removed'
+    );
   }
 
   // ---- Projects & Isolation ----
@@ -248,11 +516,33 @@ class ReactiveStorageEngine {
   }
 
   public saveTask(task: Task, user: UserProfile): void {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
+    }
     if (user.role === 'viewer') {
       throw new Error('Permission denied: Viewers have read-only access and cannot mutate tasks.');
     }
     // Verify membership in project
-    this.getProjectById(task.projectId, user);
+    const project = this.getProjectById(task.projectId, user);
+
+    // Database-level enforcement of mandatory project team membership:
+    if (task.assigneeId) {
+      const targetUser = this.getUser(task.assigneeId);
+      if (!targetUser) {
+        throw new Error(`Assignee user "${task.assigneeId}" not found in workspace.`);
+      }
+      if (targetUser.status === 'blocked' || targetUser.status === 'terminated') {
+        throw new Error(`Cannot assign task to "${targetUser.displayName}": User account is ${targetUser.status}.`);
+      }
+      const existingTask = this.tasks.find(t => t.id === task.id);
+      const isAssigneeChanging = !existingTask || existingTask.assigneeId !== task.assigneeId;
+
+      if (isAssigneeChanging && project && !project.memberIds.includes(task.assigneeId)) {
+        throw new Error(
+          `Permission denied: Assignee "${targetUser.displayName}" is not an active member of this project team. Please add them using Manage Team first.`
+        );
+      }
+    }
 
     const index = this.tasks.findIndex(t => t.id === task.id);
     if (index >= 0) {

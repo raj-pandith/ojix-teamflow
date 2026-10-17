@@ -10,21 +10,25 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function isActiveUser() {
+      return isAuthenticated() && (getUserData().status == 'active' || !('status' in getUserData()));
+    }
+
     function isWorkspaceAdmin() {
-      return isAuthenticated() && getUserData().role == 'workspace_admin';
+      return isActiveUser() && getUserData().role == 'workspace_admin';
     }
 
     function isProjectLead() {
-      return isAuthenticated() && getUserData().role == 'project_lead';
+      return isActiveUser() && getUserData().role == 'project_lead';
     }
 
     function isViewer() {
-      return isAuthenticated() && getUserData().role == 'viewer';
+      return isActiveUser() && getUserData().role == 'viewer';
     }
 
     function isProjectMember(projectId) {
       let project = get(/databases/$(database)/documents/projects/$(projectId)).data;
-      return isAuthenticated() && (
+      return isActiveUser() && (
         isWorkspaceAdmin() || 
         request.auth.uid in project.memberIds
       );
@@ -32,16 +36,26 @@ service cloud.firestore {
 
     function isProjectOwner(projectId) {
       let project = get(/databases/$(database)/documents/projects/$(projectId)).data;
-      return isAuthenticated() && (
+      return isActiveUser() && (
         isWorkspaceAdmin() || 
         request.auth.uid == project.ownerId
+      );
+    }
+
+    function isValidAssignee(projectId, assigneeId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId)).data;
+      let assignee = get(/databases/$(database)/documents/users/$(assigneeId)).data;
+      return assigneeId == null || (
+        assigneeId in project.memberIds &&
+        (assignee.status == 'active' || !('status' in assignee))
       );
     }
 
     // Collection: Users
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isWorkspaceAdmin() || request.auth.uid == userId;
+      // Only workspace admin can create, update, or terminate user accounts
+      allow write: if isWorkspaceAdmin();
     }
 
     // Collection: Workspaces
@@ -61,8 +75,12 @@ service cloud.firestore {
     // Collection: Tasks
     match /tasks/{taskId} {
       allow read: if isProjectMember(resource.data.projectId);
-      allow create: if isProjectMember(request.resource.data.projectId) && !isViewer();
-      allow update: if isProjectMember(resource.data.projectId) && !isViewer();
+      allow create: if isProjectMember(request.resource.data.projectId) && !isViewer() &&
+        isValidAssignee(request.resource.data.projectId, request.resource.data.assigneeId);
+      allow update: if isProjectMember(resource.data.projectId) && !isViewer() && (
+        request.resource.data.assigneeId == resource.data.assigneeId ||
+        isValidAssignee(resource.data.projectId, request.resource.data.assigneeId)
+      );
       allow delete: if isWorkspaceAdmin() || isProjectOwner(resource.data.projectId);
     }
 

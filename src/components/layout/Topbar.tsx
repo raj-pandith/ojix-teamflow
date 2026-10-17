@@ -6,12 +6,14 @@ import { Button } from '../common/Button';
 interface TopbarProps {
   onOpenTriage: () => void;
   onOpenNewTask: () => void;
+  onOpenAddUser?: () => void;
   canMutate: boolean;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
   onOpenTriage,
   onOpenNewTask,
+  onOpenAddUser,
   canMutate,
 }) => {
   const { currentUser, personas, switchPersona, resetDemoData } = useAuth();
@@ -26,6 +28,19 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       <div className="topbar-right">
+        {/* Add User Button (Workspace Admin only per RBAC) */}
+        {currentUser?.role === 'workspace_admin' && onOpenAddUser && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onOpenAddUser}
+            id="add-user-topbar-btn"
+            title="Add a new member to the workspace"
+          >
+            👥 + Add User
+          </Button>
+        )}
+
         {/* Triage Assistant Quick-Trigger (DEC-012) */}
         <Button
           variant="secondary"

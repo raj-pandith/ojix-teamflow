@@ -3,7 +3,7 @@ import { TaskPriority, TaskStatus } from '../../types/task';
 import { UserRole } from '../../types/auth';
 
 export interface BadgeProps {
-  type: 'status' | 'priority' | 'role' | 'overdue';
+  type: 'status' | 'priority' | 'role' | 'overdue' | 'user-status';
   value: TaskStatus | TaskPriority | UserRole | string;
   className?: string;
 }
@@ -24,6 +24,15 @@ export const Badge: React.FC<BadgeProps> = ({ type, value, className = '' }) => 
   } else if (type === 'overdue') {
     badgeClass += ' badge-urgent';
     label = 'OVERDUE';
+  } else if (type === 'user-status') {
+    if (value === 'active') {
+      badgeClass += ' badge-status-done';
+    } else if (value === 'blocked') {
+      badgeClass += ' badge-status-blocked';
+    } else if (value === 'terminated') {
+      badgeClass += ' badge-urgent';
+    }
+    label = String(value).toUpperCase();
   }
 
   return <span className={`${badgeClass} ${className}`}>{label}</span>;

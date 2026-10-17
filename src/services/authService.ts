@@ -63,6 +63,12 @@ class AuthService {
     if (!user) {
       throw new Error(`Persona with UID ${uid} not found.`);
     }
+    if (user.status === 'blocked') {
+      throw new Error(`Account Suspended: User "${user.displayName}" is currently blocked by Workspace Admin.`);
+    }
+    if (user.status === 'terminated') {
+      throw new Error(`Account Terminated: User "${user.displayName}" has been permanently terminated. Access revoked.`);
+    }
     this.currentUser = user;
     localStorage.setItem(AUTH_STORAGE_KEY, user.uid);
     this.notify();
@@ -73,6 +79,12 @@ class AuthService {
     const user = storageEngine.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
     if (!user) {
       throw new Error('Invalid credentials. Use a seeded demo email or quick-select a persona.');
+    }
+    if (user.status === 'blocked') {
+      throw new Error(`Account Suspended: User "${user.displayName}" is currently blocked by Workspace Admin.`);
+    }
+    if (user.status === 'terminated') {
+      throw new Error(`Account Terminated: User "${user.displayName}" has been permanently terminated. Access revoked.`);
     }
     this.currentUser = user;
     localStorage.setItem(AUTH_STORAGE_KEY, user.uid);

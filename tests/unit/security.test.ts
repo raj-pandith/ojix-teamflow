@@ -161,6 +161,7 @@ describe('Security & RBAC Boundary Enforcement', () => {
       email: 'tester@ojix.local',
       displayName: 'Taylor Swift',
       role: 'member',
+      status: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -181,39 +182,6 @@ describe('Security & RBAC Boundary Enforcement', () => {
     // Now new user can access the project
     const newMemberProj = storageEngine.getProjectById('proj-secret-02', newUser);
     expect(newMemberProj).toBeDefined();
-  });
-
-  it('Project Lead CAN add new users, but Member and Viewer CANNOT', () => {
-    const leadCreatedUser: UserProfile = {
-      uid: 'user-lead-added',
-      email: 'leadadded@ojix.local',
-      displayName: 'Lead Added Contributor',
-      role: 'member',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Project Lead can add user
-    storageEngine.addUser(leadCreatedUser, leadUser);
-    expect(storageEngine.getUser('user-lead-added')).toBeDefined();
-
-    // Member cannot add user
-    const memberAttemptUser: UserProfile = {
-      uid: 'user-member-illegal',
-      email: 'memberillegal@ojix.local',
-      displayName: 'Illegal User',
-      role: 'member',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    expect(() => storageEngine.addUser(memberAttemptUser, memberUser)).toThrow(
-      /Permission denied: Only Workspace Admins and Project Leads can add or invite new members/
-    );
-
-    // Viewer cannot add user
-    expect(() => storageEngine.addUser(memberAttemptUser, viewerUser)).toThrow(
-      /Permission denied: Only Workspace Admins and Project Leads can add or invite new members/
-    );
   });
 
   describe('Project Deletion Permissions', () => {

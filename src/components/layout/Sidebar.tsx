@@ -2,7 +2,7 @@ import React from 'react';
 import { Project } from '../../types/project';
 import { UserProfile } from '../../types/auth';
 
-export type ActiveNavTab = 'kanban' | 'list' | 'dashboard' | 'my-tasks' | 'security' | 'projects';
+export type ActiveNavTab = 'kanban' | 'list' | 'dashboard' | 'my-tasks' | 'security' | 'projects' | 'users';
 
 interface SidebarProps {
   currentTab: ActiveNavTab;
@@ -73,6 +73,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="nav-icon">📑</span>
           <span className="nav-label">Grouped List View</span>
         </button>
+
+        {currentUser?.role === 'workspace_admin' && (
+          <button
+            className={`nav-item ${currentTab === 'users' ? 'active' : ''}`}
+            onClick={() => onSelectTab('users')}
+            id="nav-manage-users"
+          >
+            <span className="nav-icon">👥</span>
+            <span className="nav-label">Manage Users</span>
+          </button>
+        )}
 
         {currentUser?.role === 'workspace_admin' && (
           <button

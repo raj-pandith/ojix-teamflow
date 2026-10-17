@@ -60,14 +60,18 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
 
   if (!isOpen || !task) return null;
 
-  const assignableUsers = users.filter(u => u.role !== 'viewer');
-  const sortedAssignableUsers = [...assignableUsers].sort((a, b) => {
-    const aIn = project ? project.memberIds.includes(a.uid) : true;
-    const bIn = project ? project.memberIds.includes(b.uid) : true;
-    if (aIn && !bIn) return -1;
-    if (!aIn && bIn) return 1;
-    return a.displayName.localeCompare(b.displayName);
-  });
+  // Mandatory Team Membership: Only eligible, active workspace users already in this project team
+  const projectTeamMembers = users
+    .filter(u => (project ? project.memberIds.includes(u.uid) : true) && u.status === 'active' && u.role !== 'viewer')
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  // If the task was previously assigned to a user who has since been removed from the team or deactivated,
+  // display them with an alert so current state is clear, but prompt for reassignment.
+  const currentAssignedUser = task.assigneeId ? users.find(u => u.uid === task.assigneeId) : null;
+  const isCurrentAssigneeOutOfTeam =
+    currentAssignedUser &&
+    project &&
+    (!project.memberIds.includes(currentAssignedUser.uid) || currentAssignedUser.status !== 'active');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,9 +89,10 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
     setIsSubmitting(true);
     setError('');
     try {
-      if (assigneeId && project && !project.memberIds.includes(assigneeId)) {
-        storageEngine.addMemberToProject(project.id, assigneeId);
-      }
+    if (assigneeId && project && !project.memberIds.includes(assigneeId)) {
+      setError('Selected assignee is not an active member of this project team. Please add them via Manage Team first.');
+      return;
+    }
       const updated = await onUpdateTask(task.id, {
         title: title.trim(),
         description: description.trim(),
@@ -169,21 +174,39 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
         </div>
 
         <div className="form-row-2">
-          <Select
-            label="Assignee"
-            value={assigneeId}
-            onChange={e => setAssigneeId(e.target.value)}
-            options={[
-              { value: '', label: 'Unassigned' },
-              ...sortedAssignableUsers.map(m => ({
-                value: m.uid,
-                label: project && project.memberIds.includes(m.uid)
-                  ? `${m.displayName} (${m.role.replace('_', ' ')})`
-                  : `${m.displayName} (${m.role.replace('_', ' ')}) — Add to Project`,
-              })),
-            ]}
-            id="update-task-assignee-select"
-          />
+          <div>
+            <Select
+              label="Assignee (Project Team Only)"
+              value={assigneeId}
+              onChange={e => setAssigneeId(e.target.value)}
+              options={[
+                { value: '', label: 'Unassigned' },
+                ...(isCurrentAssigneeOutOfTeam && currentAssignedUser
+                  ? [
+                      {
+                        value: currentAssignedUser.uid,
+                        label: `⚠️ ${currentAssignedUser.displayName} (Removed from Team — Reassign)`,
+                      },
+                    ]
+                  : []),
+                ...projectTeamMembers.map(m => ({
+                  value: m.uid,
+                  label: `${m.displayName} (${m.role.replace('_', ' ')})`,
+                })),
+              ]}
+              id="update-task-assignee-select"
+            />
+            {isCurrentAssigneeOutOfTeam && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-blocked)', display: 'block', marginTop: '4px' }}>
+                ⚠️ Current assignee is no longer in this project team. Please reassign to an active team member.
+              </span>
+            )}
+            {projectTeamMembers.length === 0 && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-blocked)', display: 'block', marginTop: '4px' }}>
+                ⚠️ No active members in this project team. Add members via <strong>Manage Team</strong> to assign tasks.
+              </span>
+            )}
+          </div>
 
           <Input
             label="Due Date"

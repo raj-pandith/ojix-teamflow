@@ -81,6 +81,7 @@ describe('canUserMoveTask authorization rules', () => {
     email: 'marcus@ojix.local',
     displayName: 'Marcus Vance',
     role: 'member',
+    status: 'active',
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
   };
@@ -90,6 +91,7 @@ describe('canUserMoveTask authorization rules', () => {
     email: 'david@ojix.local',
     displayName: 'David Kim',
     role: 'member',
+    status: 'active',
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
   };
@@ -99,6 +101,7 @@ describe('canUserMoveTask authorization rules', () => {
     email: 'sarah@ojix.local',
     displayName: 'Sarah Chen',
     role: 'project_lead',
+    status: 'active',
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
   };
@@ -108,6 +111,7 @@ describe('canUserMoveTask authorization rules', () => {
     email: 'alex@ojix.local',
     displayName: 'Alex Morgan',
     role: 'workspace_admin',
+    status: 'active',
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
   };
@@ -117,6 +121,7 @@ describe('canUserMoveTask authorization rules', () => {
     email: 'elena@ojix.local',
     displayName: 'Elena Rostova',
     role: 'viewer',
+    status: 'active',
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
   };

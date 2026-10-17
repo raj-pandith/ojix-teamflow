@@ -6,7 +6,14 @@ export type AuditAction =
   | 'blocked'
   | 'unblocked'
   | 'edited'
-  | 'deleted';
+  | 'deleted'
+  | 'user_created'
+  | 'user_updated'
+  | 'user_blocked'
+  | 'user_unblocked'
+  | 'user_terminated'
+  | 'team_member_added'
+  | 'team_member_removed';
 
 export interface ActivityLogEntry {
   readonly id: string;

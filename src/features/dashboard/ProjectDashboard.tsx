@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Project } from '../../types/project';
 import { Task } from '../../types/task';
 import { UserProfile } from '../../types/auth';
 import { Badge } from '../../components/common/Badge';
+import { ManageTeamModal } from '../../components/projects/ManageTeamModal';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
 import { storageEngine } from '../../services/storageEngine';
 
@@ -13,7 +14,6 @@ interface ProjectDashboardProps {
   onGoToKanban: () => void;
   onDeleteProject?: (projectId: string) => void;
   onRequestDelete?: (projectId: string, projectName: string) => void;
-  onOpenAddUser?: () => void;
   currentUser?: UserProfile | null;
 }
 
@@ -24,9 +24,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   onGoToKanban,
   onDeleteProject,
   onRequestDelete,
-  onOpenAddUser,
   currentUser,
 }) => {
+  const [isManageTeamOpen, setIsManageTeamOpen] = useState(false);
+
   if (!project) {
     return (
       <div className="empty-panel-state">
@@ -47,8 +48,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
 
   const canDelete =
     currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
-  const canAddUser =
-    currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+
+  const canManageTeam =
+    currentUser?.role === 'workspace_admin' ||
+    (currentUser?.role === 'project_lead' && (project.ownerId === currentUser.uid || project.memberIds.includes(currentUser.uid)));
 
   return (
     <div className="dashboard-container">
@@ -178,17 +181,17 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
         </div>
 
         <div className="dashboard-panel">
-          <div className="panel-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+          <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="panel-title">👥 Team Workload & Allocation ({project.memberIds.length} Members)</h3>
-            {canAddUser && onOpenAddUser && (
+            {canManageTeam && (
               <button
-                className="btn btn-secondary btn-sm"
-                onClick={onOpenAddUser}
-                id="dashboard-add-user-btn"
-                title="Add or invite a new member to this project and workspace"
+                className="btn btn-primary btn-sm"
+                onClick={() => setIsManageTeamOpen(true)}
+                id="dashboard-manage-team-btn"
                 style={{ fontSize: 'var(--text-xs)', padding: '4px 10px' }}
+                title="Add or remove team members for this project"
               >
-                👥 + Add User
+                👥 Manage Team
               </button>
             )}
           </div>
@@ -268,6 +271,13 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      <ManageTeamModal
+        isOpen={isManageTeamOpen}
+        onClose={() => setIsManageTeamOpen(false)}
+        project={project}
+        currentUser={currentUser || null}
+      />
     </div>
   );
 };

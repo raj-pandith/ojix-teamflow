@@ -42,15 +42,10 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
     });
   }, [isOpen]);
 
-  // All assignable users in the workspace (Member, Project Lead, Admin)
-  const assignableUsers = users.filter(u => u.role !== 'viewer');
-  const sortedAssignableUsers = [...assignableUsers].sort((a, b) => {
-    const aIn = project.memberIds.includes(a.uid);
-    const bIn = project.memberIds.includes(b.uid);
-    if (aIn && !bIn) return -1;
-    if (!aIn && bIn) return 1;
-    return a.displayName.localeCompare(b.displayName);
-  });
+  // Mandatory Team Membership: Only eligible, active workspace users already in this project team
+  const projectTeamMembers = users
+    .filter(u => project.memberIds.includes(u.uid) && u.status === 'active' && u.role !== 'viewer')
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,9 +61,10 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
     setIsSubmitting(true);
     setError('');
     try {
-      if (assigneeId && !project.memberIds.includes(assigneeId)) {
-        storageEngine.addMemberToProject(project.id, assigneeId);
-      }
+    if (assigneeId && !project.memberIds.includes(assigneeId)) {
+      setError('Selected assignee is not an active member of this project team. Please add them via Manage Team first.');
+      return;
+    }
       await onCreateTask({
         title: title.trim(),
         description: description.trim(),
@@ -151,21 +147,26 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
         </div>
 
         <div className="form-row-2">
-          <Select
-            label="Assignee"
-            value={assigneeId}
-            onChange={e => setAssigneeId(e.target.value)}
-            options={[
-              { value: '', label: 'Unassigned' },
-              ...sortedAssignableUsers.map(m => ({
-                value: m.uid,
-                label: project.memberIds.includes(m.uid)
-                  ? `${m.displayName} (${m.role.replace('_', ' ')})`
-                  : `${m.displayName} (${m.role.replace('_', ' ')}) — Add to Project`,
-              })),
-            ]}
-            id="new-task-assignee-select"
-          />
+          <div>
+            <Select
+              label="Assignee (Project Team Only)"
+              value={assigneeId}
+              onChange={e => setAssigneeId(e.target.value)}
+              options={[
+                { value: '', label: 'Unassigned' },
+                ...projectTeamMembers.map(m => ({
+                  value: m.uid,
+                  label: `${m.displayName} (${m.role.replace('_', ' ')})`,
+                })),
+              ]}
+              id="new-task-assignee-select"
+            />
+            {projectTeamMembers.length === 0 && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-blocked)', display: 'block', marginTop: '4px' }}>
+                ⚠️ No members in this project team yet. Add members via <strong>Manage Team</strong> to assign tasks.
+              </span>
+            )}
+          </div>
 
           <Input
             label="Due Date"

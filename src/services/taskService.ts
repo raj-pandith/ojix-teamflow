@@ -28,8 +28,32 @@ class TaskService {
     data: TaskFormData,
     user: UserProfile
   ): Promise<Task> {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
+    }
+
     if (user.role === 'viewer') {
       throw new Error('Permission denied: Viewers cannot create tasks.');
+    }
+
+    const project = storageEngine.getProjectById(projectId, user);
+    if (!project) {
+      throw new Error(`Project ${projectId} not found.`);
+    }
+
+    if (data.assigneeId) {
+      const targetUser = storageEngine.getUser(data.assigneeId);
+      if (!targetUser) {
+        throw new Error(`Assignee user "${data.assigneeId}" not found in workspace.`);
+      }
+      if (targetUser.status === 'blocked' || targetUser.status === 'terminated') {
+        throw new Error(`Cannot assign task to "${targetUser.displayName}": User account is ${targetUser.status}.`);
+      }
+      if (!project.memberIds.includes(data.assigneeId)) {
+        throw new Error(
+          `Permission denied: Assignee "${targetUser.displayName}" is not an active member of this project team. Please add them using Manage Team first.`
+        );
+      }
     }
 
     const validation = validateTaskForm(data);
@@ -82,6 +106,10 @@ class TaskService {
     blockerReason: string | undefined,
     user: UserProfile
   ): Promise<Task> {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
+    }
+
     if (user.role === 'viewer') {
       throw new Error('Permission denied: Viewers cannot update task status.');
     }
@@ -146,6 +174,10 @@ class TaskService {
     updates: Partial<TaskFormData>,
     user: UserProfile
   ): Promise<Task> {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
+    }
+
     if (user.role === 'viewer') {
       throw new Error('Permission denied: Viewers cannot edit tasks.');
     }
@@ -154,6 +186,8 @@ class TaskService {
     if (!existing) {
       throw new Error(`Task ${taskId} not found.`);
     }
+
+    const project = storageEngine.getProjectById(existing.projectId, user);
 
     const merged: TaskFormData = {
       title: updates.title ?? existing.title,
@@ -165,6 +199,21 @@ class TaskService {
       dueDate: updates.dueDate ?? existing.dueDate,
       milestoneId: updates.milestoneId ?? existing.milestoneId,
     };
+
+    if (merged.assigneeId) {
+      const targetUser = storageEngine.getUser(merged.assigneeId);
+      if (!targetUser) {
+        throw new Error(`Assignee user "${merged.assigneeId}" not found in workspace.`);
+      }
+      if (targetUser.status === 'blocked' || targetUser.status === 'terminated') {
+        throw new Error(`Cannot assign task to "${targetUser.displayName}": User account is ${targetUser.status}.`);
+      }
+      if (project && !project.memberIds.includes(merged.assigneeId)) {
+        throw new Error(
+          `Permission denied: Assignee "${targetUser.displayName}" is not an active member of this project team. Please add them using Manage Team first.`
+        );
+      }
+    }
 
     const validation = validateTaskForm(merged);
     if (!validation.isValid) {
@@ -347,6 +396,9 @@ class TaskService {
   }
 
   public async deleteTask(taskId: string, user: UserProfile): Promise<void> {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
+    }
     if (user.role !== 'workspace_admin' && user.role !== 'project_lead') {
       throw new Error('Permission denied: Only Workspace Admins and Project Leads can delete tasks.');
     }

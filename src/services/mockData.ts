@@ -11,6 +11,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     role: 'workspace_admin',
     roleLabel: 'Workspace Admin',
     description: 'Full workspace governance, member directory, and global settings.',
+    phone: '+1 (555) 234-5678',
+    status: 'active',
   },
   {
     uid: 'user-lead-sarah',
@@ -19,6 +21,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     role: 'project_lead',
     roleLabel: 'Project Lead',
     description: 'Creates projects, assigns work, and oversees project execution.',
+    phone: '+1 (555) 345-6789',
+    status: 'active',
   },
   {
     uid: 'user-member-marcus',
@@ -27,6 +31,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     role: 'member',
     roleLabel: 'Member',
     description: 'Executes assigned tasks, posts progress notes, and updates statuses.',
+    phone: '+1 (555) 456-7890',
+    status: 'active',
   },
   {
     uid: 'user-viewer-elena',
@@ -35,6 +41,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     role: 'viewer',
     roleLabel: 'Viewer (Read-Only)',
     description: 'Observes permitted boards and dashboards; cannot modify any data.',
+    phone: '+1 (555) 567-8901',
+    status: 'active',
   },
 ];
 
@@ -43,6 +51,8 @@ export const INITIAL_USERS: UserProfile[] = DEMO_PERSONAS.map(p => ({
   email: p.email,
   displayName: p.displayName,
   role: p.role,
+  status: p.status || 'active',
+  phone: p.phone,
   createdAt: '2026-10-01T08:00:00Z',
   updatedAt: '2026-10-01T08:00:00Z',
 }));

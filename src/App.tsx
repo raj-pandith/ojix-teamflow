@@ -10,6 +10,7 @@ import { GroupedListView } from './features/tasks/GroupedListView';
 import { PersonalDashboard } from './features/dashboard/PersonalDashboard';
 import { ProjectDashboard } from './features/dashboard/ProjectDashboard';
 import { SecurityAssurancePanel } from './features/security/SecurityAssurancePanel';
+import { UserManagementView } from './components/users/UserManagementView';
 import { WorkTriageDrawer } from './features/triage/WorkTriageDrawer';
 import { TaskCreateModal } from './components/tasks/TaskCreateModal';
 import { ProjectCreateModal } from './components/projects/ProjectCreateModal';
@@ -52,8 +53,6 @@ const MainApp: React.FC = () => {
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
 
   const canMutate = currentUser?.role !== 'viewer';
-  const canDeleteProject =
-    currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
   const handleSelectTaskFromDashboard = (task: Task) => {
     if (task.projectId && task.projectId !== activeProjectId) {
@@ -64,7 +63,7 @@ const MainApp: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentTab === 'security' && currentUser?.role !== 'workspace_admin') {
+    if ((currentTab === 'security' || currentTab === 'users') && currentUser?.role !== 'workspace_admin') {
       setCurrentTab('kanban');
     }
   }, [currentUser, currentTab]);
@@ -90,6 +89,7 @@ const MainApp: React.FC = () => {
         <Topbar
           onOpenTriage={() => setIsTriageOpen(true)}
           onOpenNewTask={() => setIsCreateTaskOpen(true)}
+          onOpenAddUser={() => setIsInviteUserOpen(true)}
           canMutate={canMutate}
         />
 
@@ -101,16 +101,6 @@ const MainApp: React.FC = () => {
                   <h1 className="view-title">{activeProject?.name || 'Project Execution Board'}</h1>
                   <p className="view-subtitle">{activeProject?.objective || 'Active Project Board'}</p>
                 </div>
-                {canDeleteProject && activeProject && (
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => setProjectToDelete({ id: activeProject.id, name: activeProject.name })}
-                    id="header-delete-project-btn"
-                    title={`Delete project "${activeProject.name}"`}
-                  >
-                    🗑️ Delete Project
-                  </button>
-                )}
               </div>
               <KanbanBoard
                 tasks={tasks}
@@ -135,16 +125,6 @@ const MainApp: React.FC = () => {
                   </h1>
                   <p className="view-subtitle">Faceted filter search, status groupings, and inline transitions.</p>
                 </div>
-                {canDeleteProject && activeProject && (
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => setProjectToDelete({ id: activeProject.id, name: activeProject.name })}
-                    id="header-list-delete-project-btn"
-                    title={`Delete project "${activeProject.name}"`}
-                  >
-                    🗑️ Delete Project
-                  </button>
-                )}
               </div>
               <GroupedListView
                 tasks={filteredTasks}
@@ -168,7 +148,6 @@ const MainApp: React.FC = () => {
               onGoToKanban={() => setCurrentTab('kanban')}
               onDeleteProject={deleteProject}
               onRequestDelete={(id, name) => setProjectToDelete({ id, name })}
-              onOpenAddUser={() => setIsInviteUserOpen(true)}
               currentUser={currentUser}
             />
           )}
@@ -188,6 +167,16 @@ const MainApp: React.FC = () => {
             ) : (
               <div className="empty-panel-state">
                 <p>Access Restricted: Only Workspace Admins can access the Assurance & RBAC panel.</p>
+              </div>
+            )
+          )}
+
+          {currentTab === 'users' && currentUser && (
+            currentUser.role === 'workspace_admin' ? (
+              <UserManagementView currentUser={currentUser} />
+            ) : (
+              <div className="empty-panel-state">
+                <p>Access Restricted: Only Workspace Admins can access User Management.</p>
               </div>
             )
           )}
