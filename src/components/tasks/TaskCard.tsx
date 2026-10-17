@@ -67,7 +67,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             </span>
           )}
         </div>
-        {isOverdue && <Badge type="overdue" value="OVERDUE" />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {isOverdue && <Badge type="overdue" value="OVERDUE" />}
+        </div>
       </div>
 
       <h3 className="task-card-title">{task.title}</h3>

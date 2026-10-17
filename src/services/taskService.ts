@@ -116,6 +116,8 @@ class TaskService {
     storageEngine.saveTask(updatedTask, user);
 
     // Audit log
+    const oldStatusLabel = oldStatus.replace('_', ' ').toUpperCase();
+    const targetStatusLabel = targetStatus.replace('_', ' ').toUpperCase();
     const action = isNowBlocked ? 'blocked' : wasBlocked ? 'unblocked' : 'status_changed';
     auditService.logActivity({
       id: `log-${Date.now().toString(36)}`,
@@ -126,13 +128,13 @@ class TaskService {
       userDisplayName: user.displayName,
       action,
       fieldChanged: 'status',
-      oldValue: oldStatus,
-      newValue: targetStatus,
+      oldValue: oldStatusLabel,
+      newValue: targetStatusLabel,
       commentText: isNowBlocked
-        ? `Marked blocked: ${blockerReason}`
+        ? `${user.displayName} marked task as BLOCKED: "${blockerReason}"`
         : wasBlocked
-        ? `Resolved blocker and transitioned to ${targetStatus}.`
-        : `Moved status from ${oldStatus} to ${targetStatus}.`,
+        ? `${user.displayName} resolved blocker and moved status to "${targetStatusLabel}".`
+        : `${user.displayName} moved status from "${oldStatusLabel}" to "${targetStatusLabel}".`,
       createdAt: new Date().toISOString(),
     }, user);
 
@@ -185,17 +187,161 @@ class TaskService {
 
     storageEngine.saveTask(updatedTask, user);
 
-    auditService.logActivity({
-      id: `log-${Date.now().toString(36)}`,
-      workspaceId: existing.workspaceId,
-      projectId: existing.projectId,
-      taskId: existing.id,
-      userId: user.uid,
-      userDisplayName: user.displayName,
-      action: 'edited',
-      commentText: 'Task details updated.',
-      createdAt: new Date().toISOString(),
-    }, user);
+    const userDisplayName = user.displayName;
+    let anyLogged = false;
+
+    // 1. Assignee update
+    if (merged.assigneeId !== existing.assigneeId) {
+      anyLogged = true;
+      const oldUser = existing.assigneeId ? (storageEngine.getUser(existing.assigneeId)?.displayName || 'Unassigned') : 'Unassigned';
+      const newUser = merged.assigneeId ? (storageEngine.getUser(merged.assigneeId)?.displayName || 'Unassigned') : 'Unassigned';
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}-assignee`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName,
+        action: 'reassigned',
+        fieldChanged: 'assignee',
+        oldValue: oldUser,
+        newValue: newUser,
+        commentText: `${userDisplayName} reassigned task from "${oldUser}" to "${newUser}".`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
+
+    // 2. Status update
+    if (merged.status !== existing.status) {
+      anyLogged = true;
+      const oldStatus = existing.status.replace('_', ' ').toUpperCase();
+      const newStatus = merged.status.replace('_', ' ').toUpperCase();
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}-status`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName,
+        action: merged.status === 'blocked' ? 'blocked' : 'status_changed',
+        fieldChanged: 'status',
+        oldValue: oldStatus,
+        newValue: newStatus,
+        commentText: `${userDisplayName} moved status from "${oldStatus}" to "${newStatus}".`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
+
+    // 3. Priority update
+    if (merged.priority !== existing.priority) {
+      anyLogged = true;
+      const oldPriority = existing.priority.toUpperCase();
+      const newPriority = merged.priority.toUpperCase();
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}-priority`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName,
+        action: 'edited',
+        fieldChanged: 'priority',
+        oldValue: oldPriority,
+        newValue: newPriority,
+        commentText: `${userDisplayName} changed priority from "${oldPriority}" to "${newPriority}".`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
+
+    // 4. Due date update
+    if (merged.dueDate !== existing.dueDate) {
+      anyLogged = true;
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}-due`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName,
+        action: 'edited',
+        fieldChanged: 'dueDate',
+        oldValue: existing.dueDate,
+        newValue: merged.dueDate,
+        commentText: `${userDisplayName} changed due date from "${existing.dueDate}" to "${merged.dueDate}".`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
+
+    // 5. Title update
+    if (merged.title.trim() !== existing.title.trim()) {
+      anyLogged = true;
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}-title`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName,
+        action: 'edited',
+        fieldChanged: 'title',
+        oldValue: existing.title,
+        newValue: merged.title.trim(),
+        commentText: `${userDisplayName} updated title to "${merged.title.trim()}".`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
+
+    // 6. Description update
+    if (merged.description.trim() !== existing.description.trim()) {
+      anyLogged = true;
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}-desc`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName,
+        action: 'edited',
+        fieldChanged: 'description',
+        oldValue: existing.description ? `${existing.description.slice(0, 30)}...` : 'none',
+        newValue: `${merged.description.slice(0, 30)}...`,
+        commentText: `${userDisplayName} updated task description.`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
+
+    // 7. Blocker Reason update
+    if (merged.blockerReason?.trim() !== (existing.blockerReason?.trim() || '') && merged.blockerReason) {
+      anyLogged = true;
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}-blocker`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName,
+        action: 'blocked',
+        fieldChanged: 'blocker reason',
+        oldValue: existing.blockerReason || 'none',
+        newValue: merged.blockerReason,
+        commentText: `${userDisplayName} updated blocker reason: "${merged.blockerReason}".`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
+
+    if (!anyLogged) {
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName,
+        action: 'edited',
+        commentText: `${userDisplayName} saved task changes.`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
 
     return updatedTask;
   }

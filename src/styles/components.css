@@ -788,6 +788,28 @@
   user-select: none;
 }
 
+.btn-card-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-card-update:hover {
+  background: var(--accent-primary-subtle);
+  border-color: var(--accent-primary-border);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
 .task-card-overdue {
   border-left: 3px solid var(--status-overdue);
 }
@@ -1774,8 +1796,57 @@
   color: var(--text-primary);
 }
 
+.timeline-action-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.action-badge-reassigned {
+  background: var(--accent-primary-subtle);
+  border-color: var(--accent-primary-border);
+  color: var(--accent-primary);
+}
+
+.action-badge-status_changed {
+  background: var(--status-inprogress-subtle);
+  border-color: var(--status-inprogress-border);
+  color: var(--status-inprogress);
+}
+
+.action-badge-blocked {
+  background: var(--status-blocked-subtle);
+  border-color: var(--status-blocked-border);
+  color: var(--status-blocked);
+}
+
+.action-badge-unblocked {
+  background: var(--status-done-subtle);
+  border-color: var(--status-done-border);
+  color: var(--status-done);
+}
+
+.action-badge-edited {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-prominent);
+  color: var(--text-secondary);
+}
+
+.action-badge-comment_added {
+  background: hsla(215, 20%, 65%, 0.15);
+  border-color: hsla(215, 20%, 65%, 0.35);
+  color: var(--text-secondary);
+}
+
 .timeline-time {
   color: var(--text-muted);
+  font-size: var(--text-xs);
 }
 
 .timeline-text {

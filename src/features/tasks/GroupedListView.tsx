@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Task, TaskStatus, TaskPriority, TaskFilterOptions } from '../../types/task';
+import { Task, TaskStatus, TaskPriority, TaskFilterOptions, TaskFormData } from '../../types/task';
 import { UserProfile } from '../../types/auth';
 import { Project } from '../../types/project';
 import { Badge } from '../../components/common/Badge';
@@ -17,7 +17,7 @@ interface GroupedListViewProps {
   currentUser: UserProfile | null;
   project?: Project | null;
   onTransitionStatus: (taskId: string, status: TaskStatus, blockerReason?: string) => Promise<unknown>;
-  onUpdateTask?: (taskId: string, updates: { assigneeId: string | null }) => Promise<unknown>;
+  onUpdateTask?: (taskId: string, updates: Partial<TaskFormData>) => Promise<unknown>;
   onDeleteTask: (taskId: string) => Promise<unknown>;
 }
 
@@ -274,6 +274,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
           setSelectedTask(null);
         }}
         currentUser={currentUser}
+        project={project}
         onDeleteTask={onDeleteTask}
         onUpdateTask={onUpdateTask}
         canMutate={canMutate}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Task, TaskStatus } from '../../types/task';
+import { Task, TaskStatus, TaskFormData } from '../../types/task';
 import { UserProfile } from '../../types/auth';
 import { Project } from '../../types/project';
 import { TaskCard } from '../../components/tasks/TaskCard';
@@ -14,7 +14,7 @@ interface KanbanBoardProps {
   currentUser: UserProfile | null;
   project?: Project | null;
   onTransitionStatus: (taskId: string, status: TaskStatus, blockerReason?: string) => Promise<unknown>;
-  onUpdateTask?: (taskId: string, updates: { assigneeId: string | null }) => Promise<unknown>;
+  onUpdateTask?: (taskId: string, updates: Partial<TaskFormData>) => Promise<unknown>;
   onDeleteTask: (taskId: string) => Promise<unknown>;
   highlightedTaskId?: string | null;
   onClearHighlight?: () => void;
@@ -201,6 +201,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           setSelectedTask(null);
         }}
         currentUser={currentUser}
+        project={project}
         onDeleteTask={onDeleteTask}
         onUpdateTask={onUpdateTask}
         canMutate={canMutate}

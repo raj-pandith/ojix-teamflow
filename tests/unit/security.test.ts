@@ -351,5 +351,127 @@ describe('Security & RBAC Boundary Enforcement', () => {
       expect(res1).toBe('created-once');
       expect(res2).toBe('created-once');
     });
+
+    it('Audit logging on task updates explicitly records who updated and what updated', async () => {
+      // Create a task
+      const createdTask = await taskService.createTask(
+        'proj-infra-01',
+        {
+          title: 'Audit Logging Verification Task',
+          description: 'Testing that changes mention who and what updated',
+          priority: 'medium',
+          status: 'todo',
+          dueDate: '2026-10-30',
+          assigneeId: null,
+        },
+        adminUser
+      );
+
+      // 1. Reassign task from Unassigned to Marcus by Sarah
+      await taskService.updateTask(
+        createdTask.id,
+        { assigneeId: memberUser.uid },
+        leadUser
+      );
+
+      const logsAfterReassign = storageEngine.getTaskLogs(createdTask.id, leadUser);
+      const reassignLog = logsAfterReassign.find(l => l.action === 'reassigned');
+      expect(reassignLog).toBeDefined();
+      expect(reassignLog?.userDisplayName).toBe(leadUser.displayName); // Who updated
+      expect(reassignLog?.fieldChanged).toBe('assignee'); // What updated
+      expect(reassignLog?.oldValue).toBe('Unassigned');
+      expect(reassignLog?.newValue).toBe(memberUser.displayName);
+      expect(reassignLog?.commentText).toContain(leadUser.displayName);
+      expect(reassignLog?.commentText).toContain('reassigned');
+
+      // 2. Change priority to Urgent by Marcus
+      await taskService.updateTask(
+        createdTask.id,
+        { priority: 'urgent' },
+        memberUser
+      );
+
+      const logsAfterPriority = storageEngine.getTaskLogs(createdTask.id, memberUser);
+      const priorityLog = logsAfterPriority.find(l => l.fieldChanged === 'priority');
+      expect(priorityLog).toBeDefined();
+      expect(priorityLog?.userDisplayName).toBe(memberUser.displayName); // Who updated
+      expect(priorityLog?.oldValue).toBe('MEDIUM');
+      expect(priorityLog?.newValue).toBe('URGENT');
+      expect(priorityLog?.commentText).toContain(memberUser.displayName);
+      expect(priorityLog?.commentText).toContain('changed priority');
+
+      // 3. Move status to In Progress
+      await taskService.transitionStatus(
+        createdTask.id,
+        'in_progress',
+        undefined,
+        memberUser
+      );
+
+      const logsAfterStatus = storageEngine.getTaskLogs(createdTask.id, memberUser);
+      const statusLog = logsAfterStatus.find(l => l.action === 'status_changed');
+      expect(statusLog).toBeDefined();
+      expect(statusLog?.userDisplayName).toBe(memberUser.displayName);
+      expect(statusLog?.commentText).toContain(memberUser.displayName);
+      expect(statusLog?.commentText).toContain('IN PROGRESS');
+    });
+
+    it('Card Update Permissions: only Workspace Admin and Project Lead can update task via update button', () => {
+      const isAuthorizedToUpdate = (role?: string) => role === 'workspace_admin' || role === 'project_lead';
+
+      expect(isAuthorizedToUpdate(adminUser.role)).toBe(true);
+      expect(isAuthorizedToUpdate(leadUser.role)).toBe(true);
+      expect(isAuthorizedToUpdate(memberUser.role)).toBe(false);
+      expect(isAuthorizedToUpdate(viewerUser.role)).toBe(false);
+      expect(isAuthorizedToUpdate(undefined)).toBe(false);
+    });
+
+    it('Full Task Update by Project Lead logs all changed fields to post section', async () => {
+      const task = await taskService.createTask(
+        'proj-infra-01',
+        {
+          title: 'Initial Title',
+          description: 'Initial Description',
+          priority: 'low',
+          status: 'todo',
+          assigneeId: null,
+          dueDate: '2026-11-01',
+        },
+        leadUser
+      );
+
+      // Project Lead updates title, description, priority, and due date
+      await taskService.updateTask(
+        task.id,
+        {
+          title: 'Updated Title By Lead',
+          description: 'Enhanced Description',
+          priority: 'urgent',
+          dueDate: '2026-11-15',
+        },
+        leadUser
+      );
+
+      const logs = storageEngine.getTaskLogs(task.id, leadUser);
+      
+      const titleLog = logs.find(l => l.fieldChanged === 'title');
+      expect(titleLog).toBeDefined();
+      expect(titleLog?.userDisplayName).toBe(leadUser.displayName);
+      expect(titleLog?.oldValue).toBe('Initial Title');
+      expect(titleLog?.newValue).toBe('Updated Title By Lead');
+
+      const priorityLog = logs.find(l => l.fieldChanged === 'priority');
+      expect(priorityLog).toBeDefined();
+      expect(priorityLog?.userDisplayName).toBe(leadUser.displayName);
+      expect(priorityLog?.oldValue).toBe('LOW');
+      expect(priorityLog?.newValue).toBe('URGENT');
+
+      const dueDateLog = logs.find(l => l.fieldChanged === 'dueDate');
+      expect(dueDateLog).toBeDefined();
+      expect(dueDateLog?.userDisplayName).toBe(leadUser.displayName);
+      expect(dueDateLog?.oldValue).toBe('2026-11-01');
+      expect(dueDateLog?.newValue).toBe('2026-11-15');
+    });
   });
 });
+
