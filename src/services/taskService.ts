@@ -4,6 +4,7 @@ import { storageEngine } from './storageEngine';
 import { validateTaskForm, validateAssigneeEligibility } from '../domain/validation';
 import { validateTaskTransition, canUserMoveTask } from '../domain/taskStateMachine';
 import { auditService } from './auditService';
+import { notificationService } from './notificationService';
 
 class TaskService {
   public getTasks(projectId: string, user: UserProfile): Task[] {
@@ -88,6 +89,14 @@ class TaskService {
         commentText: `Task created with priority "${newTask.priority}" and status "${newTask.status}".`,
         createdAt: new Date().toISOString(),
       }, user);
+
+      // Notification to assignee
+      if (newTask.assigneeId) {
+        const assigneeUser = storageEngine.getUser(newTask.assigneeId);
+        if (assigneeUser) {
+          notificationService.notifyTaskAssigned(newTask, project, assigneeUser, user, false);
+        }
+      }
 
       return newTask;
     });
@@ -181,6 +190,9 @@ class TaskService {
     }
 
     const project = storageEngine.getProjectById(existing.projectId, user);
+    if (!project) {
+      throw new Error(`Project ${existing.projectId} not found.`);
+    }
 
     const merged: TaskFormData = {
       title: updates.title ?? existing.title,
@@ -244,6 +256,13 @@ class TaskService {
         commentText: `${userDisplayName} reassigned task from "${oldUser}" to "${newUser}".`,
         createdAt: new Date().toISOString(),
       }, user);
+
+      if (merged.assigneeId) {
+        const assigneeUser = storageEngine.getUser(merged.assigneeId);
+        if (assigneeUser) {
+          notificationService.notifyTaskAssigned(updatedTask, project, assigneeUser, user, true);
+        }
+      }
     }
 
     // 2. Status update

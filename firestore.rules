@@ -93,5 +93,29 @@ service cloud.firestore {
       allow create: if isProjectMember(request.resource.data.projectId) && !isViewer();
       allow update, delete: if false; // Append-only immutable log
     }
+
+    // Collection: Push Subscriptions (Native Web Push VAPID)
+    match /push_subscriptions/{subId} {
+      // User can only view, create, and delete their own push subscriptions
+      allow read, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && request.auth.uid == request.resource.data.userId;
+    }
+
+    // Collection: Notifications (Message Center Inbox)
+    match /notifications/{notifId} {
+      // Recipients only have access to their personal message inbox
+      allow read, update: if isAuthenticated() && request.auth.uid == resource.data.recipientUserId;
+      allow create: if isAuthenticated();
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.recipientUserId;
+    }
+
+    // Collection: Direct Messages
+    match /direct_messages/{messageId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.recipientId || request.auth.uid == resource.data.senderId);
+      allow create: if isActiveUser() && request.auth.uid == request.resource.data.senderId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.recipientId; // mark read
+      allow delete: if false;
+    }
   }
 }

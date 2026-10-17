@@ -7,6 +7,8 @@ import { Button } from '../../components/common/Button';
 import { formatDisplayDate } from '../../domain/timezone';
 import { ProjectDeletionSummaryModal } from './ProjectDeletionSummaryModal';
 import { DirectMessageModal } from './DirectMessageModal';
+import { WebPushSettingsModal } from './WebPushSettingsModal';
+import { nativePushService } from '../../services/nativePushService';
 
 type MessageFilterTab = 'all' | 'unread' | 'notifications' | 'direct_messages' | 'sent';
 
@@ -39,8 +41,12 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
   const [replyText, setReplyText] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [isNewDmOpen, setIsNewDmOpen] = useState(false);
+  const [isWebPushModalOpen, setIsWebPushModalOpen] = useState(false);
   const [deletionNoticeModalItem, setDeletionNoticeModalItem] = useState<AppNotification | null>(null);
   const [activeBlockedNotice, setActiveBlockedNotice] = useState<AppNotification | null>(null);
+  const [desktopPermission, setDesktopPermission] = useState<NotificationPermission>(() =>
+    nativePushService.getPermission()
+  );
 
   const workspaceUsers = useMemo(() => storageEngine.getUsers(), []);
 
@@ -202,6 +208,88 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {desktopPermission !== 'granted' ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                const res = await nativePushService.requestPermission();
+                setDesktopPermission(res);
+              }}
+              id="enable-desktop-push-btn"
+              title="Enable native alerts outside the browser on your desktop"
+              style={{
+                border: '1px solid var(--accent-primary, #6366f1)',
+                color: 'var(--accent-primary-light, #818cf8)',
+                background: 'rgba(99, 102, 241, 0.12)',
+              }}
+            >
+              🔔 Enable Desktop OS Alerts
+            </Button>
+          ) : (
+            <span
+              style={{
+                fontSize: '12px',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                background: 'rgba(34, 197, 94, 0.12)',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+                color: 'var(--status-done, #22c55e)',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+              title="Desktop push alerts outside the browser are active"
+            >
+              ✓ Desktop Push Active
+            </span>
+          )}
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={async () => {
+              if (!currentUser) return;
+              if (desktopPermission !== 'granted') {
+                const p = await nativePushService.requestPermission();
+                setDesktopPermission(p);
+              }
+              // Dispatch an on-screen push alert and native OS notification
+              storageEngine.addNotification({
+                id: `notif-sample-${Date.now().toString(36)}`,
+                recipientUserId: currentUser.uid,
+                actorUserId: 'u-lead-test',
+                actorDisplayName: 'Marcus Lead',
+                type: 'TASK_COMMENT_MENTION',
+                title: 'You were mentioned in a task comment',
+                body: `Marcus Lead: "@${currentUser.email.split('@')[0]} can you verify the latest changes?"`,
+                entityType: 'comment',
+                entityId: 'sample-comment',
+                projectId: 'proj-infra-01',
+                projectName: 'Q4 Cloud Infrastructure & Telemetry',
+                taskId: 'task-auth-01',
+                taskTitle: 'Legacy auth token deprecation',
+                isRead: false,
+                createdAt: new Date().toISOString(),
+              });
+            }}
+            id="trigger-sample-push-btn"
+            title="Display a live on-screen push notification alert"
+          >
+            ⚡ Test Push Alert
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsWebPushModalOpen(true)}
+            id="web-push-settings-btn"
+            title="Manage browser Web Push subscriptions, VAPID registration, and devices"
+          >
+            📡 Web Push Settings
+          </Button>
+
           {totalUnreadCount > 0 && (
             <Button
               variant="secondary"
@@ -234,7 +322,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '12px',
-          borderBottom: '1px solid var(--border-default, #30363d)',
+          borderBottom: '1px solid #e2e8f0',
           paddingBottom: '12px',
           marginBottom: '20px',
         }}
@@ -246,25 +334,29 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             onClick={() => setActiveTab('all')}
             style={{
               padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              background: activeTab === 'all' ? 'var(--surface-elevated, #21262d)' : 'transparent',
-              color: activeTab === 'all' ? 'var(--text-primary, #f0f6fc)' : 'var(--text-secondary, #8b949e)',
+              borderRadius: '8px',
+              border: activeTab === 'all' ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+              background: activeTab === 'all' ? '#e0e7ff' : '#ffffff',
+              color: activeTab === 'all' ? '#4338ca' : '#64748b',
               fontWeight: 600,
               fontSize: '13px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              boxShadow: activeTab === 'all' ? '0 1px 3px rgba(67, 56, 202, 0.15)' : 'none',
+              transition: 'all 0.15s ease',
             }}
           >
             All
             <span
               style={{
                 fontSize: '11px',
-                padding: '2px 6px',
+                padding: '2px 7px',
                 borderRadius: '10px',
-                background: 'rgba(255, 255, 255, 0.08)',
+                background: activeTab === 'all' ? '#c7d2fe' : '#f1f5f9',
+                color: activeTab === 'all' ? '#3730a3' : '#64748b',
+                fontWeight: 700,
               }}
             >
               {notifications.length}
@@ -276,16 +368,18 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             onClick={() => setActiveTab('unread')}
             style={{
               padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              background: activeTab === 'unread' ? 'var(--surface-elevated, #21262d)' : 'transparent',
-              color: activeTab === 'unread' ? 'var(--accent-primary-light, #818cf8)' : 'var(--text-secondary, #8b949e)',
+              borderRadius: '8px',
+              border: activeTab === 'unread' ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+              background: activeTab === 'unread' ? '#e0e7ff' : '#ffffff',
+              color: activeTab === 'unread' ? '#4338ca' : '#64748b',
               fontWeight: 600,
               fontSize: '13px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              boxShadow: activeTab === 'unread' ? '0 1px 3px rgba(67, 56, 202, 0.15)' : 'none',
+              transition: 'all 0.15s ease',
             }}
           >
             Unread
@@ -293,9 +387,9 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               <span
                 style={{
                   fontSize: '11px',
-                  padding: '2px 6px',
+                  padding: '2px 7px',
                   borderRadius: '10px',
-                  background: 'var(--accent-primary, #6366f1)',
+                  background: '#4f46e5',
                   color: '#fff',
                   fontWeight: 700,
                 }}
@@ -310,13 +404,15 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             onClick={() => setActiveTab('notifications')}
             style={{
               padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              background: activeTab === 'notifications' ? 'var(--surface-elevated, #21262d)' : 'transparent',
-              color: activeTab === 'notifications' ? 'var(--text-primary, #f0f6fc)' : 'var(--text-secondary, #8b949e)',
+              borderRadius: '8px',
+              border: activeTab === 'notifications' ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+              background: activeTab === 'notifications' ? '#e0e7ff' : '#ffffff',
+              color: activeTab === 'notifications' ? '#4338ca' : '#64748b',
               fontWeight: 600,
               fontSize: '13px',
               cursor: 'pointer',
+              boxShadow: activeTab === 'notifications' ? '0 1px 3px rgba(67, 56, 202, 0.15)' : 'none',
+              transition: 'all 0.15s ease',
             }}
           >
             🔔 Notifications
@@ -327,16 +423,18 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             onClick={() => setActiveTab('direct_messages')}
             style={{
               padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              background: activeTab === 'direct_messages' ? 'var(--surface-elevated, #21262d)' : 'transparent',
-              color: activeTab === 'direct_messages' ? 'var(--text-primary, #f0f6fc)' : 'var(--text-secondary, #8b949e)',
+              borderRadius: '8px',
+              border: activeTab === 'direct_messages' ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+              background: activeTab === 'direct_messages' ? '#e0e7ff' : '#ffffff',
+              color: activeTab === 'direct_messages' ? '#4338ca' : '#64748b',
               fontWeight: 600,
               fontSize: '13px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              boxShadow: activeTab === 'direct_messages' ? '0 1px 3px rgba(67, 56, 202, 0.15)' : 'none',
+              transition: 'all 0.15s ease',
             }}
           >
             💬 Direct Messages
@@ -344,10 +442,10 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               <span
                 style={{
                   fontSize: '11px',
-                  padding: '2px 6px',
+                  padding: '2px 7px',
                   borderRadius: '10px',
-                  background: 'var(--status-in-progress, #38bdf8)',
-                  color: '#000',
+                  background: '#0284c7',
+                  color: '#fff',
                   fontWeight: 700,
                 }}
               >
@@ -361,13 +459,15 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             onClick={() => setActiveTab('sent')}
             style={{
               padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              background: activeTab === 'sent' ? 'var(--surface-elevated, #21262d)' : 'transparent',
-              color: activeTab === 'sent' ? 'var(--text-primary, #f0f6fc)' : 'var(--text-secondary, #8b949e)',
+              borderRadius: '8px',
+              border: activeTab === 'sent' ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+              background: activeTab === 'sent' ? '#e0e7ff' : '#ffffff',
+              color: activeTab === 'sent' ? '#4338ca' : '#64748b',
               fontWeight: 600,
               fontSize: '13px',
               cursor: 'pointer',
+              boxShadow: activeTab === 'sent' ? '0 1px 3px rgba(67, 56, 202, 0.15)' : 'none',
+              transition: 'all 0.15s ease',
             }}
           >
             📤 Sent
@@ -382,7 +482,15 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             placeholder="Search messages & alerts..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            style={{ width: '100%', fontSize: '13px', padding: '7px 12px 7px 32px' }}
+            style={{
+              width: '100%',
+              fontSize: '13px',
+              padding: '7px 12px 7px 32px',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#0f172a',
+              borderRadius: '8px',
+            }}
           />
           <span
             style={{
@@ -390,7 +498,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               left: '10px',
               top: '50%',
               transform: 'translateY(-50%)',
-              color: 'var(--text-muted, #8b949e)',
+              color: '#64748b',
               fontSize: '13px',
             }}
           >
@@ -401,37 +509,39 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
 
       {/* Tab Content Views */}
       {activeTab === 'direct_messages' ? (
-        /* Direct Messages Two-Pane View */
+        /* Direct Messages Two-Pane View (Clean Light Grey Aesthetic) */
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: '320px 1fr',
-            gap: '16px',
-            background: 'var(--surface-subtle, #161b22)',
-            border: '1px solid var(--border-default, #30363d)',
-            borderRadius: '10px',
-            minHeight: '520px',
+            gap: 0,
+            background: '#f1f5f9',
+            border: '1px solid #cbd5e1',
+            borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+            minHeight: '560px',
             overflow: 'hidden',
           }}
         >
           {/* Conversation List Sidebar */}
           <div
             style={{
-              borderRight: '1px solid var(--border-default, #30363d)',
+              borderRight: '1px solid #cbd5e1',
               display: 'flex',
               flexDirection: 'column',
-              background: 'rgba(0, 0, 0, 0.1)',
+              background: '#e2e8f0',
             }}
           >
             <div
               style={{
-                padding: '12px 16px',
-                borderBottom: '1px solid var(--border-default, #30363d)',
+                padding: '14px 18px',
+                borderBottom: '1px solid #cbd5e1',
                 fontSize: '12px',
                 fontWeight: 700,
-                color: 'var(--text-muted, #8b949e)',
+                color: '#334155',
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px',
+                letterSpacing: '0.6px',
+                background: '#f8fafc',
               }}
             >
               Conversations ({conversations.length})
@@ -445,27 +555,27 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     key={conv.id}
                     onClick={() => setSelectedConversationId(conv.id)}
                     style={{
-                      padding: '12px 14px',
-                      borderBottom: '1px solid var(--border-subtle, #21262d)',
+                      padding: '13px 16px',
+                      borderBottom: '1px solid #cbd5e1',
+                      borderLeft: isSelected ? '4px solid #6366f1' : '4px solid transparent',
                       cursor: 'pointer',
-                      background: isSelected
-                        ? 'var(--surface-elevated, #21262d)'
-                        : 'transparent',
-                      transition: 'background 0.15s ease',
+                      background: isSelected ? '#ffffff' : 'transparent',
+                      boxShadow: isSelected ? '0 2px 8px rgba(0, 0, 0, 0.06)' : 'none',
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary, #f0f6fc)' }}>
+                      <span style={{ fontWeight: isSelected ? 700 : 600, fontSize: '13px', color: '#0f172a' }}>
                         👤 {conv.otherUser.displayName}
                       </span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted, #8b949e)' }}>
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>
                         {new Date(conv.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                     <div
                       style={{
                         fontSize: '12px',
-                        color: 'var(--text-secondary, #8b949e)',
+                        color: isSelected ? '#334155' : '#64748b',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -481,7 +591,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                             fontWeight: 700,
                             padding: '1px 6px',
                             borderRadius: '10px',
-                            background: 'var(--accent-primary, #6366f1)',
+                            background: '#6366f1',
                             color: '#fff',
                           }}
                         >
@@ -494,7 +604,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               })}
 
               {conversations.length === 0 && (
-                <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted, #8b949e)', fontSize: '13px' }}>
+                <div style={{ padding: '32px 16px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
                   No active conversations. Start one using "+ New Message".
                 </div>
               )}
@@ -503,23 +613,23 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
 
           {/* Active Conversation Thread */}
           {activeConversation ? (
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
               {/* Thread Header */}
               <div
                 style={{
                   padding: '14px 20px',
-                  borderBottom: '1px solid var(--border-default, #30363d)',
+                  borderBottom: '1px solid #cbd5e1',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: 'rgba(255, 255, 255, 0.02)',
+                  background: '#ffffff',
                 }}
               >
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary, #f0f6fc)' }}>
+                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
                     {activeConversation.otherUser.displayName}
                   </h4>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted, #8b949e)' }}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>
                     {activeConversation.otherUser.email} • {activeConversation.otherUser.role.replace('_', ' ').toUpperCase()}
                   </span>
                 </div>
@@ -529,7 +639,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     padding: '2px 8px',
                     borderRadius: '12px',
                     background: activeConversation.otherUser.status === 'active' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                    color: activeConversation.otherUser.status === 'active' ? 'var(--status-done, #22c55e)' : 'var(--status-blocked, #ef4444)',
+                    color: activeConversation.otherUser.status === 'active' ? '#15803d' : '#b91c1c',
                     fontWeight: 600,
                   }}
                 >
@@ -546,6 +656,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
+                  background: '#f8fafc',
                 }}
               >
                 {conversationMessages.map(msg => {
@@ -564,7 +675,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                       <div
                         style={{
                           fontSize: '11px',
-                          color: 'var(--text-muted, #8b949e)',
+                          color: '#64748b',
                           marginBottom: '4px',
                         }}
                       >
@@ -574,20 +685,28 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
 
                       <div
                         style={{
-                          padding: '10px 14px',
-                          borderRadius: isMine ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                          background: isMine
-                            ? 'var(--accent-primary, #6366f1)'
-                            : 'var(--surface-elevated, #21262d)',
-                          color: '#fff',
+                          padding: '11px 16px',
+                          borderRadius: isMine ? '14px 14px 3px 14px' : '14px 14px 14px 3px',
+                          background: isMine ? '#4f46e5' : '#ffffff',
+                          color: isMine ? '#ffffff' : '#0f172a',
                           fontSize: '13.5px',
                           lineHeight: 1.5,
-                          border: isMine ? 'none' : '1px solid var(--border-default, #30363d)',
+                          border: isMine ? 'none' : '1px solid #cbd5e1',
+                          boxShadow: isMine
+                            ? '0 3px 10px rgba(79, 70, 229, 0.25)'
+                            : '0 2px 8px rgba(0, 0, 0, 0.04)',
                           wordBreak: 'break-word',
                         }}
                       >
                         {msg.subject && (
-                          <div style={{ fontWeight: 700, marginBottom: '4px', fontSize: '13px' }}>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              marginBottom: '4px',
+                              fontSize: '13px',
+                              color: isMine ? 'rgba(255, 255, 255, 0.92)' : '#0f172a',
+                            }}
+                          >
                             {msg.subject}
                           </div>
                         )}
@@ -595,7 +714,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                       </div>
 
                       {isMine && (
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted, #8b949e)', marginTop: '2px' }}>
+                        <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
                           {msg.isRead ? '✓✓ Read' : '✓ Delivered'}
                         </span>
                       )}
@@ -609,15 +728,14 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 onSubmit={handleSendReply}
                 style={{
                   padding: '14px 20px',
-                  borderTop: '1px solid var(--border-default, #30363d)',
+                  borderTop: '1px solid #cbd5e1',
                   display: 'flex',
                   gap: '10px',
-                  background: 'rgba(255, 255, 255, 0.01)',
+                  background: '#ffffff',
                 }}
               >
                 <input
                   type="text"
-                  className="form-input"
                   placeholder={
                     isBlocked
                       ? 'Messaging disabled for blocked accounts.'
@@ -626,7 +744,16 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
                   disabled={isBlocked || isSendingReply}
-                  style={{ flex: 1, fontSize: '13px' }}
+                  style={{
+                    flex: 1,
+                    fontSize: '13px',
+                    padding: '9px 14px',
+                    borderRadius: '8px',
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    color: '#0f172a',
+                    outline: 'none',
+                  }}
                 />
                 <Button
                   type="submit"
@@ -645,8 +772,9 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--text-muted, #8b949e)',
+                color: '#64748b',
                 fontSize: '14px',
+                background: '#f8fafc',
               }}
             >
               Select a conversation to read and reply.
@@ -660,26 +788,27 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             <div
               key={msg.id}
               style={{
-                background: 'var(--surface-subtle, #161b22)',
-                border: '1px solid var(--border-default, #30363d)',
-                borderRadius: '8px',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
                 padding: '14px 18px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary, #f0f6fc)' }}>
+                <span style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a' }}>
                   To: 👤 {msg.recipientDisplayName}
                 </span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted, #8b949e)' }}>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
                   {new Date(msg.createdAt).toLocaleString()} • {msg.isRead ? '✓✓ Read' : '✓ Delivered'}
                 </span>
               </div>
               {msg.subject && (
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary, #8b949e)', marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   {msg.subject}
                 </div>
               )}
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary, #8b949e)', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5 }}>
                 {msg.body}
               </div>
             </div>
@@ -690,9 +819,10 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               style={{
                 padding: '48px',
                 textAlign: 'center',
-                background: 'var(--surface-subtle, #161b22)',
-                borderRadius: '8px',
-                color: 'var(--text-muted, #8b949e)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                color: '#64748b',
               }}
             >
               No sent messages found.
@@ -711,20 +841,15 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 key={notif.id}
                 className="notification-card"
                 style={{
-                  background: isUnread
-                    ? 'rgba(99, 102, 241, 0.05)'
-                    : 'var(--surface-subtle, #161b22)',
-                  border: isUnread
-                    ? '1px solid rgba(99, 102, 241, 0.35)'
-                    : '1px solid var(--border-default, #30363d)',
-                  borderLeft: isUnread
-                    ? '4px solid var(--accent-primary, #6366f1)'
-                    : '1px solid var(--border-default, #30363d)',
-                  borderRadius: '8px',
+                  background: isUnread ? '#f8faff' : '#ffffff',
+                  border: isUnread ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+                  borderLeft: isUnread ? '4px solid #4f46e5' : '4px solid #cbd5e1',
+                  borderRadius: '10px',
                   padding: '14px 18px',
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '14px',
+                  boxShadow: isUnread ? '0 2px 8px rgba(79, 70, 229, 0.08)' : '0 1px 3px rgba(0, 0, 0, 0.04)',
                   transition: 'background 0.2s ease',
                 }}
               >
@@ -734,7 +859,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     fontSize: '20px',
                     padding: '8px',
                     borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.04)',
+                    background: isUnread ? '#e0e7ff' : '#f1f5f9',
                     lineHeight: 1,
                   }}
                 >
@@ -744,7 +869,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 {/* Main Body */}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--text-primary, #f0f6fc)' }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
                       {notif.title}
                     </h4>
                     {isUnread && (
@@ -753,13 +878,13 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           width: '8px',
                           height: '8px',
                           borderRadius: '50%',
-                          background: 'var(--accent-primary, #6366f1)',
+                          background: '#4f46e5',
                           display: 'inline-block',
                         }}
                         title="Unread"
                       />
                     )}
-                    <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-muted, #8b949e)' }}>
+                    <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#64748b' }}>
                       {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{' '}
                       {formatDisplayDate(notif.createdAt.slice(0, 10))}
                     </span>
@@ -769,7 +894,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     style={{
                       margin: '0 0 8px',
                       fontSize: '13px',
-                      color: 'var(--text-secondary, #8b949e)',
+                      color: isUnread ? '#1e293b' : '#475569',
                       lineHeight: 1.5,
                     }}
                   >
@@ -784,8 +909,8 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           fontSize: '11px',
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          background: 'rgba(56, 189, 248, 0.1)',
-                          color: 'var(--status-in-progress, #38bdf8)',
+                          background: '#e0f2fe',
+                          color: '#0369a1',
                           fontWeight: 500,
                         }}
                       >
@@ -799,8 +924,8 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           fontSize: '11px',
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          background: 'rgba(168, 85, 247, 0.1)',
-                          color: '#c084fc',
+                          background: '#f3e8ff',
+                          color: '#7e22ce',
                           fontWeight: 500,
                         }}
                       >
@@ -814,8 +939,8 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           fontSize: '11px',
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          color: 'var(--text-muted, #8b949e)',
+                          background: '#f1f5f9',
+                          color: '#475569',
                         }}
                       >
                         👤 {notif.actorDisplayName}
@@ -832,14 +957,15 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: 'var(--accent-primary-light, #818cf8)',
+                        color: '#4f46e5',
                         fontSize: '12px',
+                        fontWeight: 600,
                         cursor: 'pointer',
                         padding: '4px 6px',
                       }}
                       title="Mark as read"
                     >
-                      ✓ Read
+                      ✓ Mark read
                     </button>
                   )}
 
@@ -915,16 +1041,17 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               style={{
                 padding: '48px',
                 textAlign: 'center',
-                background: 'var(--surface-subtle, #161b22)',
-                borderRadius: '8px',
-                color: 'var(--text-muted, #8b949e)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                color: '#64748b',
               }}
             >
               <div style={{ fontSize: '32px', marginBottom: '8px' }}>📭</div>
-              <h4 style={{ margin: '0 0 4px', color: 'var(--text-primary, #f0f6fc)' }}>
+              <h4 style={{ margin: '0 0 4px', color: '#0f172a' }}>
                 No messages found
               </h4>
-              <p style={{ margin: 0, fontSize: '13px' }}>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
                 {searchQuery ? 'Try clearing your search query.' : 'You have no notifications in this view.'}
               </p>
             </div>
@@ -993,6 +1120,15 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Web Push (VAPID) Settings & Device Management Modal */}
+      {currentUser && (
+        <WebPushSettingsModal
+          isOpen={isWebPushModalOpen}
+          onClose={() => setIsWebPushModalOpen(false)}
+          currentUser={currentUser}
+        />
       )}
     </div>
   );

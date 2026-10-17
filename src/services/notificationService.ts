@@ -178,6 +178,40 @@ class NotificationService {
       });
     }
   }
+
+  public notifyTaskAssigned(
+    task: Task,
+    project: Project,
+    assignee: UserProfile,
+    actor: UserProfile,
+    isReassignment: boolean = false
+  ): void {
+    if (assignee.uid === actor.uid) return;
+
+    const now = new Date().toISOString();
+    const type: NotificationType = isReassignment ? 'TASK_REASSIGNED' : 'TASK_ASSIGNED';
+    const title = isReassignment ? 'Task reassigned to you' : 'New task assigned to you';
+    const body = `${actor.displayName} ${isReassignment ? 'reassigned' : 'assigned'} task "${task.title}" to you in "${project.name}".`;
+
+    storageEngine.addNotification({
+      id: `notif-tsk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      recipientUserId: assignee.uid,
+      actorUserId: actor.uid,
+      actorDisplayName: actor.displayName,
+      type,
+      title,
+      body,
+      entityType: 'task',
+      entityId: task.id,
+      projectId: project.id,
+      projectName: project.name,
+      taskId: task.id,
+      taskTitle: task.title,
+      isRead: false,
+      createdAt: now,
+      deduplicationKey: `tskasg-${task.id}-${assignee.uid}-${isReassignment ? 're' : 'new'}-${Date.now()}`,
+    });
+  }
 }
 
 export const notificationService = new NotificationService();

@@ -42,9 +42,76 @@ class ReactiveStorageEngine {
   private directMessages: DirectMessage[] = [];
   private listeners: Set<Listener> = new Set();
   private inFlightMutations: Map<string, Promise<unknown>> = new Map();
+  private broadcastChannel: BroadcastChannel | null = null;
+  private lastKnownSyncClock = 0;
 
   constructor() {
     this.initialize();
+    this.setupCrossTabSync();
+  }
+
+  private setupCrossTabSync(): void {
+    if (typeof window === 'undefined') return;
+
+    // 1. Zero-latency BroadcastChannel for instantaneous cross-tab updates
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        this.broadcastChannel = new BroadcastChannel('ojix_teamflow_bus');
+        this.broadcastChannel.onmessage = event => {
+          if (event.data?.type === 'SYNC_UPDATE') {
+            this.reloadFromStorage();
+          }
+        };
+      } catch (err) {
+        console.warn('BroadcastChannel not available:', err);
+      }
+    }
+
+    // 2. Storage event listener (fires across tabs on localStorage mutations)
+    window.addEventListener('storage', event => {
+      if (event.key && (Object.values(STORAGE_KEYS).includes(event.key) || event.key === 'ojix_teamflow_sync_clock')) {
+        this.reloadFromStorage();
+      }
+    });
+
+    // 3. Fallback interval clock check (ensures sync even if events are constrained)
+    setInterval(() => {
+      this.checkSyncClock();
+    }, 1000);
+  }
+
+  public reloadFromStorage(): void {
+    try {
+      const rawUsers: UserProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]') || INITIAL_USERS;
+      this.users = (rawUsers.length > 0 ? rawUsers : INITIAL_USERS).map(u => ({
+        ...u,
+        status: u.status || 'active',
+      }));
+      this.projects = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROJECTS) || '[]') || INITIAL_PROJECTS;
+      this.tasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.TASKS) || '[]') || INITIAL_TASKS;
+      this.logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGS) || '[]') || INITIAL_ACTIVITY_LOGS;
+      this.deletionNotices = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTICES) || '[]');
+      this.notifications = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || 'null') ?? INITIAL_NOTIFICATIONS;
+      this.directMessages = JSON.parse(localStorage.getItem(STORAGE_KEYS.DIRECT_MESSAGES) || 'null') ?? INITIAL_DIRECT_MESSAGES;
+      this.notify();
+    } catch (err) {
+      console.warn('Failed to reload from storage:', err);
+    }
+  }
+
+  private checkSyncClock(): void {
+    try {
+      const clockStr = localStorage.getItem('ojix_teamflow_sync_clock');
+      if (clockStr) {
+        const clock = parseInt(clockStr, 10);
+        if (clock > this.lastKnownSyncClock) {
+          this.lastKnownSyncClock = clock;
+          this.reloadFromStorage();
+        }
+      }
+    } catch {
+      // Ignore
+    }
   }
 
   public initialize(forceReset = false): void {
@@ -82,13 +149,25 @@ class ReactiveStorageEngine {
   }
 
   private persist(): void {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(this.users));
-    localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(this.projects));
-    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(this.tasks));
-    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(this.logs));
-    localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(this.deletionNotices));
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(this.notifications));
-    localStorage.setItem(STORAGE_KEYS.DIRECT_MESSAGES, JSON.stringify(this.directMessages));
+    try {
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(this.users));
+      localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(this.projects));
+      localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(this.tasks));
+      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(this.logs));
+      localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(this.deletionNotices));
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(this.notifications));
+      localStorage.setItem(STORAGE_KEYS.DIRECT_MESSAGES, JSON.stringify(this.directMessages));
+      const nowClock = Date.now();
+      this.lastKnownSyncClock = nowClock;
+      localStorage.setItem('ojix_teamflow_sync_clock', nowClock.toString());
+
+      // Broadcast immediately across all open tabs/windows
+      if (this.broadcastChannel) {
+        this.broadcastChannel.postMessage({ type: 'SYNC_UPDATE', timestamp: nowClock });
+      }
+    } catch (err) {
+      console.warn('Failed to persist to localStorage:', err);
+    }
   }
 
   public subscribe(listener: Listener): () => void {
@@ -887,21 +966,64 @@ class ReactiveStorageEngine {
     this.notifications.unshift(notification);
     this.persist();
     this.notify();
+    this.dispatchPushNotification(notification);
   }
 
   public addNotifications(notifications: AppNotification[]): void {
     let added = false;
+    const newlyAdded: AppNotification[] = [];
     for (const notif of notifications) {
       if (notif.deduplicationKey) {
         const exists = this.notifications.some(n => n.deduplicationKey === notif.deduplicationKey);
         if (exists) continue;
       }
       this.notifications.unshift(notif);
+      newlyAdded.push(notif);
       added = true;
     }
     if (added) {
       this.persist();
       this.notify();
+      for (const notif of newlyAdded) {
+        this.dispatchPushNotification(notif);
+      }
+    }
+  }
+
+  private dispatchPushNotification(notification: AppNotification): void {
+    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+
+    try {
+      const payload = {
+        id: notification.id,
+        title: notification.title,
+        body: notification.body,
+        type: notification.type,
+        projectId: notification.projectId,
+        projectName: notification.projectName,
+        taskId: notification.taskId,
+        taskTitle: notification.taskTitle,
+        commentId: notification.commentId,
+        conversationId: notification.conversationId,
+        timestamp: Date.now(),
+        requireInteraction: true,
+      };
+
+      fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientUserId: notification.recipientUserId,
+          payload,
+        }),
+      }).catch(err => {
+        // Keep persistent inbox record even when push delivery fails
+        if (process.env.NODE_ENV !== 'test') {
+          console.debug('[WebPush] Push delivery status:', err);
+        }
+      });
+    } catch {
+      // Safe no-op on non-network/offline environments
     }
   }
 

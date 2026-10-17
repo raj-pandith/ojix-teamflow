@@ -18,10 +18,13 @@ import { ProjectDeleteModal } from './components/projects/ProjectDeleteModal';
 import { UserInviteModal } from './components/users/UserInviteModal';
 import { StickyDeletionBanner } from './components/layout/StickyDeletionBanner';
 import { MessageCenterView } from './features/messages/MessageCenterView';
+import { ProjectDeletionSummaryModal } from './features/messages/ProjectDeletionSummaryModal';
+import { PushNotificationBanner } from './components/notifications/PushNotificationBanner';
 import { TaskDetailModal } from './components/tasks/TaskDetailModal';
 import { useMessages } from './hooks/useMessages';
 import { storageEngine } from './services/storageEngine';
 import { Task } from './types/task';
+import { AppNotification } from './types/message';
 import './styles/global.css';
 
 const MainApp: React.FC = () => {
@@ -57,6 +60,7 @@ const MainApp: React.FC = () => {
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [inspectedTask, setInspectedTask] = useState<{ task: Task; commentId?: string | null } | null>(null);
+  const [deletionSummaryNotif, setDeletionSummaryNotif] = useState<AppNotification | null>(null);
 
   const canMutate = currentUser?.role !== 'viewer';
 
@@ -280,6 +284,28 @@ const MainApp: React.FC = () => {
           highlightCommentId={inspectedTask.commentId}
         />
       )}
+
+      {/* Project Deletion Summary Modal (from push notification click) */}
+      {deletionSummaryNotif && (
+        <ProjectDeletionSummaryModal
+          isOpen={true}
+          onClose={() => setDeletionSummaryNotif(null)}
+          notification={deletionSummaryNotif}
+        />
+      )}
+
+      {/* On-Screen Real-Time Push Notification Alerts */}
+      <PushNotificationBanner
+        currentUser={currentUser}
+        onNavigateToProject={handleNavigateToProject}
+        onNavigateToTask={handleNavigateToTask}
+        onOpenMessages={() => {
+          setCurrentTab('messages');
+        }}
+        onOpenDeletionSummary={notif => {
+          setDeletionSummaryNotif(notif);
+        }}
+      />
     </div>
   );
 };
