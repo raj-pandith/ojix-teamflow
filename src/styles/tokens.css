@@ -1,38 +1,51 @@
 :root {
-  /* Application Canvas & SaaS Layout Layers */
-  --bg-canvas: #F5F7FB;
+  /* Warm Editorial Canvas & SaaS Layout Layers (Palette: #F8F1EC, #CC642D, #101D30, #E8DED5, #FFFFFF) */
+  --bg-canvas: #F8F1EC;
+  --bg-canvas-subtle: #F3EAE3;
   --bg-surface: #FFFFFF;
-  --bg-surface-elevated: #FFFFFF;
-  --bg-surface-hover: #F8FAFC;
-  --bg-surface-active: #F1F5F9;
-  --bg-overlay: rgba(15, 23, 42, 0.6);
+  --bg-surface-elevated: #FAF5F0;
+  --bg-surface-hover: #F2E8E0;
+  --bg-surface-active: #EADFD5;
+  --bg-overlay: rgba(16, 29, 48, 0.65);
 
-  /* Dark Navy Sidebar Tokens */
-  --sidebar-bg: #142238;
-  --sidebar-active-bg: #203650;
-  --sidebar-hover-bg: #1A2D4A;
-  --sidebar-border: #1E3352;
-  --sidebar-text: #E2E8F0;
-  --sidebar-text-muted: #94A3B8;
-  --sidebar-brand-accent: #38BDF8;
+  /* Deep Midnight-Navy Card & Surface Tokens */
+  --bg-midnight: #101D30;
+  --bg-midnight-elevated: #18283E;
+  --bg-midnight-hover: #1F324D;
+  --bg-midnight-border: rgba(232, 222, 213, 0.16);
 
-  /* Clean White Topbar Tokens */
+  /* Dark Midnight-Navy Sidebar Tokens */
+  --sidebar-bg: #101D30;
+  --sidebar-active-bg: #1C2D45;
+  --sidebar-hover-bg: #16263D;
+  --sidebar-border: #1E314B;
+  --sidebar-text: #F8F1EC;
+  --sidebar-text-muted: #8E9EA5;
+  --sidebar-brand-accent: #CC642D;
+
+  /* Clean Warm Topbar Tokens */
   --topbar-bg: #FFFFFF;
-  --topbar-border: #E2E8F0;
+  --topbar-border: #E8DED5;
 
   /* Card Background & Borders */
   --card-bg: #FFFFFF;
-  --card-border: #E2E8F0;
-  --card-border-hover: #CBD5E1;
+  --bg-card: #FFFFFF;
+  --card-border: #E8DED5;
+  --card-border-hover: #D9CCC0;
+  --color-border: #E8DED5;
 
   /* Borders & Dividers */
-  --border-subtle: #E2E8F0;
-  --border-prominent: #CBD5E1;
-  --border-contrast: #94A3B8;
-  --border-focus: #2563EB;
+  --border-subtle: #E8DED5;
+  --border-prominent: #D9CCC0;
+  --border-contrast: #B5A597;
+  --border-focus: #CC642D;
 
-  /* Typography: Clean SaaS UI Font Pairings */
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Text Aliases */
+  --color-text-primary: #101D30;
+  --color-text-secondary: #566579;
+
+  /* Typography: Oversized Bold Headings & Technical Labels */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
@@ -44,73 +57,73 @@
   --bp-2xl: 1536px;
   --touch-target-min: 44px;
 
-  /* Typography Scale (Fluid with clamp for headings) */
+  /* Typography Scale (Fluid with clamp for oversized headings) */
   --text-xs: 0.75rem;                                           /* 12px */
   --text-sm: 0.875rem;                                          /* 14px */
   --text-base: 0.9375rem;                                       /* 15px */
   --text-lg: 1.125rem;                                          /* 18px */
   --text-xl: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);        /* 18-20px */
-  --text-2xl: clamp(1.25rem, 1.125rem + 0.6vw, 1.5rem);         /* 20-24px */
-  --text-3xl: clamp(1.5rem, 1.35rem + 0.8vw, 1.875rem);         /* 24-30px */
-  --text-4xl: clamp(1.75rem, 1.5rem + 1.2vw, 2.25rem);          /* 28-36px */
+  --text-2xl: clamp(1.35rem, 1.2rem + 0.7vw, 1.65rem);         /* 22-26px */
+  --text-3xl: clamp(1.65rem, 1.45rem + 1vw, 2.125rem);         /* 26-34px */
+  --text-4xl: clamp(2rem, 1.65rem + 1.6vw, 2.75rem);           /* 32-44px */
 
-  /* Text Contrast Hierarchy */
-  --text-primary: #17243A;
-  --text-secondary: #64748B;
-  --text-muted: #94A3B8;
+  /* Text Contrast Hierarchy (Deep Midnight-Navy Typography #101D30) */
+  --text-primary: #101D30;
+  --text-secondary: #566579;
+  --text-muted: #8E9EA5;
   --text-inverse: #FFFFFF;
 
-  /* Primary Brand Action (Restrained Blue #2563EB) */
-  --accent-primary: #2563EB;
-  --accent-primary-hover: #1D4ED8;
-  --accent-primary-subtle: #EFF6FF;
-  --accent-primary-border: #BFDBFE;
+  /* Primary Brand Action (Burnt Orange #CC642D) */
+  --accent-primary: #CC642D;
+  --accent-primary-hover: #B55322;
+  --accent-primary-subtle: #FDF2EC;
+  --accent-primary-border: #F3D2C1;
 
-  /* Status Accents (Subtle Pastel Tints & Enterprise Hues) */
-  --status-todo: #475569;
-  --status-todo-subtle: #F1F5F9;
-  --status-todo-border: #CBD5E1;
+  /* Status Accents (Editorial Warm Harmony) */
+  --status-todo: #505E70;
+  --status-todo-subtle: #F3EFEA;
+  --status-todo-border: #DFD6CE;
 
-  --status-inprogress: #2563EB;
-  --status-inprogress-subtle: #EFF6FF;
-  --status-inprogress-border: #BFDBFE;
+  --status-inprogress: #1F4E79;
+  --status-inprogress-subtle: #EEF4FB;
+  --status-inprogress-border: #C6D8E9;
 
-  --status-blocked: #D97706;
-  --status-blocked-subtle: #FEF3C7;
-  --status-blocked-border: #FDE68A;
+  --status-blocked: #A65700;
+  --status-blocked-subtle: #FDF5E8;
+  --status-blocked-border: #F5D9A8;
 
-  --status-review: #7C3AED;
-  --status-review-subtle: #F5F3FF;
-  --status-review-border: #DDD6FE;
+  --status-review: #6B377D;
+  --status-review-subtle: #F8F1FA;
+  --status-review-border: #DECAE6;
 
-  --status-done: #16A36A;
-  --status-done-subtle: #ECFDF5;
-  --status-done-border: #A7F3D0;
+  --status-done: #176E3C;
+  --status-done-subtle: #EEF7F2;
+  --status-done-border: #B6DFC7;
 
-  --status-overdue: #DC3545;
-  --status-overdue-subtle: #FEF2F2;
-  --status-overdue-border: #FECACA;
+  --status-overdue: #BA2C1D;
+  --status-overdue-subtle: #FDF1EF;
+  --status-overdue-border: #F5BDB5;
 
   --status-backlog: #64748B;
-  --status-backlog-subtle: #F8FAFC;
-  --status-backlog-border: #E2E8F0;
+  --status-backlog-subtle: #F5F0EB;
+  --status-backlog-border: #E8DED5;
 
   /* Priorities */
-  --priority-urgent: #DC3545;
-  --priority-urgent-subtle: #FEF2F2;
-  --priority-urgent-border: #FECACA;
+  --priority-urgent: #BA2C1D;
+  --priority-urgent-subtle: #FDF1EF;
+  --priority-urgent-border: #F5BDB5;
 
-  --priority-high: #EA580C;
-  --priority-high-subtle: #FFF7ED;
-  --priority-high-border: #FED7AA;
+  --priority-high: #CC642D;
+  --priority-high-subtle: #FDF2EC;
+  --priority-high-border: #F3D2C1;
 
-  --priority-medium: #D97706;
-  --priority-medium-subtle: #FFFBEB;
-  --priority-medium-border: #FDE68A;
+  --priority-medium: #A65700;
+  --priority-medium-subtle: #FDF5E8;
+  --priority-medium-border: #F5D9A8;
 
-  --priority-low: #16A36A;
-  --priority-low-subtle: #ECFDF5;
-  --priority-low-border: #A7F3D0;
+  --priority-low: #176E3C;
+  --priority-low-subtle: #EEF7F2;
+  --priority-low-border: #B6DFC7;
 
   /* Spacing */
   --space-1: 0.25rem;  /* 4px */
@@ -122,22 +135,23 @@
   --space-8: 2rem;     /* 32px */
   --space-12: 3rem;    /* 48px */
 
-  /* Rounded Corners */
+  /* Rounded Corners (Rounded Pill buttons & Moderately Rounded cards) */
   --radius-none: 0px;
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-pill: 9999px;
   --radius-full: 9999px;
 
-  /* Refined SaaS Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-card-hover: 0 6px 16px -2px rgba(15, 23, 42, 0.1), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
+  /* Soft Realistic SaaS Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(16, 29, 48, 0.04);
+  --shadow-md: 0 4px 8px -2px rgba(16, 29, 48, 0.06), 0 2px 4px -2px rgba(16, 29, 48, 0.04);
+  --shadow-lg: 0 12px 28px -6px rgba(16, 29, 48, 0.1), 0 4px 8px -4px rgba(16, 29, 48, 0.04);
+  --shadow-card: 0 1px 3px rgba(16, 29, 48, 0.04), 0 3px 8px rgba(16, 29, 48, 0.03);
+  --shadow-card-hover: 0 8px 24px -4px rgba(16, 29, 48, 0.09), 0 2px 6px -1px rgba(16, 29, 48, 0.04);
+  --shadow-modal: 0 24px 48px -12px rgba(16, 29, 48, 0.18), 0 8px 16px -4px rgba(16, 29, 48, 0.08);
 
   /* Transitions */
   --transition-fast: 150ms ease-in-out;

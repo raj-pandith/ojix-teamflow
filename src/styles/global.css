@@ -11,11 +11,11 @@
   background: var(--bg-canvas);
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: var(--border-prominent);
   border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: var(--border-contrast);
 }
 
 /* Accessibility Focus Ring */
@@ -24,12 +24,13 @@
   outline-offset: 2px;
 }
 
-/* Base Layout Classes with Dynamic Viewport Units */
+/* Base Layout Classes with Dynamic Viewport Units & Subtle Peach Canvas */
 .app-container {
   display: flex;
   min-height: 100vh;
   min-height: 100dvh;
   background-color: var(--bg-canvas);
+  background-image: radial-gradient(circle at 15% 15%, #FFFDFB 0%, #F8F1EC 100%);
   position: relative;
   overflow-x: hidden;
   width: 100%;
@@ -44,7 +45,7 @@
   overflow-x: hidden;
   max-height: 100vh;
   max-height: 100dvh;
-  background-color: var(--bg-canvas);
+  background-color: transparent;
   position: relative;
 }
 
@@ -68,7 +69,7 @@
   }
 }
 
-/* Page Header & View Titles */
+/* Page Header & View Titles - Oversized Bold Sans-Serif with Tight Tracking */
 .view-header {
   margin-bottom: var(--space-5);
   padding-bottom: var(--space-4);
@@ -80,115 +81,117 @@
 
 .view-title {
   font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  font-weight: 700;
+  font-size: var(--text-3xl);
+  font-weight: 800;
   color: var(--text-primary);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
   margin: 0 0 var(--space-1) 0;
 }
 
 .view-subtitle {
   font-size: var(--text-sm);
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.55;
   max-width: 76ch;
   margin: 0;
 }
 
-/* Badges & Pills */
+/* Badges & Pills - Small Uppercase Labels with Letter Spacing */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: var(--radius-pill);
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   line-height: 1.2;
   border: 1px solid transparent;
   white-space: nowrap;
 }
 
-/* Priority Badges */
+/* Priority Badges (Warm Editorial SaaS Palette) */
 .badge-urgent {
-  background: #FEF2F2;
-  color: #DC3545;
-  border-color: #FECACA;
+  background: var(--priority-urgent-subtle);
+  color: var(--priority-urgent);
+  border-color: var(--priority-urgent-border);
 }
 .badge-high {
-  background: #FFF7ED;
-  color: #EA580C;
-  border-color: #FED7AA;
+  background: var(--priority-high-subtle);
+  color: var(--priority-high);
+  border-color: var(--priority-high-border);
 }
 .badge-medium {
-  background: #EFF6FF;
-  color: #2563EB;
-  border-color: #BFDBFE;
+  background: var(--priority-medium-subtle);
+  color: var(--priority-medium);
+  border-color: var(--priority-medium-border);
 }
 .badge-low {
-  background: #ECFDF5;
-  color: #16A36A;
-  border-color: #A7F3D0;
+  background: var(--priority-low-subtle);
+  color: var(--priority-low);
+  border-color: var(--priority-low-border);
 }
 
 /* Status Badges */
 .badge-status-done {
-  background: #ECFDF5;
-  color: #16A36A;
-  border-color: #A7F3D0;
+  background: var(--status-done-subtle);
+  color: var(--status-done);
+  border-color: var(--status-done-border);
 }
 .badge-status-inprogress {
-  background: #EFF6FF;
-  color: #2563EB;
-  border-color: #BFDBFE;
+  background: var(--status-inprogress-subtle);
+  color: var(--status-inprogress);
+  border-color: var(--status-inprogress-border);
 }
 .badge-status-review {
-  background: #F5F3FF;
-  color: #7C3AED;
-  border-color: #DDD6FE;
+  background: var(--status-review-subtle);
+  color: var(--status-review);
+  border-color: var(--status-review-border);
 }
 .badge-status-blocked {
-  background: #FEF3C7;
-  color: #D97706;
-  border-color: #FDE68A;
+  background: var(--status-blocked-subtle);
+  color: var(--status-blocked);
+  border-color: var(--status-blocked-border);
 }
 .badge-status-todo {
-  background: #F1F5F9;
-  color: #475569;
-  border-color: #CBD5E1;
+  background: var(--status-todo-subtle);
+  color: var(--status-todo);
+  border-color: var(--status-todo-border);
 }
 .badge-status-backlog {
-  background: #F8FAFC;
-  color: #64748B;
-  border-color: #E2E8F0;
+  background: var(--status-backlog-subtle);
+  color: var(--status-backlog);
+  border-color: var(--status-backlog-border);
 }
 
 /* Role Badges */
 .badge-role-workspace_admin {
-  background: #EFF6FF;
-  color: #2563EB;
-  border-color: #BFDBFE;
+  background: var(--accent-primary-subtle);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary-border);
 }
 .badge-role-project_lead {
-  background: #F5F3FF;
-  color: #7C3AED;
-  border-color: #DDD6FE;
+  background: var(--status-review-subtle);
+  color: var(--status-review);
+  border-color: var(--status-review-border);
 }
 .badge-role-member {
-  background: #ECFDF5;
-  color: #16A36A;
-  border-color: #A7F3D0;
+  background: var(--status-done-subtle);
+  color: var(--status-done);
+  border-color: var(--status-done-border);
 }
 .badge-role-viewer {
-  background: #F1F5F9;
-  color: #475569;
-  border-color: #CBD5E1;
+  background: var(--status-todo-subtle);
+  color: var(--status-todo);
+  border-color: var(--status-todo-border);
 }
 
 /* Micro-animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(3px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -198,15 +201,15 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn var(--transition-normal) ease forwards;
+  animation: fadeIn var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .skeleton-shimmer {
   background: linear-gradient(
     90deg,
-    #F1F5F9 0%,
-    #E2E8F0 50%,
-    #F1F5F9 100%
+    #F3EAE3 0%,
+    #E8DED5 50%,
+    #F3EAE3 100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
