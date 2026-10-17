@@ -1,5 +1,5 @@
 import { UserProfile, UserStatus } from '../types/auth';
-import { Project, ProjectDeletionNotice } from '../types/project';
+import { Project, ProjectDeletionNotice, TaskReassignmentDecision, RemoveMemberResult } from '../types/project';
 import { Task } from '../types/task';
 import { ActivityLogEntry, AuditAction } from '../types/audit';
 import { INITIAL_USERS, INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_ACTIVITY_LOGS } from './mockData';
@@ -30,6 +30,9 @@ class ReactiveStorageEngine {
   }
 
   public initialize(forceReset = false): void {
+    if (forceReset) {
+      this.inFlightMutations.clear();
+    }
     if (forceReset || !localStorage.getItem(STORAGE_KEYS.INITIALIZED)) {
       this.users = [...INITIAL_USERS];
       this.projects = [...INITIAL_PROJECTS];
@@ -80,11 +83,16 @@ class ReactiveStorageEngine {
     if (this.inFlightMutations.has(key)) {
       return this.inFlightMutations.get(key) as Promise<T>;
     }
-    const promise = mutationFn().finally(() => {
-      setTimeout(() => {
+    const promise = mutationFn()
+      .catch(err => {
         this.inFlightMutations.delete(key);
-      }, 2000);
-    });
+        throw err;
+      })
+      .finally(() => {
+        setTimeout(() => {
+          this.inFlightMutations.delete(key);
+        }, 2000);
+      });
     this.inFlightMutations.set(key, promise);
     return promise;
   }
@@ -325,7 +333,31 @@ class ReactiveStorageEngine {
     return this.projects[pIndex];
   }
 
-  public removeTeamMember(projectId: string, uid: string, caller: UserProfile): Project {
+  public getMemberProjectTasks(projectId: string, userId: string, caller: UserProfile): {
+    activeTasks: Task[];
+    completedTasks: Task[];
+  } {
+    const project = this.getProjectById(projectId, caller);
+    if (!project) {
+      throw new Error(`Project ${projectId} not found.`);
+    }
+    const memberTasks = this.tasks.filter(t => t.projectId === projectId && t.assigneeId === userId);
+    return {
+      activeTasks: memberTasks.filter(t => t.status !== 'done'),
+      completedTasks: memberTasks.filter(t => t.status === 'done'),
+    };
+  }
+
+  public removeTeamMember(
+    projectId: string,
+    uid: string,
+    caller: UserProfile,
+    reassignments?: TaskReassignmentDecision[]
+  ): Project & RemoveMemberResult {
+    if (caller.status === 'blocked' || caller.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${caller.status}.`);
+    }
+
     const pIndex = this.projects.findIndex(p => p.id === projectId);
     if (pIndex === -1) {
       throw new Error(`Project ${projectId} not found.`);
@@ -334,33 +366,140 @@ class ReactiveStorageEngine {
 
     const isProjectManager =
       caller.role === 'workspace_admin' ||
-      (caller.role === 'project_lead' && (project.ownerId === caller.uid || project.memberIds.includes(caller.uid)));
+      (caller.role === 'project_lead' && project.ownerId === caller.uid);
 
     if (!isProjectManager) {
-      throw new Error('Permission denied: Only the Project Lead or Workspace Admin can manage team membership for this project.');
+      throw new Error('Permission denied: Only the authorized Project Lead for this project or a Workspace Admin can remove team members.');
     }
 
-    if (project.ownerId === uid && caller.uid === uid) {
-      throw new Error('Project owner cannot remove themselves from their project team.');
+    const targetUser = this.users.find(u => u.uid === uid);
+    if (!targetUser) {
+      throw new Error(`User ${uid} does not exist in workspace.`);
+    }
+
+    if (!project.memberIds.includes(uid)) {
+      throw new Error(`User "${targetUser.displayName}" is not a member of this project team.`);
+    }
+
+    if (project.ownerId === uid) {
+      if (caller.uid === uid) {
+        throw new Error('Project owner cannot remove themselves from their project team.');
+      }
+      throw new Error('Project owner cannot be removed from their own team.');
     }
 
     if (caller.role === 'workspace_admin' && caller.uid === uid) {
       throw new Error('Safety restriction: Workspace Admins cannot remove themselves from the project team.');
     }
 
-    const targetUser = this.users.find(u => u.uid === uid);
-    const targetName = targetUser?.displayName || uid;
-
-    if (caller.role === 'project_lead' && targetUser?.role === 'workspace_admin') {
+    if (caller.role === 'project_lead' && targetUser.role === 'workspace_admin') {
       throw new Error('Permission denied: Project Leads cannot remove a Workspace Admin from the project team.');
     }
 
+    // 1. Scan tasks for this member in this project
+    const memberTasks = this.tasks.filter(t => t.projectId === projectId && t.assigneeId === uid);
+    const activeTasks = memberTasks.filter(t => t.status !== 'done');
+    const completedTasks = memberTasks.filter(t => t.status === 'done');
+
+    // 2. Validate all reassignment choices upfront before committing any mutation
+    if (reassignments && reassignments.length > 0) {
+      for (const decision of reassignments) {
+        const task = memberTasks.find(t => t.id === decision.taskId);
+        if (!task) {
+          throw new Error(`Task ${decision.taskId} not found or not assigned to member "${targetUser.displayName}".`);
+        }
+
+        if (task.status === 'done' && decision.newAssigneeId !== null && decision.newAssigneeId !== uid) {
+          throw new Error('Cannot reassign completed tasks. Completed tasks retain historical ownership.');
+        }
+
+        if (decision.newAssigneeId) {
+          if (decision.newAssigneeId === uid) {
+            throw new Error('Cannot reassign tasks to the member being removed.');
+          }
+
+          const replacementUser = this.users.find(u => u.uid === decision.newAssigneeId);
+          if (!replacementUser) {
+            throw new Error(`Replacement assignee "${decision.newAssigneeId}" not found in workspace.`);
+          }
+
+          if (!project.memberIds.includes(decision.newAssigneeId)) {
+            throw new Error(`Cannot reassign task "${task.title}": User "${replacementUser.displayName}" is not an active member of this project team.`);
+          }
+
+          if (replacementUser.status === 'blocked' || replacementUser.status === 'terminated') {
+            throw new Error(`Cannot reassign task "${task.title}": User "${replacementUser.displayName}" account is ${replacementUser.status}.`);
+          }
+        }
+      }
+    }
+
+    // 3. Atomically apply task reassignments & team removal
+    const now = new Date().toISOString();
+    const reassignedTasks: Task[] = [];
+    const unassignedTasks: Task[] = [];
+
+    if (reassignments !== undefined) {
+      // Reassignment mode: update unfinished tasks according to decisions (or leave unassigned)
+      for (const t of activeTasks) {
+        const decision = reassignments.find(r => r.taskId === t.id);
+        const targetAssigneeId = decision ? decision.newAssigneeId : null;
+
+        const taskIndex = this.tasks.findIndex(existing => existing.id === t.id);
+        if (taskIndex >= 0) {
+          const updatedTask: Task = {
+            ...t,
+            assigneeId: targetAssigneeId,
+            updatedAt: now,
+          };
+          this.tasks[taskIndex] = updatedTask;
+
+          if (targetAssigneeId) {
+            reassignedTasks.push(updatedTask);
+            const replacementUser = this.users.find(u => u.uid === targetAssigneeId);
+            this.logs.unshift({
+              id: `log-${Date.now().toString(36)}-reassign-${t.id}`,
+              workspaceId: project.workspaceId,
+              projectId: project.id,
+              taskId: t.id,
+              userId: caller.uid,
+              userDisplayName: caller.displayName,
+              action: 'reassigned',
+              fieldChanged: 'assignee',
+              oldValue: targetUser.displayName,
+              newValue: replacementUser?.displayName || targetAssigneeId,
+              commentText: `${caller.displayName} reassigned task "${t.title}" from "${targetUser.displayName}" to "${replacementUser?.displayName || targetAssigneeId}" during member removal.`,
+              createdAt: now,
+            });
+          } else {
+            unassignedTasks.push(updatedTask);
+            this.logs.unshift({
+              id: `log-${Date.now().toString(36)}-unassign-${t.id}`,
+              workspaceId: project.workspaceId,
+              projectId: project.id,
+              taskId: t.id,
+              userId: caller.uid,
+              userDisplayName: caller.displayName,
+              action: 'reassigned',
+              fieldChanged: 'assignee',
+              oldValue: targetUser.displayName,
+              newValue: 'Unassigned',
+              commentText: `${caller.displayName} left task "${t.title}" unassigned during member removal.`,
+              createdAt: now,
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Update project memberIds
     this.projects[pIndex] = {
       ...project,
       memberIds: project.memberIds.filter(id => id !== uid),
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     };
 
+    // 5. Audit log for member removal
     this.logs.unshift({
       id: `log-team-${Date.now().toString(36)}-remove`,
       workspaceId: project.workspaceId,
@@ -370,14 +509,25 @@ class ReactiveStorageEngine {
       userDisplayName: caller.displayName,
       action: 'team_member_removed',
       fieldChanged: 'team',
-      oldValue: targetName,
-      commentText: `${caller.displayName} removed "${targetName}" from project team. Historical task records are preserved.`,
-      createdAt: new Date().toISOString(),
+      oldValue: targetUser.displayName,
+      commentText: `${caller.displayName} removed "${targetUser.displayName}" from project team "${project.name}". Historical task records are preserved (${completedTasks.length} completed task(s) retained, ${reassignedTasks.length} reassigned, ${unassignedTasks.length} left unassigned).`,
+      createdAt: now,
     });
 
     this.persist();
     this.notify();
-    return this.projects[pIndex];
+
+    const updatedProject = this.projects[pIndex];
+    const result: Project & RemoveMemberResult = {
+      ...updatedProject,
+      project: updatedProject,
+      removedUser: targetUser,
+      reassignedTasks,
+      unassignedTasks,
+      preservedCompletedTasks: completedTasks,
+    };
+
+    return result;
   }
 
   public addMemberToProject(projectId: string, uid: string): void {

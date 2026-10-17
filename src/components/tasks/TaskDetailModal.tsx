@@ -20,6 +20,7 @@ interface TaskDetailModalProps {
   onDeleteTask: (taskId: string) => void;
   onUpdateTask?: (taskId: string, updates: Partial<TaskFormData>) => Promise<unknown>;
   canMutate: boolean;
+  zIndex?: number;
 }
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
@@ -31,6 +32,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onDeleteTask,
   onUpdateTask,
   canMutate,
+  zIndex = 1200,
 }) => {
   const [currentTask, setCurrentTask] = useState<Task | null>(task);
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
@@ -95,7 +97,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const canUpdate = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={activeTask.title} maxWidth="720px">
+    <Modal isOpen={isOpen} onClose={onClose} title={activeTask.title} maxWidth="720px" zIndex={zIndex}>
       <div className="task-detail-container">
         {/* Top Badges & Meta */}
         <div className="task-detail-meta-row">

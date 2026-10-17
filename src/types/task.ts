@@ -14,6 +14,7 @@ export interface Task {
   readonly blockerReason?: string;
   readonly dueDate: string; // ISO date 'YYYY-MM-DD'
   readonly milestoneId?: string;
+  readonly dependencies?: string[];
   readonly createdBy: string;
   readonly createdAt: string; // ISO-8601 UTC
   readonly updatedAt: string; // ISO-8601 UTC
@@ -28,6 +29,7 @@ export interface TaskFormData {
   blockerReason?: string;
   dueDate: string;
   milestoneId?: string;
+  dependencies?: string[];
 }
 
 export interface TaskFilterOptions {

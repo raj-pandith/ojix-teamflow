@@ -1,5 +1,6 @@
-import { Project, ProjectFormData, ProjectDeletionNotice } from '../types/project';
+import { Project, ProjectFormData, ProjectDeletionNotice, TaskReassignmentDecision, RemoveMemberResult } from '../types/project';
 import { UserProfile } from '../types/auth';
+import { Task } from '../types/task';
 import { storageEngine } from './storageEngine';
 import { validateProjectForm } from '../domain/validation';
 
@@ -77,6 +78,26 @@ class ProjectService {
 
   public async deleteProject(projectId: string, user: UserProfile): Promise<void> {
     storageEngine.deleteProject(projectId, user);
+  }
+
+  public async removeTeamMember(
+    projectId: string,
+    userId: string,
+    caller: UserProfile,
+    reassignments?: TaskReassignmentDecision[]
+  ): Promise<Project & RemoveMemberResult> {
+    const idempotencyKey = `remove-team-member-${projectId}-${userId}-${caller.uid}-${JSON.stringify(reassignments || [])}`;
+    return storageEngine.executeIdempotent(idempotencyKey, async () => {
+      return storageEngine.removeTeamMember(projectId, userId, caller, reassignments);
+    });
+  }
+
+  public getMemberProjectTasks(
+    projectId: string,
+    userId: string,
+    caller: UserProfile
+  ): { activeTasks: Task[]; completedTasks: Task[] } {
+    return storageEngine.getMemberProjectTasks(projectId, userId, caller);
   }
 
   public getDeletionNotices(user: UserProfile): ProjectDeletionNotice[] {

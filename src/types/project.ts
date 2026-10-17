@@ -33,3 +33,17 @@ export interface ProjectDeletionNotice {
   readonly memberIds: readonly string[];
   readonly deletedAt: string; // ISO date-time string
 }
+
+export interface TaskReassignmentDecision {
+  readonly taskId: string;
+  readonly newAssigneeId: string | null; // null represents unassigned
+}
+
+export interface RemoveMemberResult {
+  readonly project: Project;
+  readonly removedUser: import('./auth').UserProfile;
+  readonly reassignedTasks: import('./task').Task[];
+  readonly unassignedTasks: import('./task').Task[];
+  readonly preservedCompletedTasks: import('./task').Task[];
+}
+

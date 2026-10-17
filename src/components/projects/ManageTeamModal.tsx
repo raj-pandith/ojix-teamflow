@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Project } from '../../types/project';
+import { Project, RemoveMemberResult } from '../../types/project';
 import { UserProfile, UserRole } from '../../types/auth';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { storageEngine } from '../../services/storageEngine';
 import { useToast } from '../../hooks/useToast';
+import { RemoveMemberConfirmModal } from './RemoveMemberConfirmModal';
 
 interface ManageTeamModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<UserRole | 'all'>('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<UserProfile | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -75,32 +77,30 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
     }
   };
 
-  const handleRemoveMember = async (userId: string, userName: string) => {
-    if (userId === project.ownerId) {
+  const handleInitiateRemove = (member: UserProfile) => {
+    if (member.uid === project.ownerId) {
       showToast('error', 'Operation Denied', 'Project owner cannot be removed from their own team.');
       return;
     }
-    const targetMember = users.find(u => u.uid === userId);
-    if (currentUser.role === 'project_lead' && targetMember?.role === 'workspace_admin') {
+    if (currentUser.role === 'project_lead' && member.role === 'workspace_admin') {
       showToast('error', 'Operation Denied', 'Project Leads cannot remove Workspace Admins from the project team.');
       return;
     }
-    if (currentUser.role === 'workspace_admin' && userId === currentUser.uid) {
+    if (currentUser.role === 'workspace_admin' && member.uid === currentUser.uid) {
       showToast('error', 'Safety Restriction', 'Workspace Admins cannot remove themselves from the project team.');
       return;
     }
-    if (!window.confirm(`Are you sure you want to remove "${userName}" from project team "${project.name}"? Historical tasks and contributions will be preserved.`)) {
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      storageEngine.removeTeamMember(project.id, userId, currentUser);
-      showToast('info', 'Member Removed', `"${userName}" was removed from the team. Historical task records remain intact.`);
-    } catch (err: unknown) {
-      showToast('error', 'Failed to Remove Member', err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsSubmitting(false);
-    }
+    setMemberToRemove(member);
+  };
+
+  const handleRemovalSuccess = (result: RemoveMemberResult) => {
+    const { removedUser, reassignedTasks, unassignedTasks, preservedCompletedTasks } = result;
+    showToast(
+      'info',
+      'Member Removed from Team',
+      `"${removedUser.displayName}" was removed from the team. Reassigned ${reassignedTasks.length} task(s), ${unassignedTasks.length} left unassigned. ${preservedCompletedTasks.length} completed task(s) preserved.`
+    );
+    setMemberToRemove(null);
   };
 
   return (
@@ -187,7 +187,7 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
                             variant="danger"
                             size="sm"
                             disabled={isSubmitting || isProtectedAdmin || isSelfAdmin}
-                            onClick={() => handleRemoveMember(member.uid, member.displayName)}
+                            onClick={() => handleInitiateRemove(member)}
                             id={`remove-member-btn-${member.uid}`}
                             title={
                               isSelfAdmin
@@ -302,6 +302,17 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
           </Button>
         </div>
       </div>
+
+      {memberToRemove && (
+        <RemoveMemberConfirmModal
+          isOpen={!!memberToRemove}
+          onClose={() => setMemberToRemove(null)}
+          project={project}
+          member={memberToRemove}
+          currentUser={currentUser}
+          onSuccess={handleRemovalSuccess}
+        />
+      )}
     </Modal>
   );
 };
