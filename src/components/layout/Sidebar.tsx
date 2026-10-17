@@ -11,8 +11,6 @@ interface SidebarProps {
   activeProjectId: string;
   onSelectProject: (projectId: string) => void;
   onOpenNewProject: () => void;
-  onDeleteProject?: (projectId: string) => void;
-  onRequestDelete?: (projectId: string, projectName: string) => void;
   currentUser: UserProfile | null;
 }
 
@@ -23,8 +21,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeProjectId,
   onSelectProject,
   onOpenNewProject,
-  onDeleteProject,
-  onRequestDelete,
   currentUser,
 }) => {
   const canCreateProject =
@@ -107,8 +103,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="project-list-scroll">
           {projects.map(proj => {
-            const canDelete =
-              currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
             const isActive = proj.id === activeProjectId;
 
             return (
@@ -125,24 +119,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {proj.name}
                   </span>
                 </button>
-                {canDelete && (
-                  <button
-                    className="btn-delete-project"
-                    onClick={e => {
-                      e.stopPropagation();
-                      if (onRequestDelete) {
-                        onRequestDelete(proj.id, proj.name);
-                      } else if (onDeleteProject) {
-                        onDeleteProject(proj.id);
-                      }
-                    }}
-                    title={`Delete project "${proj.name}"`}
-                    aria-label={`Delete project ${proj.name}`}
-                    id={`sidebar-delete-project-${proj.id}`}
-                  >
-                    🗑️
-                  </button>
-                )}
               </div>
             );
           })}

@@ -76,8 +76,6 @@ const MainApp: React.FC = () => {
           setActiveProjectId(id);
         }}
         onOpenNewProject={() => setIsCreateProjectOpen(true)}
-        onDeleteProject={deleteProject}
-        onRequestDelete={(id, name) => setProjectToDelete({ id, name })}
         currentUser={currentUser}
       />
 
