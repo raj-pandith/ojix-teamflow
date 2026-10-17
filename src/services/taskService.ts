@@ -1,7 +1,7 @@
 import { Task, TaskFormData, TaskStatus } from '../types/task';
 import { UserProfile } from '../types/auth';
 import { storageEngine } from './storageEngine';
-import { validateTaskForm } from '../domain/validation';
+import { validateTaskForm, validateAssigneeEligibility } from '../domain/validation';
 import { validateTaskTransition, canUserMoveTask } from '../domain/taskStateMachine';
 import { auditService } from './auditService';
 
@@ -43,16 +43,9 @@ class TaskService {
 
     if (data.assigneeId) {
       const targetUser = storageEngine.getUser(data.assigneeId);
-      if (!targetUser) {
-        throw new Error(`Assignee user "${data.assigneeId}" not found in workspace.`);
-      }
-      if (targetUser.status === 'blocked' || targetUser.status === 'terminated') {
-        throw new Error(`Cannot assign task to "${targetUser.displayName}": User account is ${targetUser.status}.`);
-      }
-      if (!project.memberIds.includes(data.assigneeId)) {
-        throw new Error(
-          `Permission denied: Assignee "${targetUser.displayName}" is not an active member of this project team. Please add them using Manage Team first.`
-        );
+      const eligibility = validateAssigneeEligibility(targetUser, project);
+      if (!eligibility.eligible) {
+        throw new Error(`Permission denied: Cannot assign task. ${eligibility.reason}`);
       }
     }
 
@@ -200,18 +193,11 @@ class TaskService {
       milestoneId: updates.milestoneId ?? existing.milestoneId,
     };
 
-    if (merged.assigneeId) {
+    if (merged.assigneeId && merged.assigneeId !== existing.assigneeId) {
       const targetUser = storageEngine.getUser(merged.assigneeId);
-      if (!targetUser) {
-        throw new Error(`Assignee user "${merged.assigneeId}" not found in workspace.`);
-      }
-      if (targetUser.status === 'blocked' || targetUser.status === 'terminated') {
-        throw new Error(`Cannot assign task to "${targetUser.displayName}": User account is ${targetUser.status}.`);
-      }
-      if (project && !project.memberIds.includes(merged.assigneeId)) {
-        throw new Error(
-          `Permission denied: Assignee "${targetUser.displayName}" is not an active member of this project team. Please add them using Manage Team first.`
-        );
+      const eligibility = validateAssigneeEligibility(targetUser, project);
+      if (!eligibility.eligible) {
+        throw new Error(`Permission denied: Cannot assign task. ${eligibility.reason}`);
       }
     }
 

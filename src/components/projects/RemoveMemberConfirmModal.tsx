@@ -10,6 +10,7 @@ import { projectService } from '../../services/projectService';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
 import { TaskDetailModal } from '../tasks/TaskDetailModal';
 import { taskService } from '../../services/taskService';
+import { getEligibleProjectAssignees } from '../../domain/validation';
 
 export interface RemoveMemberConfirmModalProps {
   isOpen: boolean;
@@ -61,12 +62,10 @@ export const RemoveMemberConfirmModal: React.FC<RemoveMemberConfirmModalProps> =
 
   if (!isOpen || !member || !project) return null;
 
-  // Eligible replacement members: active workspace users who already belong to this project team (excluding the member being removed)
+  // Eligible replacement members: active workspace users with assignable role (Member or Project Lead) who belong to this project team (excluding the member being removed)
   const allWorkspaceUsers = storageEngine.getUsers();
-  const eligibleMembers = allWorkspaceUsers.filter(u =>
-    u.uid !== member.uid &&
-    project.memberIds.includes(u.uid) &&
-    (u.status === 'active' || !u.status)
+  const eligibleMembers = getEligibleProjectAssignees(allWorkspaceUsers, project).filter(
+    u => u.uid !== member.uid
   );
 
   const handleTaskAssigneeChange = (taskId: string, newAssigneeId: string) => {

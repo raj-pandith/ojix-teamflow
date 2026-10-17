@@ -4,6 +4,7 @@ import { Project } from '../../types/project';
 import { UserProfile } from '../../types/auth';
 import { Button } from '../../components/common/Button';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
+import { isUserEligibleForAssignment } from '../../domain/validation';
 
 interface WorkTriageDrawerProps {
   isOpen: boolean;
@@ -62,13 +63,14 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
     setAddingTaskIndex(index);
     try {
       const today = new Date().toISOString().slice(0, 10);
+      const isEligible = isUserEligibleForAssignment(currentUser, project);
       await onCreateTask(project.id, {
         title: task.title,
         description: 'Imported from team notes.',
         priority: task.priority,
         status: 'todo',
         dueDate: today,
-        assigneeId: currentUser.uid,
+        assigneeId: isEligible ? currentUser.uid : null,
       });
       setExtractedTasks(prev => prev.filter((_, i) => i !== index));
     } finally {

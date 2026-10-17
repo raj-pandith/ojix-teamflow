@@ -10,6 +10,7 @@ import { TaskUpdateModal } from './TaskUpdateModal';
 import { auditService } from '../../services/auditService';
 import { storageEngine } from '../../services/storageEngine';
 import { formatDisplayDate } from '../../domain/timezone';
+import { isUserEligibleForAssignment } from '../../domain/validation';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -79,6 +80,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   if (!activeTask) return null;
 
   const assignee = users.find(u => u.uid === activeTask.assigneeId);
+  const isAssigneeIneligible = Boolean(assignee && project && !isUserEligibleForAssignment(assignee, project));
 
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,9 +117,56 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
           <div className="meta-item">
             <span className="meta-label">Assignee</span>
-            <span className="meta-value">{assignee?.displayName || 'Unassigned'}</span>
+            <span className="meta-value">
+              {assignee?.displayName || 'Unassigned'}
+              {isAssigneeIneligible && assignee && (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    marginLeft: '6px',
+                    fontSize: '11px',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    color: 'var(--status-blocked, #ef4444)',
+                    fontWeight: 600,
+                  }}
+                  title="This user is ineligible to receive task assignments under the project role policy."
+                >
+                  ⚠️ Ineligible ({assignee.role.replace('_', ' ')})
+                </span>
+              )}
+            </span>
           </div>
         </div>
+
+        {/* Reassignment Prompt if Ineligible */}
+        {isAssigneeIneligible && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: '6px',
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              marginBottom: '16px',
+            }}
+          >
+            <div>
+              <strong>Reassignment Recommended:</strong> Current assignee (<strong>{assignee?.displayName}</strong>) is no longer eligible to hold tasks in this project.
+            </div>
+            {canUpdate && (
+              <Button size="sm" variant="secondary" onClick={() => setIsUpdateOpen(true)}>
+                Reassign Task
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Blocker Notice if Blocked */}
         {activeTask.status === 'blocked' && activeTask.blockerReason && (

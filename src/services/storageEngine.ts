@@ -3,6 +3,7 @@ import { Project, ProjectDeletionNotice, TaskReassignmentDecision, RemoveMemberR
 import { Task } from '../types/task';
 import { ActivityLogEntry, AuditAction } from '../types/audit';
 import { INITIAL_USERS, INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_ACTIVITY_LOGS } from './mockData';
+import { validateAssigneeEligibility } from '../domain/validation';
 
 const STORAGE_KEYS = {
   USERS: 'ojix_teamflow_users',
@@ -418,17 +419,10 @@ class ReactiveStorageEngine {
             throw new Error('Cannot reassign tasks to the member being removed.');
           }
 
-          const replacementUser = this.users.find(u => u.uid === decision.newAssigneeId);
-          if (!replacementUser) {
-            throw new Error(`Replacement assignee "${decision.newAssigneeId}" not found in workspace.`);
-          }
-
-          if (!project.memberIds.includes(decision.newAssigneeId)) {
-            throw new Error(`Cannot reassign task "${task.title}": User "${replacementUser.displayName}" is not an active member of this project team.`);
-          }
-
-          if (replacementUser.status === 'blocked' || replacementUser.status === 'terminated') {
-            throw new Error(`Cannot reassign task "${task.title}": User "${replacementUser.displayName}" account is ${replacementUser.status}.`);
+          const replacementUser = this.getUser(decision.newAssigneeId);
+          const eligibility = validateAssigneeEligibility(replacementUser, project);
+          if (!eligibility.eligible) {
+            throw new Error(`Cannot reassign task "${task.title}": ${eligibility.reason}`);
           }
         }
       }
@@ -444,6 +438,17 @@ class ReactiveStorageEngine {
       for (const t of activeTasks) {
         const decision = reassignments.find(r => r.taskId === t.id);
         const targetAssigneeId = decision ? decision.newAssigneeId : null;
+
+        if (targetAssigneeId) {
+          if (targetAssigneeId === uid) {
+            throw new Error(`Cannot reassign task to the member "${targetUser.displayName}" who is being removed.`);
+          }
+          const replacementUser = this.getUser(targetAssigneeId);
+          const eligibility = validateAssigneeEligibility(replacementUser, project);
+          if (!eligibility.eligible) {
+            throw new Error(`Permission denied: Cannot reassign task "${t.title}". ${eligibility.reason}`);
+          }
+        }
 
         const taskIndex = this.tasks.findIndex(existing => existing.id === t.id);
         if (taskIndex >= 0) {
@@ -683,22 +688,17 @@ class ReactiveStorageEngine {
     // Verify membership in project
     const project = this.getProjectById(task.projectId, user);
 
-    // Database-level enforcement of mandatory project team membership:
+    // Database-level enforcement of mandatory task assignee eligibility rules:
     if (task.assigneeId) {
-      const targetUser = this.getUser(task.assigneeId);
-      if (!targetUser) {
-        throw new Error(`Assignee user "${task.assigneeId}" not found in workspace.`);
-      }
-      if (targetUser.status === 'blocked' || targetUser.status === 'terminated') {
-        throw new Error(`Cannot assign task to "${targetUser.displayName}": User account is ${targetUser.status}.`);
-      }
       const existingTask = this.tasks.find(t => t.id === task.id);
       const isAssigneeChanging = !existingTask || existingTask.assigneeId !== task.assigneeId;
 
-      if (isAssigneeChanging && project && !project.memberIds.includes(task.assigneeId)) {
-        throw new Error(
-          `Permission denied: Assignee "${targetUser.displayName}" is not an active member of this project team. Please add them using Manage Team first.`
-        );
+      if (isAssigneeChanging) {
+        const targetUser = this.getUser(task.assigneeId);
+        const eligibility = validateAssigneeEligibility(targetUser, project);
+        if (!eligibility.eligible) {
+          throw new Error(`Permission denied: Cannot assign task. ${eligibility.reason}`);
+        }
       }
     }
 

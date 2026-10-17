@@ -1,9 +1,94 @@
 import { TaskFormData } from '../types/task';
-import { ProjectFormData } from '../types/project';
+import { Project, ProjectFormData } from '../types/project';
+import { UserProfile } from '../types/auth';
 
 export interface ValidationResult {
   readonly isValid: boolean;
   readonly errors: Record<string, string>;
+}
+
+export interface AssigneeEligibilityResult {
+  readonly eligible: boolean;
+  readonly reason?: string;
+}
+
+/**
+ * Validates whether a user is eligible for task assignment in a given project.
+ * Rules:
+ * 1. User account must exist.
+ * 2. User account must be 'active' (not 'blocked' or 'terminated').
+ * 3. User's role must be 'member' or 'project_lead' (explicitly reject 'workspace_admin' and 'viewer').
+ * 4. User must be an active member of the specific project team (user.uid in project.memberIds).
+ */
+export function validateAssigneeEligibility(
+  user: UserProfile | null | undefined,
+  project: Project | null | undefined
+): AssigneeEligibilityResult {
+  if (!user) {
+    return { eligible: false, reason: 'Assignee user account does not exist in workspace.' };
+  }
+
+  if (user.status !== 'active') {
+    return {
+      eligible: false,
+      reason: `Cannot assign task to "${user.displayName}": User account is ${user.status} and cannot receive task assignments.`,
+    };
+  }
+
+  if (user.role === 'workspace_admin') {
+    return {
+      eligible: false,
+      reason: 'Workspace Admins manage governance and cannot be assigned operational tasks.',
+    };
+  }
+
+  if (user.role === 'viewer') {
+    return {
+      eligible: false,
+      reason: 'Viewers have read-only permissions and cannot receive task assignments.',
+    };
+  }
+
+  if (user.role !== 'member' && user.role !== 'project_lead') {
+    return {
+      eligible: false,
+      reason: `User role "${user.role}" is not permitted to receive task assignments under the role policy.`,
+    };
+  }
+
+  if (!project) {
+    return { eligible: false, reason: 'Target project does not exist.' };
+  }
+
+  if (!project.memberIds.includes(user.uid)) {
+    return {
+      eligible: false,
+      reason: `User "${user.displayName}" is not an active member of this project team "${project.name}". Please add them using Manage Team first.`,
+    };
+  }
+
+  return { eligible: true };
+}
+
+/**
+ * Convenience predicate returning true if user is assignable in the project.
+ */
+export function isUserEligibleForAssignment(
+  user: UserProfile | null | undefined,
+  project: Project | null | undefined
+): boolean {
+  return validateAssigneeEligibility(user, project).eligible;
+}
+
+/**
+ * Filters workspace users down to only eligible, active project team assignees.
+ */
+export function getEligibleProjectAssignees(
+  users: readonly UserProfile[],
+  project: Project | null | undefined
+): UserProfile[] {
+  if (!project) return [];
+  return users.filter(u => isUserEligibleForAssignment(u, project));
 }
 
 /**

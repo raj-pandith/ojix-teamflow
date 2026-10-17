@@ -7,6 +7,7 @@ import { Button } from '../common/Button';
 import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { storageEngine } from '../../services/storageEngine';
+import { getEligibleProjectAssignees, isUserEligibleForAssignment, validateAssigneeEligibility } from '../../domain/validation';
 
 interface TaskUpdateModalProps {
   isOpen: boolean;
@@ -60,18 +61,17 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
 
   if (!isOpen || !task) return null;
 
-  // Mandatory Team Membership: Only eligible, active workspace users already in this project team
-  const projectTeamMembers = users
-    .filter(u => (project ? project.memberIds.includes(u.uid) : true) && u.status === 'active' && u.role !== 'viewer')
+  // Task Assignment Eligibility: Only active project team members with eligible role (Member or Project Lead)
+  const projectTeamMembers = getEligibleProjectAssignees(users, project)
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
-  // If the task was previously assigned to a user who has since been removed from the team or deactivated,
+  // If the task was previously assigned to a user who is ineligible under the policy (Admin, Viewer, removed member, etc.),
   // display them with an alert so current state is clear, but prompt for reassignment.
   const currentAssignedUser = task.assigneeId ? users.find(u => u.uid === task.assigneeId) : null;
-  const isCurrentAssigneeOutOfTeam =
+  const isCurrentAssigneeIneligible =
     currentAssignedUser &&
     project &&
-    (!project.memberIds.includes(currentAssignedUser.uid) || currentAssignedUser.status !== 'active');
+    !isUserEligibleForAssignment(currentAssignedUser, project);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,10 +89,14 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
     setIsSubmitting(true);
     setError('');
     try {
-    if (assigneeId && project && !project.memberIds.includes(assigneeId)) {
-      setError('Selected assignee is not an active member of this project team. Please add them via Manage Team first.');
-      return;
-    }
+      if (assigneeId && assigneeId !== task.assigneeId) {
+        const targetUser = users.find(u => u.uid === assigneeId);
+        const eligibility = validateAssigneeEligibility(targetUser, project);
+        if (!eligibility.eligible) {
+          setError(eligibility.reason || 'Selected assignee is not eligible for assignment in this project.');
+          return;
+        }
+      }
       const updated = await onUpdateTask(task.id, {
         title: title.trim(),
         description: description.trim(),
@@ -181,11 +185,11 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
               onChange={e => setAssigneeId(e.target.value)}
               options={[
                 { value: '', label: 'Unassigned' },
-                ...(isCurrentAssigneeOutOfTeam && currentAssignedUser
+                ...(isCurrentAssigneeIneligible && currentAssignedUser
                   ? [
                       {
                         value: currentAssignedUser.uid,
-                        label: `⚠️ ${currentAssignedUser.displayName} (Removed from Team — Reassign)`,
+                        label: `⚠️ ${currentAssignedUser.displayName} (Ineligible: ${currentAssignedUser.role.replace('_', ' ')} — Reassign)`,
                       },
                     ]
                   : []),
@@ -196,9 +200,9 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
               ]}
               id="update-task-assignee-select"
             />
-            {isCurrentAssigneeOutOfTeam && (
+            {isCurrentAssigneeIneligible && (
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-blocked)', display: 'block', marginTop: '4px' }}>
-                ⚠️ Current assignee is no longer in this project team. Please reassign to an active team member.
+                ⚠️ Current assignee ({currentAssignedUser?.displayName}) is ineligible to receive task assignments under the project role policy. Please reassign to an eligible team member or leave unassigned.
               </span>
             )}
             {projectTeamMembers.length === 0 && (

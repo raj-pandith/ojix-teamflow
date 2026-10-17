@@ -8,6 +8,7 @@ import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { storageEngine } from '../../services/storageEngine';
 import { getLocalTodayDateString } from '../../domain/timezone';
+import { getEligibleProjectAssignees, validateAssigneeEligibility } from '../../domain/validation';
 
 interface TaskCreateModalProps {
   isOpen: boolean;
@@ -42,9 +43,8 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
     });
   }, [isOpen]);
 
-  // Mandatory Team Membership: Only eligible, active workspace users already in this project team
-  const projectTeamMembers = users
-    .filter(u => project.memberIds.includes(u.uid) && u.status === 'active' && u.role !== 'viewer')
+  // Task Assignment Eligibility: Only active project team members with eligible role (Member or Project Lead)
+  const projectTeamMembers = getEligibleProjectAssignees(users, project)
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,10 +61,14 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
     setIsSubmitting(true);
     setError('');
     try {
-    if (assigneeId && !project.memberIds.includes(assigneeId)) {
-      setError('Selected assignee is not an active member of this project team. Please add them via Manage Team first.');
-      return;
-    }
+      if (assigneeId) {
+        const targetUser = users.find(u => u.uid === assigneeId);
+        const eligibility = validateAssigneeEligibility(targetUser, project);
+        if (!eligibility.eligible) {
+          setError(eligibility.reason || 'Selected assignee is not eligible for assignment in this project.');
+          return;
+        }
+      }
       await onCreateTask({
         title: title.trim(),
         description: description.trim(),

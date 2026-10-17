@@ -67,13 +67,17 @@ describe('RemoveMemberConfirmModal UI Component', () => {
     const unassignedBadges = screen.getAllByText('⏸ Will be Unassigned');
     expect(unassignedBadges.length).toBeGreaterThan(0);
 
-    // Reassign task-102 to Alex Morgan (Workspace Admin)
-    const select102 = screen.getByLabelText(/Reassign task Zero-trust ingress proxy setup/i);
-    fireEvent.change(select102, { target: { value: 'user-admin-alex' } });
+    // Reassign task-102 to eligible Project Lead (Sarah Chen)
+    const select102 = screen.getByLabelText(/Reassign task Zero-trust ingress proxy setup/i) as HTMLSelectElement;
+    // Confirm Alex Morgan (admin) is excluded from options
+    const optionValues = Array.from(select102.options).map(o => o.value);
+    expect(optionValues).not.toContain('user-admin-alex');
 
-    // Now there should be a badge indicating reassigned to Alex Morgan
+    fireEvent.change(select102, { target: { value: 'user-lead-sarah' } });
+
+    // Now there should be a badge indicating reassigned to Sarah Chen
     await waitFor(() => {
-      expect(screen.getByText('➔ Reassigned to Alex Morgan')).toBeDefined();
+      expect(screen.getByText('➔ Reassigned to Sarah Chen')).toBeDefined();
     });
   });
 

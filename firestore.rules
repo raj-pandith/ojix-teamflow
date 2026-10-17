@@ -47,7 +47,10 @@ service cloud.firestore {
       let assignee = get(/databases/$(database)/documents/users/$(assigneeId)).data;
       return assigneeId == null || (
         assigneeId in project.memberIds &&
-        (assignee.status == 'active' || !('status' in assignee))
+        (assignee.status == 'active' || !('status' in assignee)) &&
+        assignee.role != 'workspace_admin' &&
+        assignee.role != 'viewer' &&
+        (assignee.role == 'member' || assignee.role == 'project_lead')
       );
     }
 
