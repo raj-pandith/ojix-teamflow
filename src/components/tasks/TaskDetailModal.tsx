@@ -98,37 +98,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title={activeTask.title} maxWidth="720px">
       <div className="task-detail-container">
         {/* Top Badges & Meta */}
-        <div className="task-detail-meta-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-            <div className="meta-item">
-              <span className="meta-label">Status</span>
-              <Badge type="status" value={activeTask.status} />
-            </div>
-            <div className="meta-item">
-              <span className="meta-label">Priority</span>
-              <Badge type="priority" value={activeTask.priority} />
-            </div>
-            <div className="meta-item">
-              <span className="meta-label">Due Date</span>
-              <span className="meta-value">📅 {formatDisplayDate(activeTask.dueDate)}</span>
-            </div>
-            <div className="meta-item">
-              <span className="meta-label">Assignee</span>
-              <span className="meta-value">👤 {assignee?.displayName || 'Unassigned'}</span>
-            </div>
+        <div className="task-detail-meta-row">
+          <div className="meta-item">
+            <span className="meta-label">Status</span>
+            <Badge type="status" value={activeTask.status} />
           </div>
-
-          {canUpdate && onUpdateTask && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setIsUpdateOpen(true)}
-              id="detail-update-task-btn"
-              title="Admin & Project Lead: Update task details"
-            >
-              ✏️ Update Task
-            </Button>
-          )}
+          <div className="meta-item">
+            <span className="meta-label">Priority</span>
+            <Badge type="priority" value={activeTask.priority} />
+          </div>
+          <div className="meta-item">
+            <span className="meta-label">Due Date</span>
+            <span className="meta-value">📅 {formatDisplayDate(activeTask.dueDate)}</span>
+          </div>
+          <div className="meta-item">
+            <span className="meta-label">Assignee</span>
+            <span className="meta-value">👤 {assignee?.displayName || 'Unassigned'}</span>
+          </div>
         </div>
 
         {/* Blocker Notice if Blocked */}
