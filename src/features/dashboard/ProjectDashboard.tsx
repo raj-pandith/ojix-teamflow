@@ -39,6 +39,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
   const blockedTasks = tasks.filter(t => t.status === 'blocked');
   const overdueTasks = tasks.filter(t => isTaskOverdue(t.dueDate, t.status));
+  const unassignedTasks = tasks.filter(t => !t.assigneeId);
 
   const completionPercentage = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
 
@@ -172,35 +173,80 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
 
         <div className="dashboard-panel">
           <div className="panel-header">
-            <h3 className="panel-title">👥 Team Allocation ({project.memberIds.length} Members)</h3>
+            <h3 className="panel-title">👥 Team Workload & Allocation ({project.memberIds.length} Members)</h3>
           </div>
           <div className="panel-body">
             <div className="team-allocations-list">
+              {/* Unassigned Tasks Warning if any */}
+              {unassignedTasks.length > 0 && (
+                <div className="team-member-row">
+                  <div className="team-member-row-header">
+                    <div className="team-member-info">
+                      <span className="member-avatar member-avatar-unassigned">⚠️</span>
+                      <div className="member-details-text">
+                        <strong className="member-name">Unassigned Work</strong>
+                        <span className="member-role" style={{ color: 'var(--status-blocked)' }}>NEEDS ALLOCATION</span>
+                      </div>
+                    </div>
+                    <div className="member-stats">
+                      <span className="stat-pill stat-unassigned">{unassignedTasks.length} unallocated</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Members Allocation Breakdown */}
               {project.memberIds.map(uid => {
                 const member = users.find(u => u.uid === uid);
                 const memberTasks = tasks.filter(t => t.assigneeId === uid);
                 const memberDone = memberTasks.filter(t => t.status === 'done');
                 const memberBlocked = memberTasks.filter(t => t.status === 'blocked');
+                const memberActive = memberTasks.filter(t => t.status === 'in_progress' || t.status === 'in_review');
+                const memberBacklog = memberTasks.length - memberDone.length - memberBlocked.length - memberActive.length;
+
+                const donePct = memberTasks.length > 0 ? (memberDone.length / memberTasks.length) * 100 : 0;
+                const activePct = memberTasks.length > 0 ? (memberActive.length / memberTasks.length) * 100 : 0;
+                const blockedPct = memberTasks.length > 0 ? (memberBlocked.length / memberTasks.length) * 100 : 0;
+                const backlogPct = memberTasks.length > 0 ? (Math.max(0, memberBacklog) / memberTasks.length) * 100 : 0;
 
                 return (
                   <div key={uid} className="team-member-row">
-                    <div className="team-member-info">
-                      <span className="member-avatar">{member?.displayName.charAt(0) || 'U'}</span>
-                      <div>
-                        <strong className="member-name">{member?.displayName}</strong>
-                        <span className="member-role">{member?.role.replace('_', ' ').toUpperCase()}</span>
+                    <div className="team-member-row-header">
+                      <div className="team-member-info">
+                        <span className="member-avatar">{member?.displayName.charAt(0) || 'U'}</span>
+                        <div className="member-details-text">
+                          <strong className="member-name">{member?.displayName || 'Unknown Member'}</strong>
+                          <span className="member-role">{member?.role.replace('_', ' ').toUpperCase()}</span>
+                        </div>
+                      </div>
+                      <div className="member-stats">
+                        <span className="stat-pill">{memberTasks.length} {memberTasks.length === 1 ? 'task' : 'tasks'}</span>
+                        {memberDone.length > 0 && (
+                          <span className="stat-pill stat-done">{memberDone.length} done</span>
+                        )}
+                        {memberBlocked.length > 0 && (
+                          <span className="stat-pill stat-blocked">{memberBlocked.length} blocked</span>
+                        )}
                       </div>
                     </div>
-                    <div className="member-stats">
-                      <span className="stat-pill">{memberTasks.length} tasks</span>
-                      <span className="stat-pill stat-done">{memberDone.length} done</span>
-                      {memberBlocked.length > 0 && (
-                        <span className="stat-pill stat-blocked">{memberBlocked.length} blocked</span>
-                      )}
-                    </div>
+
+                    {memberTasks.length > 0 && (
+                      <div className="workload-bar-track" title={`${memberDone.length} done, ${memberActive.length} active, ${memberBlocked.length} blocked`}>
+                        <div className="workload-bar-segment workload-bar-done" style={{ width: `${donePct}%` }} />
+                        <div className="workload-bar-segment workload-bar-active" style={{ width: `${activePct}%` }} />
+                        <div className="workload-bar-segment workload-bar-blocked" style={{ width: `${blockedPct}%` }} />
+                        <div className="workload-bar-segment workload-bar-backlog" style={{ width: `${backlogPct}%` }} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
+
+              {project.memberIds.length === 0 && (
+                <div className="empty-panel-state">
+                  <p>No members assigned to this project yet.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
