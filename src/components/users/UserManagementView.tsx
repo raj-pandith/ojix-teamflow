@@ -9,6 +9,7 @@ import { Select } from '../common/Select';
 import { storageEngine } from '../../services/storageEngine';
 import { formatDisplayDate } from '../../domain/timezone';
 import { useToast } from '../../hooks/useToast';
+import { UserPersonaModal } from './UserPersonaModal';
 
 interface UserManagementViewProps {
   currentUser: UserProfile;
@@ -26,6 +27,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [terminatingUser, setTerminatingUser] = useState<UserProfile | null>(null);
   const [pendingBlockUser, setPendingBlockUser] = useState<UserProfile | null>(null);
+  const [inspectingPersonaUser, setInspectingPersonaUser] = useState<UserProfile | null>(null);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -286,6 +288,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               <th>Contact Phone</th>
               <th>Category / Role</th>
               <th>Account Status</th>
+              <th>Permitted Projects</th>
               <th>Registered Date</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
@@ -323,11 +326,69 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                   <td>
                     <Badge type="user-status" value={user.status || 'active'} />
                   </td>
+                  <td>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '240px' }}>
+                      {user.role === 'workspace_admin' ? (
+                        <span
+                          className="badge"
+                          style={{
+                            fontSize: '11px',
+                            padding: '2px 8px',
+                            background: 'rgba(99, 102, 241, 0.15)',
+                            color: 'var(--accent-primary-light, #818cf8)',
+                            border: '1px solid rgba(99, 102, 241, 0.3)',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ⚡ All Projects (Global)
+                        </span>
+                      ) : (
+                        (() => {
+                          const permitted = storageEngine.getProjects(user);
+                          if (permitted.length === 0) {
+                            return (
+                              <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                                None assigned
+                              </span>
+                            );
+                          }
+                          return permitted.map(p => (
+                            <span
+                              key={p.id}
+                              className="badge"
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 7px',
+                                background: 'var(--surface-sunken, #161b22)',
+                                border: '1px solid var(--border-default, #30363d)',
+                                borderRadius: '4px',
+                                color: 'var(--color-text-primary, #f0f6fc)',
+                              }}
+                              title={`Invited to contribute in ${p.name}`}
+                            >
+                              📁 {p.name}
+                            </span>
+                          ));
+                        })()
+                      )}
+                    </div>
+                  </td>
                   <td style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                     {formatDisplayDate(user.createdAt ? user.createdAt.slice(0, 10) : '2026-10-01')}
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '3px 8px', fontSize: '12px' }}
+                        onClick={() => setInspectingPersonaUser(user)}
+                        id={`view-persona-btn-${user.uid}`}
+                        title="View user persona and permitted projects"
+                      >
+                        👤 Persona
+                      </button>
                       {!isTerminated && (
                         <button
                           type="button"
@@ -654,6 +715,14 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
           </div>
         </div>
       </Modal>
+
+      {/* User Persona & Permitted Projects Modal */}
+      <UserPersonaModal
+        isOpen={Boolean(inspectingPersonaUser)}
+        onClose={() => setInspectingPersonaUser(null)}
+        user={inspectingPersonaUser}
+        currentUserId={currentUser.uid}
+      />
     </div>
   );
 };

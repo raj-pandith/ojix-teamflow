@@ -12,6 +12,7 @@ interface TopbarProps {
   canMutate: boolean;
   canCreateTask?: boolean;
   onToggleMobileNav?: () => void;
+  onOpenPersonaModal?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -23,6 +24,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   canMutate: _canMutate,
   canCreateTask,
   onToggleMobileNav,
+  onOpenPersonaModal,
 }) => {
   const { currentUser, personas, switchPersona, resetDemoData } = useAuth();
   const canCreate = canCreateTask !== undefined
@@ -175,10 +177,34 @@ export const Topbar: React.FC<TopbarProps> = ({
           >
             {personas.map(p => (
               <option key={p.uid} value={p.uid}>
-                {p.displayName} ({p.roleLabel})
+                {p.displayName} ({p.roleLabel}{p.status === 'blocked' ? ' — Blocked' : p.status === 'terminated' ? ' — Terminated' : ''})
               </option>
             ))}
           </select>
+          {onOpenPersonaModal && (
+            <button
+              type="button"
+              className="persona-info-btn"
+              onClick={onOpenPersonaModal}
+              id="topbar-inspect-persona-btn"
+              title="Inspect active persona profile & permitted projects"
+              style={{
+                background: 'var(--surface-elevated, #21262d)',
+                border: '1px solid var(--border-default, #30363d)',
+                borderRadius: '6px',
+                padding: '4px 7px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--color-text-secondary, #8b949e)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              ℹ️
+            </button>
+          )}
         </div>
 
         {/* Active Role Pill */}

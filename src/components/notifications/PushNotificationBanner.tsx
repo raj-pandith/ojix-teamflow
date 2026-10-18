@@ -4,7 +4,6 @@ import { AppNotification } from '../../types/message';
 import { notificationService } from '../../services/notificationService';
 import { nativePushService } from '../../services/nativePushService';
 import { webPushClient } from '../../services/webPushClient';
-import { storageEngine } from '../../services/storageEngine';
 
 interface PushNotificationBannerProps {
   currentUser: UserProfile | null;
@@ -120,33 +119,6 @@ export const PushNotificationBanner: React.FC<PushNotificationBannerProps> = ({
       };
     }
   }, [currentUser, onNavigateToProject, onNavigateToTask, onOpenMessages, triggerBrowserNotification]);
-
-  // Listen for storage engine updates to display native desktop push notifications outside browser for mentions
-  useEffect(() => {
-    if (typeof window === 'undefined' || !currentUser) return;
-
-    const seenStorageNotifIds = new Set<string>();
-    const allExisting = storageEngine.getAllNotificationsUnfiltered();
-    allExisting.forEach(n => seenStorageNotifIds.add(n.id));
-
-    const unsubscribe = storageEngine.subscribe(() => {
-      if (Notification.permission !== 'granted' || !currentUser) return;
-      const allCurrent = storageEngine.getAllNotificationsUnfiltered();
-      for (const n of allCurrent) {
-        if (!seenStorageNotifIds.has(n.id)) {
-          seenStorageNotifIds.add(n.id);
-          // Only trigger native browser notification if targeted to currentUser
-          if (!n.isRead && n.recipientUserId === currentUser.uid && n.type === 'TASK_COMMENT_MENTION') {
-            triggerBrowserNotification(n);
-          }
-        }
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [currentUser, triggerBrowserNotification]);
 
   // Handle live incoming notifications
   useEffect(() => {

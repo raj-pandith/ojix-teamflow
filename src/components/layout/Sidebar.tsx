@@ -15,6 +15,7 @@ interface SidebarProps {
   unreadMessagesCount?: number;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -28,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   unreadMessagesCount,
   isMobileOpen = false,
   onCloseMobile,
+  onOpenProfile,
 }) => {
   const canCreateProject =
     currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
@@ -204,7 +206,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="sidebar-footer">
-        <div className="user-profile-widget">
+        <div
+          className="user-profile-widget"
+          onClick={onOpenProfile}
+          style={{ cursor: onOpenProfile ? 'pointer' : 'default' }}
+          title={onOpenProfile ? 'Click to inspect your persona & permitted projects' : undefined}
+          id="sidebar-user-persona-widget"
+        >
           <div className="user-avatar-initials">
             {currentUser?.displayName.charAt(0) || 'U'}
           </div>

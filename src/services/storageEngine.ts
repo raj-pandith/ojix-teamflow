@@ -1,4 +1,4 @@
-import { UserProfile, UserStatus } from '../types/auth';
+import { UserProfile, UserRole, UserStatus, DemoPersona } from '../types/auth';
 import { Project, ProjectDeletionNotice, TaskReassignmentDecision, RemoveMemberResult } from '../types/project';
 import { Task } from '../types/task';
 import { ActivityLogEntry, AuditAction } from '../types/audit';
@@ -10,6 +10,7 @@ import {
 } from '../types/message';
 import {
   INITIAL_USERS,
+  DEMO_PERSONAS,
   INITIAL_PROJECTS,
   INITIAL_TASKS,
   INITIAL_ACTIVITY_LOGS,
@@ -28,12 +29,14 @@ const STORAGE_KEYS = {
   NOTICES: 'ojix_teamflow_deletion_notices',
   NOTIFICATIONS: 'ojix_teamflow_notifications',
   DIRECT_MESSAGES: 'ojix_teamflow_direct_messages',
+  PERSONAS: 'ojix_teamflow_personas',
 };
 
 type Listener = () => void;
 
 class ReactiveStorageEngine {
   private users: UserProfile[] = [];
+  private personas: DemoPersona[] = [];
   private projects: Project[] = [];
   private tasks: Task[] = [];
   private logs: ActivityLogEntry[] = [];
@@ -269,6 +272,7 @@ class ReactiveStorageEngine {
         ...u,
         status: u.status || 'active',
       }));
+      this.personas = JSON.parse(localStorage.getItem(STORAGE_KEYS.PERSONAS) || 'null') ?? [...DEMO_PERSONAS];
       this.projects = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROJECTS) || '[]') || INITIAL_PROJECTS;
       this.tasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.TASKS) || '[]') || INITIAL_TASKS;
       this.logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGS) || '[]') || INITIAL_ACTIVITY_LOGS;
@@ -296,19 +300,103 @@ class ReactiveStorageEngine {
     }
   }
 
-  public initialize(forceReset = false): void {
-    if (forceReset) {
-      this.inFlightMutations.clear();
-      this.inFlightNotificationKeys.clear();
-    }
-    if (forceReset || !localStorage.getItem(STORAGE_KEYS.INITIALIZED)) {
+  public clearAllData(preserveCorePersonas = true): void {
+    this.inFlightMutations.clear();
+    this.inFlightNotificationKeys.clear();
+    this.projects = [];
+    this.tasks = [];
+    this.logs = [];
+    this.deletionNotices = [];
+    this.notifications = [];
+    this.directMessages = [];
+
+    if (preserveCorePersonas) {
       this.users = [...INITIAL_USERS];
+      this.personas = [...DEMO_PERSONAS];
+      this.syncPersonaProjectPermissions();
+    } else {
+      this.users = [];
+      this.personas = [];
+    }
+
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('ojix_') || k.includes('teamflow'))) {
+            keysToRemove.push(k);
+          }
+        }
+        for (const k of keysToRemove) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch {}
+
+    this.persist();
+
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({ type: 'CLEARED_ALL_DATA', timestamp: Date.now() });
+      } catch {}
+    }
+
+    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      fetch('/api/clear-all-data', { method: 'POST' }).catch(() => {});
+    }
+
+    this.notify();
+  }
+
+  public initialize(forceReset = false): void {
+    const isTestRuntime =
+      (typeof process !== 'undefined' && (process.env?.NODE_ENV === 'test' || Boolean(process.env?.VITEST))) ||
+      (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
+
+    const CLEAR_ALL_SEED_KEY = 'ojix_teamflow_cleared_all_v4';
+
+    if (forceReset) {
+      if (isTestRuntime) {
+        this.inFlightMutations.clear();
+        this.inFlightNotificationKeys.clear();
+        this.users = [...INITIAL_USERS];
+        this.personas = [...DEMO_PERSONAS];
+        this.projects = [...INITIAL_PROJECTS];
+        this.tasks = [...INITIAL_TASKS];
+        this.logs = [...INITIAL_ACTIVITY_LOGS];
+        this.deletionNotices = [];
+        this.notifications = [...INITIAL_NOTIFICATIONS];
+        this.directMessages = [...INITIAL_DIRECT_MESSAGES];
+        this.syncPersonaProjectPermissions();
+        this.persist();
+        this.notify();
+        return;
+      } else {
+        this.clearAllData(true);
+        return;
+      }
+    }
+
+    // In browser runtime, automatically enforce pristine zero-seed empty state on boot
+    if (!isTestRuntime) {
+      if (typeof window !== 'undefined' && window.localStorage && localStorage.getItem(CLEAR_ALL_SEED_KEY) !== 'cleared') {
+        this.clearAllData(true);
+        localStorage.setItem(CLEAR_ALL_SEED_KEY, 'cleared');
+        return;
+      }
+    }
+
+    if (typeof window !== 'undefined' && window.localStorage && !localStorage.getItem(STORAGE_KEYS.INITIALIZED)) {
+      this.users = [...INITIAL_USERS];
+      this.personas = [...DEMO_PERSONAS];
       this.projects = [...INITIAL_PROJECTS];
       this.tasks = [...INITIAL_TASKS];
       this.logs = [...INITIAL_ACTIVITY_LOGS];
       this.deletionNotices = [];
       this.notifications = [...INITIAL_NOTIFICATIONS];
       this.directMessages = [...INITIAL_DIRECT_MESSAGES];
+      this.syncPersonaProjectPermissions();
       this.persist();
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
     } else {
@@ -318,38 +406,17 @@ class ReactiveStorageEngine {
           ...u,
           status: u.status || 'active',
         }));
+        this.personas = JSON.parse(localStorage.getItem(STORAGE_KEYS.PERSONAS) || 'null') ?? [...DEMO_PERSONAS];
         this.projects = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROJECTS) || '[]') || INITIAL_PROJECTS;
         this.tasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.TASKS) || '[]') || INITIAL_TASKS;
         this.logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGS) || '[]') || INITIAL_ACTIVITY_LOGS;
         this.deletionNotices = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTICES) || '[]');
         this.notifications = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || 'null') ?? INITIAL_NOTIFICATIONS;
         this.directMessages = JSON.parse(localStorage.getItem(STORAGE_KEYS.DIRECT_MESSAGES) || 'null') ?? INITIAL_DIRECT_MESSAGES;
+        this.syncPersonaProjectPermissions();
       } catch {
         this.initialize(true);
       }
-    }
-
-    // Enforce empty baseline workspace versioning so existing browser localStorage is cleared
-    const EMPTY_WORKSPACE_KEY = 'ojix_teamflow_empty_workspace_v1';
-    const isTestRuntime =
-      (typeof process !== 'undefined' && (process.env?.NODE_ENV === 'test' || Boolean(process.env?.VITEST))) ||
-      (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
-
-    if (!isTestRuntime && localStorage.getItem(EMPTY_WORKSPACE_KEY) !== 'cleared') {
-      this.projects = [];
-      this.tasks = [];
-      this.logs = [];
-      this.notifications = [];
-      this.directMessages = [];
-      this.deletionNotices = [];
-      localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.DIRECT_MESSAGES, JSON.stringify([]));
-      localStorage.setItem(EMPTY_WORKSPACE_KEY, 'cleared');
-      this.persist();
     }
 
     this.notify();
@@ -358,6 +425,7 @@ class ReactiveStorageEngine {
   private persist(): void {
     try {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(this.users));
+      localStorage.setItem(STORAGE_KEYS.PERSONAS, JSON.stringify(this.personas));
       localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(this.projects));
       localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(this.tasks));
       localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(this.logs));
@@ -416,6 +484,92 @@ class ReactiveStorageEngine {
     return this.users.find(u => u.uid === uid);
   }
 
+  // ---- Dynamic Personas & Permitted Projects ----
+  public getPermittedProjectsForUser(user: { uid: string; role: UserRole }): { names: string[]; ids: string[] } {
+    if (user.role === 'workspace_admin') {
+      return {
+        names: this.projects.map(p => p.name),
+        ids: this.projects.map(p => p.id),
+      };
+    }
+    const matched = this.projects.filter(
+      p => p.memberIds.includes(user.uid) || (user.role === 'project_lead' && p.ownerId === user.uid)
+    );
+    return {
+      names: matched.map(p => p.name),
+      ids: matched.map(p => p.id),
+    };
+  }
+
+  public syncPersonaProjectPermissions(): void {
+    for (let i = 0; i < this.personas.length; i++) {
+      const p = this.personas[i];
+      const permitted = this.getPermittedProjectsForUser(p);
+      this.personas[i] = {
+        ...p,
+        permittedProjects: permitted.names,
+        permittedProjectIds: permitted.ids,
+      };
+    }
+  }
+
+  public getPersonas(): DemoPersona[] {
+    // Ensure all active workspace users have corresponding persona entries
+    const existingUids = new Set(this.personas.map(p => p.uid));
+    for (const u of this.users) {
+      if (!existingUids.has(u.uid)) {
+        const roleLabel =
+          u.role === 'workspace_admin'
+            ? 'Workspace Admin'
+            : u.role === 'project_lead'
+            ? 'Project Lead'
+            : u.role === 'member'
+            ? 'Member'
+            : 'Viewer (Read-Only)';
+
+        const description =
+          u.role === 'workspace_admin'
+            ? 'Full workspace governance, member directory, and global settings.'
+            : u.role === 'project_lead'
+            ? 'Creates projects, assigns work, and oversees project execution.'
+            : u.role === 'member'
+            ? 'Executes assigned tasks, posts progress notes, and updates statuses.'
+            : 'Observes permitted boards and dashboards; cannot modify any data.';
+
+        const permitted = this.getPermittedProjectsForUser(u);
+
+        const dynamicPersona: DemoPersona = {
+          uid: u.uid,
+          email: u.email,
+          displayName: u.displayName,
+          role: u.role,
+          roleLabel,
+          description,
+          phone: u.phone,
+          status: u.status || 'active',
+          permittedProjects: permitted.names,
+          permittedProjectIds: permitted.ids,
+        };
+        this.personas.push(dynamicPersona);
+        existingUids.add(u.uid);
+      }
+    }
+
+    // Always dynamically sync and return latest permitted projects
+    return this.personas.map(p => {
+      const permitted = this.getPermittedProjectsForUser(p);
+      return {
+        ...p,
+        permittedProjects: permitted.names,
+        permittedProjectIds: permitted.ids,
+      };
+    });
+  }
+
+  public getPersona(uid: string): DemoPersona | undefined {
+    return this.getPersonas().find(p => p.uid === uid);
+  }
+
   public addUser(user: Partial<UserProfile>, caller: UserProfile, addToProjectId?: string): UserProfile {
     if (caller.role !== 'workspace_admin') {
       throw new Error('Permission denied: Only Workspace Admins can add or invite new members.');
@@ -461,15 +615,55 @@ class ReactiveStorageEngine {
     });
 
     if (addToProjectId) {
-      const pIndex = this.projects.findIndex(p => p.id === addToProjectId);
-      if (pIndex >= 0 && !this.projects[pIndex].memberIds.includes(newUser.uid)) {
-        this.projects[pIndex] = {
-          ...this.projects[pIndex],
-          memberIds: [...this.projects[pIndex].memberIds, newUser.uid],
-          updatedAt: new Date().toISOString(),
-        };
+      try {
+        this.addTeamMember(addToProjectId, newUser.uid, caller);
+      } catch (err) {
+        console.warn('Failed to add new user to project team:', err);
       }
     }
+
+    // Dynamically create and register persona for new user
+    const roleLabel =
+      newUser.role === 'workspace_admin'
+        ? 'Workspace Admin'
+        : newUser.role === 'project_lead'
+        ? 'Project Lead'
+        : newUser.role === 'member'
+        ? 'Member'
+        : 'Viewer (Read-Only)';
+
+    const defaultDescription =
+      newUser.role === 'workspace_admin'
+        ? 'Full workspace governance, member directory, and global settings.'
+        : newUser.role === 'project_lead'
+        ? 'Creates projects, assigns work, and oversees project execution.'
+        : newUser.role === 'member'
+        ? 'Executes assigned tasks, posts progress notes, and updates statuses.'
+        : 'Observes permitted boards and dashboards; cannot modify any data.';
+
+    const permitted = this.getPermittedProjectsForUser(newUser);
+
+    const newPersona: DemoPersona = {
+      uid: newUser.uid,
+      email: newUser.email,
+      displayName: newUser.displayName,
+      role: newUser.role,
+      roleLabel,
+      description: defaultDescription,
+      phone: newUser.phone,
+      status: newUser.status,
+      permittedProjects: permitted.names,
+      permittedProjectIds: permitted.ids,
+    };
+
+    const pIdx = this.personas.findIndex(p => p.uid === newUser.uid);
+    if (pIdx >= 0) {
+      this.personas[pIdx] = newPersona;
+    } else {
+      this.personas.push(newPersona);
+    }
+
+    this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
     return newUser;
@@ -529,6 +723,58 @@ class ReactiveStorageEngine {
       createdAt: new Date().toISOString(),
     });
 
+    if (updates.role && updates.role !== existing.role) {
+      this.addNotification({
+        id: `notif-role-${updatedUser.uid}-${Date.now().toString(36)}`,
+        recipientUserId: updatedUser.uid,
+        actorUserId: caller.uid,
+        actorDisplayName: caller.displayName,
+        type: 'PROJECT_ROLE_CHANGED',
+        title: 'Role updated',
+        body: `Your workspace role has been changed to ${updatedUser.role.replace('_', ' ').toUpperCase()} by ${caller.displayName}.`,
+        entityType: 'user',
+        entityId: updatedUser.uid,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        deduplicationKey: `role-${updatedUser.uid}-${updatedUser.role}`,
+      });
+    }
+
+    // Keep persona in sync with user profile updates
+    const personaIndex = this.personas.findIndex(p => p.uid === uid);
+    if (personaIndex >= 0) {
+      const existingPersona = this.personas[personaIndex];
+      const newRole = updatedUser.role;
+      const roleLabel =
+        newRole === 'workspace_admin'
+          ? 'Workspace Admin'
+          : newRole === 'project_lead'
+          ? 'Project Lead'
+          : newRole === 'member'
+          ? 'Member'
+          : 'Viewer (Read-Only)';
+
+      const description =
+        newRole === 'workspace_admin'
+          ? 'Full workspace governance, member directory, and global settings.'
+          : newRole === 'project_lead'
+          ? 'Creates projects, assigns work, and oversees project execution.'
+          : newRole === 'member'
+          ? 'Executes assigned tasks, posts progress notes, and updates statuses.'
+          : 'Observes permitted boards and dashboards; cannot modify any data.';
+
+      this.personas[personaIndex] = {
+        ...existingPersona,
+        displayName: updatedUser.displayName,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        roleLabel,
+        description,
+        status: updatedUser.status,
+      };
+    }
+
     this.persist();
     this.notify();
     return updatedUser;
@@ -581,7 +827,7 @@ class ReactiveStorageEngine {
     });
 
     if (status === 'blocked') {
-      this.notifications.unshift({
+      this.addNotification({
         id: `notif-blk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         recipientUserId: uid,
         actorUserId: caller.uid,
@@ -597,7 +843,7 @@ class ReactiveStorageEngine {
       });
 
       if (caller.uid !== uid) {
-        this.notifications.unshift({
+        this.addNotification({
           id: `notif-blk-adm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
           recipientUserId: caller.uid,
           actorUserId: caller.uid,
@@ -611,6 +857,15 @@ class ReactiveStorageEngine {
           createdAt: new Date().toISOString(),
         });
       }
+    }
+
+    // Update persona status in registry
+    const personaIndex = this.personas.findIndex(p => p.uid === uid);
+    if (personaIndex >= 0) {
+      this.personas[personaIndex] = {
+        ...this.personas[personaIndex],
+        status,
+      };
     }
 
     this.persist();
@@ -694,6 +949,7 @@ class ReactiveStorageEngine {
       });
     }
 
+    this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
     return this.projects[pIndex];
@@ -886,7 +1142,7 @@ class ReactiveStorageEngine {
 
     // 6. Notify removed member
     if (targetUser.uid !== caller.uid) {
-      this.notifications.unshift({
+      this.addNotification({
         id: `notif-pmem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         recipientUserId: targetUser.uid,
         actorUserId: caller.uid,
@@ -904,6 +1160,7 @@ class ReactiveStorageEngine {
       });
     }
 
+    this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
 
@@ -928,6 +1185,7 @@ class ReactiveStorageEngine {
         memberIds: [...this.projects[pIndex].memberIds, uid],
         updatedAt: new Date().toISOString(),
       };
+      this.syncPersonaProjectPermissions();
       this.persist();
       this.notify();
     }
@@ -976,6 +1234,7 @@ class ReactiveStorageEngine {
     } else {
       this.projects.push(project);
     }
+    this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
   }
@@ -1019,7 +1278,7 @@ class ReactiveStorageEngine {
       : `The project "${project.name}" has been deleted by ${user.displayName} on ${formattedDate}.`;
 
     for (const recipientId of allRecipients) {
-      this.notifications.unshift({
+      this.addNotification({
         id: `notif-pdel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         recipientUserId: recipientId,
         actorUserId: user.uid,
@@ -1044,6 +1303,7 @@ class ReactiveStorageEngine {
     this.tasks = this.tasks.filter(t => t.projectId !== projectId);
     this.logs = this.logs.filter(l => l.projectId !== projectId);
 
+    this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
   }

@@ -22,6 +22,7 @@ interface KanbanBoardProps {
   onSwitchToListView?: () => void;
   canCreateProject?: boolean;
   canCreateTask?: boolean;
+  initialAssigneeFilter?: string;
 }
 
 // 5 Columns in exact requested order
@@ -47,6 +48,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onSwitchToListView,
   canCreateProject: propCanCreateProject,
   canCreateTask: propCanCreateTask,
+  initialAssigneeFilter,
 }) => {
   const canCreateProject =
     propCanCreateProject !== undefined
@@ -63,10 +65,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   // Local Filter & Sort Controls
   const [searchQuery, setSearchQuery] = useState('');
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(initialAssigneeFilter || 'all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
   const [sortBy, setSortBy] = useState<'due_date' | 'priority' | 'title'>('due_date');
   const [mobileActiveColumn, setMobileActiveColumn] = useState<TaskStatus | 'all'>('all');
+
+  React.useEffect(() => {
+    if (initialAssigneeFilter !== undefined) {
+      setAssigneeFilter(initialAssigneeFilter);
+    }
+  }, [initialAssigneeFilter]);
 
   // Auto-scroll and emphasize highlighted task (DEC-013)
   React.useEffect(() => {

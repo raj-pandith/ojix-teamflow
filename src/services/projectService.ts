@@ -31,6 +31,12 @@ class ProjectService {
 
     const idempotencyKey = `create-project-${data.name}-${user.uid}`;
     return storageEngine.executeIdempotent(idempotencyKey, async () => {
+      // Workspace Admins are always added by default on every new project created
+      const adminUsers = storageEngine
+        .getUsers()
+        .filter(u => u.role === 'workspace_admin' && u.status !== 'blocked' && u.status !== 'terminated');
+      const adminIds = adminUsers.map(u => u.uid);
+
       const newProject: Project = {
         id: `proj-${Date.now().toString(36)}`,
         workspaceId: 'ws-ojix-main',
@@ -40,7 +46,7 @@ class ProjectService {
         status: data.status,
         startDate: data.startDate,
         dueDate: data.dueDate,
-        memberIds: Array.from(new Set([user.uid, ...(data.memberIds || [])])),
+        memberIds: Array.from(new Set([user.uid, ...adminIds, ...(data.memberIds || [])])),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -126,6 +132,21 @@ class ProjectService {
 
   public async deleteProject(projectId: string, user: UserProfile, reason?: string): Promise<void> {
     storageEngine.deleteProject(projectId, user, reason);
+  }
+
+  public async addTeamMember(
+    projectId: string,
+    userId: string,
+    caller: UserProfile
+  ): Promise<Project> {
+    const existing = storageEngine.getProjectById(projectId, caller);
+    if (existing && existing.memberIds.includes(userId)) {
+      return existing;
+    }
+    const idempotencyKey = `add-team-member-${projectId}-${userId}-${caller.uid}`;
+    return storageEngine.executeIdempotent(idempotencyKey, async () => {
+      return storageEngine.addTeamMember(projectId, userId, caller);
+    });
   }
 
   public async removeTeamMember(

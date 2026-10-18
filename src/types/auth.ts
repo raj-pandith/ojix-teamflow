@@ -22,6 +22,8 @@ export interface DemoPersona {
   readonly description: string;
   readonly phone?: string;
   readonly status?: UserStatus;
+  readonly permittedProjects?: readonly string[];
+  readonly permittedProjectIds?: readonly string[];
 }
 
 export interface UserFormData {

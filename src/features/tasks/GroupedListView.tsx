@@ -90,10 +90,11 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
           <select
             className="filter-select"
             value={filters.status || 'all'}
-            onChange={e => onFilterChange({ ...filters, status: e.target.value as TaskStatus | 'all' })}
+            onChange={e => onFilterChange({ ...filters, status: e.target.value as TaskStatus | 'all' | 'pending' })}
             id="filter-status-select"
           >
             <option value="all">All Statuses</option>
+            <option value="pending">Pending (Not Done / Not Blocked)</option>
             <option value="backlog">Backlog</option>
             <option value="todo">To Do</option>
             <option value="in_progress">In Progress</option>

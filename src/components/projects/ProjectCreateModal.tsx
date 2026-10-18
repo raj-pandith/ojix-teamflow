@@ -24,13 +24,19 @@ export const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
   const [status, setStatus] = useState<ProjectStatus>('active');
   const [startDate, setStartDate] = useState(today);
   const [dueDate, setDueDate] = useState(today);
-  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(['user-member-marcus', 'user-viewer-elena']);
+  const users = storageEngine.getUsers();
+  const adminIds = users
+    .filter(u => u.role === 'workspace_admin' && u.status !== 'blocked' && u.status !== 'terminated')
+    .map(u => u.uid);
+
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(() => {
+    return Array.from(new Set([...adminIds, 'user-member-marcus', 'user-viewer-elena']));
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const users = storageEngine.getUsers();
-
   const handleToggleMember = (uid: string) => {
+    if (adminIds.includes(uid)) return; // Admin is always added by default
     setSelectedMemberIds(prev =>
       prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
     );
@@ -60,7 +66,7 @@ export const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
         status,
         startDate,
         dueDate,
-        memberIds: selectedMemberIds,
+        memberIds: Array.from(new Set([...adminIds, ...selectedMemberIds])),
       });
       // Reset form
       setName('');
@@ -140,16 +146,30 @@ export const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
         <div className="form-group">
           <label className="form-label">Assign Team Members</label>
           <div className="member-checkbox-list">
-            {users.map(u => (
-              <label key={u.uid} className="member-checkbox-item">
-                <input
-                  type="checkbox"
-                  checked={selectedMemberIds.includes(u.uid)}
-                  onChange={() => handleToggleMember(u.uid)}
-                />
-                <span className="member-cb-name">{u.displayName} ({u.role})</span>
-              </label>
-            ))}
+            {users.map(u => {
+              const isAdmin = u.role === 'workspace_admin';
+              const isChecked = isAdmin || selectedMemberIds.includes(u.uid);
+              return (
+                <label
+                  key={u.uid}
+                  className={`member-checkbox-item ${isAdmin ? 'admin-locked' : ''}`}
+                  title={isAdmin ? 'Workspace Admins are always added by default to all projects' : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    disabled={isAdmin}
+                    onChange={() => handleToggleMember(u.uid)}
+                  />
+                  <span className="member-cb-name">
+                    {u.displayName}{' '}
+                    <span className="member-cb-role">
+                      ({isAdmin ? 'Workspace Admin — Default' : u.role})
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </div>
 

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Project, ProjectFormData, ProjectStatus } from '../../types/project';
-import { Task } from '../../types/task';
+import { Task, TaskStatus } from '../../types/task';
 import { UserProfile } from '../../types/auth';
 import { Badge } from '../../components/common/Badge';
 import { ManageTeamModal } from '../../components/projects/ManageTeamModal';
@@ -17,6 +17,12 @@ interface ProjectDashboardProps {
   onDeleteProject?: (projectId: string) => void;
   onRequestDelete?: (projectId: string, projectName: string) => void;
   currentUser?: UserProfile | null;
+  onNavigateToTasks?: (filter: {
+    assigneeId?: string;
+    status?: TaskStatus | 'all' | 'pending';
+    view?: 'list' | 'kanban';
+  }) => void;
+  onOpenDirectMessage?: (memberId: string) => void;
 }
 
 export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
@@ -28,9 +34,43 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   onDeleteProject,
   onRequestDelete,
   currentUser,
+  onNavigateToTasks,
+  onOpenDirectMessage,
 }) => {
   const [isManageTeamOpen, setIsManageTeamOpen] = useState(false);
   const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
+
+  // Search, Filters & Sorting Controls for Team Allocation
+  const [searchMemberQuery, setSearchMemberQuery] = useState('');
+  const [memberRoleFilter, setMemberRoleFilter] = useState<'all' | 'member' | 'viewer'>('all');
+  const [memberSortBy, setMemberSortBy] = useState<'name' | 'tasks' | 'pending' | 'blocked'>('name');
+  const [activeMenuMemberId, setActiveMenuMemberId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcut Ctrl+K to focus search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Close 3-dots action menu on outside click
+  useEffect(() => {
+    if (!activeMenuMemberId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.member-col-actions')) {
+        setActiveMenuMemberId(null);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [activeMenuMemberId]);
 
   if (!project) {
     return (
@@ -215,94 +255,631 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
           </div>
         </div>
 
-        <div className="dashboard-panel">
-          <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 className="panel-title">Team Allocation ({project.memberIds.length} Members)</h3>
-            {canManageTeam && (
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setIsManageTeamOpen(true)}
-                id="dashboard-manage-team-btn"
-                style={{ fontSize: 'var(--text-xs)', padding: '4px 10px' }}
-                title="Add or remove team members for this project"
-              >
-                👥 Manage Team
-              </button>
-            )}
+        {/* Redesigned Modern SaaS Team Allocation Section */}
+        <div className="team-allocation-panel">
+          {/* Header & Dynamic Summary Badges */}
+          <div className="team-allocation-header">
+            <div className="team-allocation-title-group">
+              <div className="team-allocation-icon-box" aria-hidden="true">
+                👥
+              </div>
+              <div className="team-allocation-title-text">
+                <h3 className="team-allocation-title" id="team-allocation-heading">
+                  Team Allocation ({project.memberIds.length} Members)
+                </h3>
+                <p className="team-allocation-subtitle">
+                  Manage your team members and track their work allocation
+                </p>
+              </div>
+            </div>
+
+            <div className="team-allocation-header-right">
+              {/* Dynamic Summary Badges: Total, Pending, Done, Blocked */}
+              <div className="team-allocation-summary-badges">
+                <div
+                  className="summary-badge-pill badge-pastel-blue"
+                  title="Total tasks across all members in this project"
+                >
+                  <span className="summary-badge-icon">📋</span>
+                  <div className="summary-badge-content">
+                    <span className="summary-badge-count">{totalTasks}</span>
+                    <span className="summary-badge-label">Total Tasks</span>
+                  </div>
+                </div>
+
+                <div
+                  className="summary-badge-pill badge-pastel-amber"
+                  title="Tasks currently pending completion"
+                >
+                  <span className="summary-badge-icon">🕒</span>
+                  <div className="summary-badge-content">
+                    <span className="summary-badge-count">
+                      {tasks.filter(t => t.status !== 'done' && t.status !== 'blocked').length}
+                    </span>
+                    <span className="summary-badge-label">Pending</span>
+                  </div>
+                </div>
+
+                <div
+                  className="summary-badge-pill badge-pastel-green"
+                  title="Completed tasks in this project"
+                >
+                  <span className="summary-badge-icon">✅</span>
+                  <div className="summary-badge-content">
+                    <span className="summary-badge-count">{doneTasks.length}</span>
+                    <span className="summary-badge-label">Done</span>
+                  </div>
+                </div>
+
+                <div
+                  className="summary-badge-pill badge-pastel-red"
+                  title="Tasks currently blocked"
+                >
+                  <span className="summary-badge-icon">⛔</span>
+                  <div className="summary-badge-content">
+                    <span className="summary-badge-count">{blockedTasks.length}</span>
+                    <span className="summary-badge-label">Blocked</span>
+                  </div>
+                </div>
+              </div>
+
+              {canManageTeam && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setIsManageTeamOpen(true)}
+                  id="dashboard-manage-team-btn"
+                  style={{ fontSize: 'var(--text-xs)', padding: '6px 12px', height: '36px' }}
+                  title="Add or remove team members for this project"
+                >
+                  👥 Manage Team
+                </button>
+              )}
+            </div>
           </div>
-          <div className="panel-body">
-            <div className="team-allocations-list">
-              {/* Unassigned Tasks Warning if any */}
-              {unassignedTasks.length > 0 && (
-                <div className="team-member-row">
-                  <div className="team-member-row-header">
-                    <div className="team-member-info">
-                      <span className="member-avatar member-avatar-unassigned">⚠️</span>
-                      <div className="member-details-text">
-                        <strong className="member-name">Unassigned Work</strong>
-                        <span className="member-role" style={{ color: 'var(--status-blocked)' }}>NEEDS ALLOCATION</span>
-                      </div>
+
+          {/* Search, Filter Tabs & Sorting Toolbar */}
+          <div className="team-allocation-toolbar">
+            <div className="team-search-wrapper">
+              <span className="team-search-icon" aria-hidden="true">🔍</span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="team-search-input"
+                placeholder="Search member..."
+                value={searchMemberQuery}
+                onChange={e => setSearchMemberQuery(e.target.value)}
+                id="team-member-search-input"
+                aria-label="Search team member by name or role"
+              />
+              <span className="team-search-shortcut" title="Press Ctrl + K to focus search">
+                Ctrl + K
+              </span>
+            </div>
+
+            <div className="team-toolbar-controls">
+              {/* Filter Pills */}
+              <div className="team-filter-pills" role="tablist" aria-label="Member filter">
+                <button
+                  type="button"
+                  className={`team-filter-pill-btn ${memberRoleFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setMemberRoleFilter('all')}
+                  id="filter-all-members-btn"
+                >
+                  👥 All Members
+                </button>
+                <button
+                  type="button"
+                  className={`team-filter-pill-btn ${memberRoleFilter === 'member' ? 'active' : ''}`}
+                  onClick={() => setMemberRoleFilter('member')}
+                  id="filter-members-only-btn"
+                >
+                  👤 Members
+                </button>
+                <button
+                  type="button"
+                  className={`team-filter-pill-btn ${memberRoleFilter === 'viewer' ? 'active' : ''}`}
+                  onClick={() => setMemberRoleFilter('viewer')}
+                  id="filter-viewers-only-btn"
+                >
+                  👁️ Viewers
+                </button>
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="team-sort-select-wrapper">
+                <span className="team-sort-icon">⇅</span>
+                <select
+                  className="team-sort-select"
+                  value={memberSortBy}
+                  onChange={e => setMemberSortBy(e.target.value as 'name' | 'tasks' | 'pending' | 'blocked')}
+                  id="team-sort-by-select"
+                  aria-label="Sort team members"
+                >
+                  <option value="name">Sort: Name</option>
+                  <option value="tasks">Sort: Total Tasks</option>
+                  <option value="pending">Sort: Pending</option>
+                  <option value="blocked">Sort: Blocked</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Members List Container */}
+          <div className="team-allocations-list">
+            {/* Compact Unassigned Work Row if unassigned tasks exist */}
+            {unassignedTasks.length > 0 && (
+              <div className="team-member-row-card team-unassigned-row" id="unassigned-work-row">
+                <div className="member-col-identity">
+                  <span className="member-avatar-circle unassigned-avatar" aria-hidden="true">
+                    ⚠️
+                  </span>
+                  <div className="member-details-box">
+                    <div className="member-name-row">
+                      <strong className="member-name-text">Unassigned Work</strong>
                     </div>
-                    <div className="member-stats">
-                      <span className="stat-pill stat-unassigned">{unassignedTasks.length} unallocated</span>
+                    <div className="member-meta-row">
+                      <span className="member-role-pill" style={{ background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' }}>
+                        Needs Allocation
+                      </span>
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* Members Allocation Breakdown */}
-              {project.memberIds.map(uid => {
+                {/* 4 Clickable Statistics for Unassigned Tasks */}
+                <div className="member-col-stats">
+                  <button
+                    type="button"
+                    className="stat-badge-btn badge-pastel-blue"
+                    onClick={() => {
+                      if (onNavigateToTasks) {
+                        onNavigateToTasks({ assigneeId: 'unassigned', status: 'all', view: 'list' });
+                      } else {
+                        onGoToKanban();
+                      }
+                    }}
+                    title="View all unassigned tasks"
+                    aria-label={`View ${unassignedTasks.length} unassigned tasks`}
+                  >
+                    <div className="stat-badge-top">
+                      <span className="stat-badge-icon">📋</span>
+                      <span className="stat-badge-count">{unassignedTasks.length}</span>
+                    </div>
+                    <span className="stat-badge-label">Total</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="stat-badge-btn badge-pastel-amber"
+                    onClick={() => {
+                      if (onNavigateToTasks) {
+                        onNavigateToTasks({ assigneeId: 'unassigned', status: 'pending', view: 'list' });
+                      } else {
+                        onGoToKanban();
+                      }
+                    }}
+                    title="View pending unassigned tasks"
+                    aria-label="View pending unassigned tasks"
+                  >
+                    <div className="stat-badge-top">
+                      <span className="stat-badge-icon">🕒</span>
+                      <span className="stat-badge-count">
+                        {unassignedTasks.filter(t => t.status !== 'done' && t.status !== 'blocked').length}
+                      </span>
+                    </div>
+                    <span className="stat-badge-label">Pending</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="stat-badge-btn badge-pastel-green"
+                    onClick={() => {
+                      if (onNavigateToTasks) {
+                        onNavigateToTasks({ assigneeId: 'unassigned', status: 'done', view: 'list' });
+                      } else {
+                        onGoToKanban();
+                      }
+                    }}
+                    title="View completed unassigned tasks"
+                    aria-label="View completed unassigned tasks"
+                  >
+                    <div className="stat-badge-top">
+                      <span className="stat-badge-icon">✅</span>
+                      <span className="stat-badge-count">
+                        {unassignedTasks.filter(t => t.status === 'done').length}
+                      </span>
+                    </div>
+                    <span className="stat-badge-label">Done</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="stat-badge-btn badge-pastel-red"
+                    onClick={() => {
+                      if (onNavigateToTasks) {
+                        onNavigateToTasks({ assigneeId: 'unassigned', status: 'blocked', view: 'list' });
+                      } else {
+                        onGoToKanban();
+                      }
+                    }}
+                    title="View blocked unassigned tasks"
+                    aria-label="View blocked unassigned tasks"
+                  >
+                    <div className="stat-badge-top">
+                      <span className="stat-badge-icon">⛔</span>
+                      <span className="stat-badge-count">
+                        {unassignedTasks.filter(t => t.status === 'blocked').length}
+                      </span>
+                    </div>
+                    <span className="stat-badge-label">Blocked</span>
+                  </button>
+                </div>
+
+                <div className="member-col-actions">
+                  <button
+                    type="button"
+                    className="member-nav-arrow-btn"
+                    onClick={() => {
+                      if (onNavigateToTasks) {
+                        onNavigateToTasks({ assigneeId: 'unassigned', status: 'all', view: 'list' });
+                      } else {
+                        onGoToKanban();
+                      }
+                    }}
+                    title="Open unassigned tasks"
+                    aria-label="Open unassigned tasks"
+                  >
+                    ❯
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Process, Filter & Sort Members */}
+            {(() => {
+              // Deterministic pastel avatar palette matching reference mockup
+              const AVATAR_PALETTES = [
+                { bg: '#D1FAE5', color: '#065F46' }, // Mint / Soft Emerald
+                { bg: '#FFE4E6', color: '#9F1239' }, // Soft Rose / Pink
+                { bg: '#DBEAFE', color: '#1E40AF' }, // Soft Sky / Blue
+                { bg: '#EDE9FE', color: '#5B21B6' }, // Soft Lavender / Purple
+                { bg: '#FEF3C7', color: '#92400E' }, // Soft Amber
+              ];
+
+              const processedMembers = project.memberIds.map((uid, idx) => {
                 const member = users.find(u => u.uid === uid);
                 const memberTasks = tasks.filter(t => t.assigneeId === uid);
-                const memberDone = memberTasks.filter(t => t.status === 'done');
-                const memberBlocked = memberTasks.filter(t => t.status === 'blocked');
-                const memberActive = memberTasks.filter(t => t.status === 'in_progress' || t.status === 'in_review');
-                const memberBacklog = memberTasks.length - memberDone.length - memberBlocked.length - memberActive.length;
+                const total = memberTasks.length;
+                const done = memberTasks.filter(t => t.status === 'done').length;
+                const blocked = memberTasks.filter(t => t.status === 'blocked').length;
+                const pending = memberTasks.filter(t => t.status !== 'done' && t.status !== 'blocked').length;
 
-                const donePct = memberTasks.length > 0 ? (memberDone.length / memberTasks.length) * 100 : 0;
-                const activePct = memberTasks.length > 0 ? (memberActive.length / memberTasks.length) * 100 : 0;
-                const blockedPct = memberTasks.length > 0 ? (memberBlocked.length / memberTasks.length) * 100 : 0;
-                const backlogPct = memberTasks.length > 0 ? (Math.max(0, memberBacklog) / memberTasks.length) * 100 : 0;
+                const isCurrentUser = uid === currentUser?.uid;
+                const isOnline = member?.status === 'active' || isCurrentUser;
 
+                // Determine display role
+                let displayRole = 'Member';
+                let roleClass = 'role-member';
+                if (project.ownerId === uid || member?.role === 'project_lead') {
+                  displayRole = 'Project Lead';
+                  roleClass = 'role-lead';
+                } else if (member?.role === 'workspace_admin') {
+                  displayRole = 'Workspace Admin';
+                  roleClass = 'role-admin';
+                } else if (member?.role === 'viewer') {
+                  displayRole = 'Viewer';
+                  roleClass = 'role-viewer';
+                }
+
+                // Deterministic palette
+                const palette = isCurrentUser ? AVATAR_PALETTES[0] : AVATAR_PALETTES[(idx + 1) % AVATAR_PALETTES.length];
+
+                return {
+                  uid,
+                  member,
+                  displayName: member?.displayName || 'Unknown Member',
+                  email: member?.email || '',
+                  initial: (member?.displayName?.charAt(0) || 'U').toUpperCase(),
+                  role: member?.role || 'member',
+                  displayRole,
+                  roleClass,
+                  isCurrentUser,
+                  isOnline,
+                  palette,
+                  total,
+                  pending,
+                  done,
+                  blocked,
+                };
+              });
+
+              // Apply Filters
+              const filteredMembers = processedMembers.filter(m => {
+                if (memberRoleFilter === 'member') {
+                  if (m.role === 'viewer') return false;
+                } else if (memberRoleFilter === 'viewer') {
+                  if (m.role !== 'viewer') return false;
+                }
+
+                if (searchMemberQuery.trim()) {
+                  const q = searchMemberQuery.toLowerCase().trim();
+                  const matchName = m.displayName.toLowerCase().includes(q);
+                  const matchEmail = m.email.toLowerCase().includes(q);
+                  const matchRole = m.displayRole.toLowerCase().includes(q);
+                  if (!matchName && !matchEmail && !matchRole) return false;
+                }
+
+                return true;
+              });
+
+              // Apply Sorting (default name sorts current user on top if present, like reference image)
+              const sortedMembers = [...filteredMembers].sort((a, b) => {
+                if (memberSortBy === 'name') {
+                  if (a.isCurrentUser) return -1;
+                  if (b.isCurrentUser) return 1;
+                  return a.displayName.localeCompare(b.displayName);
+                }
+                if (memberSortBy === 'tasks') {
+                  return b.total - a.total;
+                }
+                if (memberSortBy === 'pending') {
+                  return b.pending - a.pending;
+                }
+                if (memberSortBy === 'blocked') {
+                  return b.blocked - a.blocked;
+                }
+                return 0;
+              });
+
+              if (sortedMembers.length === 0) {
                 return (
-                  <div key={uid} className="team-member-row">
-                    <div className="team-member-row-header">
-                      <div className="team-member-info">
-                        <span className="member-avatar">{member?.displayName.charAt(0) || 'U'}</span>
-                        <div className="member-details-text">
-                          <strong className="member-name">{member?.displayName || 'Unknown Member'}</strong>
-                          <span className="member-role">{member?.role.replace('_', ' ').toUpperCase()}</span>
-                        </div>
-                      </div>
-                      <div className="member-stats">
-                        <span className="stat-pill">{memberTasks.length} {memberTasks.length === 1 ? 'task' : 'tasks'}</span>
-                        {memberDone.length > 0 && (
-                          <span className="stat-pill stat-done">{memberDone.length} done</span>
-                        )}
-                        {memberBlocked.length > 0 && (
-                          <span className="stat-pill stat-blocked">{memberBlocked.length} blocked</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {memberTasks.length > 0 && (
-                      <div className="workload-bar-track" title={`${memberDone.length} done, ${memberActive.length} active, ${memberBlocked.length} blocked`}>
-                        <div className="workload-bar-segment workload-bar-done" style={{ width: `${donePct}%` }} />
-                        <div className="workload-bar-segment workload-bar-active" style={{ width: `${activePct}%` }} />
-                        <div className="workload-bar-segment workload-bar-blocked" style={{ width: `${blockedPct}%` }} />
-                        <div className="workload-bar-segment workload-bar-backlog" style={{ width: `${backlogPct}%` }} />
-                      </div>
+                  <div className="empty-panel-state" style={{ padding: '32px 16px' }}>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                      {searchMemberQuery || memberRoleFilter !== 'all'
+                        ? 'No team members matched your search or filter.'
+                        : 'No members assigned to this project yet.'}
+                    </p>
+                    {(searchMemberQuery || memberRoleFilter !== 'all') && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ marginTop: '12px' }}
+                        onClick={() => {
+                          setSearchMemberQuery('');
+                          setMemberRoleFilter('all');
+                        }}
+                      >
+                        Reset Filters
+                      </button>
                     )}
                   </div>
                 );
-              })}
+              }
 
-              {project.memberIds.length === 0 && (
-                <div className="empty-panel-state">
-                  <p>No members assigned to this project yet.</p>
-                </div>
-              )}
-            </div>
+              return sortedMembers.map(m => {
+                const isMenuOpen = activeMenuMemberId === m.uid;
+
+                return (
+                  <div
+                    key={m.uid}
+                    className={`team-member-row-card ${m.isCurrentUser ? 'is-current-user' : ''}`}
+                    id={`team-member-row-${m.uid}`}
+                  >
+                    {/* Member Identity: Avatar, Name, Role Badge, Presence */}
+                    <div className="member-col-identity">
+                      <span
+                        className="member-avatar-circle"
+                        style={{ backgroundColor: m.palette.bg, color: m.palette.color }}
+                        aria-hidden="true"
+                      >
+                        {m.initial}
+                      </span>
+
+                      <div className="member-details-box">
+                        <div className="member-name-row">
+                          <strong className="member-name-text">{m.displayName}</strong>
+                          {m.isCurrentUser && (
+                            <span className="member-you-pill" title="Currently logged in user">
+                              👤 You
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="member-meta-row">
+                          <span className={`member-role-pill ${m.roleClass}`}>
+                            {m.displayRole}
+                          </span>
+                          <span
+                            className="member-presence-indicator"
+                            title={m.isOnline ? 'Online now' : 'Offline'}
+                          >
+                            <span className={`presence-dot ${m.isOnline ? 'online' : 'offline'}`} />
+                            {m.isOnline ? 'Online' : 'Offline'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Direct Message Action Button (Omitted for logged-in user, as in reference image) */}
+                    {!m.isCurrentUser && (
+                      <div className="member-col-message">
+                        <button
+                          type="button"
+                          className="member-msg-btn"
+                          onClick={() => onOpenDirectMessage && onOpenDirectMessage(m.uid)}
+                          title={`Send direct message to ${m.displayName}`}
+                          aria-label={`Send message to ${m.displayName}`}
+                        >
+                          ✉️
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 4 Interactive Task Statistic Badges */}
+                    <div className="member-col-stats">
+                      {/* 1. Total */}
+                      <button
+                        type="button"
+                        className="stat-badge-btn badge-pastel-blue"
+                        onClick={() => {
+                          if (onNavigateToTasks) {
+                            onNavigateToTasks({ assigneeId: m.uid, status: 'all', view: 'list' });
+                          } else {
+                            onGoToKanban();
+                          }
+                        }}
+                        title={`View all ${m.total} tasks assigned to ${m.displayName}`}
+                        aria-label={`View ${m.total} total tasks for ${m.displayName}`}
+                      >
+                        <div className="stat-badge-top">
+                          <span className="stat-badge-icon">📋</span>
+                          <span className="stat-badge-count">{m.total}</span>
+                        </div>
+                        <span className="stat-badge-label">Total</span>
+                      </button>
+
+                      {/* 2. Pending */}
+                      <button
+                        type="button"
+                        className="stat-badge-btn badge-pastel-amber"
+                        onClick={() => {
+                          if (onNavigateToTasks) {
+                            onNavigateToTasks({ assigneeId: m.uid, status: 'pending', view: 'list' });
+                          } else {
+                            onGoToKanban();
+                          }
+                        }}
+                        title={`View ${m.pending} pending tasks assigned to ${m.displayName}`}
+                        aria-label={`View ${m.pending} pending tasks for ${m.displayName}`}
+                      >
+                        <div className="stat-badge-top">
+                          <span className="stat-badge-icon">🕒</span>
+                          <span className="stat-badge-count">{m.pending}</span>
+                        </div>
+                        <span className="stat-badge-label">Pending</span>
+                      </button>
+
+                      {/* 3. Done */}
+                      <button
+                        type="button"
+                        className="stat-badge-btn badge-pastel-green"
+                        onClick={() => {
+                          if (onNavigateToTasks) {
+                            onNavigateToTasks({ assigneeId: m.uid, status: 'done', view: 'list' });
+                          } else {
+                            onGoToKanban();
+                          }
+                        }}
+                        title={`View ${m.done} completed tasks assigned to ${m.displayName}`}
+                        aria-label={`View ${m.done} completed tasks for ${m.displayName}`}
+                      >
+                        <div className="stat-badge-top">
+                          <span className="stat-badge-icon">✅</span>
+                          <span className="stat-badge-count">{m.done}</span>
+                        </div>
+                        <span className="stat-badge-label">Done</span>
+                      </button>
+
+                      {/* 4. Blocked */}
+                      <button
+                        type="button"
+                        className="stat-badge-btn badge-pastel-red"
+                        onClick={() => {
+                          if (onNavigateToTasks) {
+                            onNavigateToTasks({ assigneeId: m.uid, status: 'blocked', view: 'list' });
+                          } else {
+                            onGoToKanban();
+                          }
+                        }}
+                        title={`View ${m.blocked} blocked tasks assigned to ${m.displayName}`}
+                        aria-label={`View ${m.blocked} blocked tasks for ${m.displayName}`}
+                      >
+                        <div className="stat-badge-top">
+                          <span className="stat-badge-icon">⛔</span>
+                          <span className="stat-badge-count">{m.blocked}</span>
+                        </div>
+                        <span className="stat-badge-label">Blocked</span>
+                      </button>
+                    </div>
+
+                    {/* Navigation Arrow & 3-Dots Action Menu */}
+                    <div className="member-col-actions">
+                      <button
+                        type="button"
+                        className="member-nav-arrow-btn"
+                        onClick={() => {
+                          if (onNavigateToTasks) {
+                            onNavigateToTasks({ assigneeId: m.uid, status: 'all', view: 'list' });
+                          } else {
+                            onGoToKanban();
+                          }
+                        }}
+                        title={`View tasks for ${m.displayName}`}
+                        aria-label={`View tasks for ${m.displayName}`}
+                      >
+                        ❯
+                      </button>
+
+                      <button
+                        type="button"
+                        className="member-menu-btn"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setActiveMenuMemberId(isMenuOpen ? null : m.uid);
+                        }}
+                        title="More options"
+                        aria-label="More options"
+                        aria-expanded={isMenuOpen}
+                      >
+                        ⋮
+                      </button>
+
+                      {isMenuOpen && (
+                        <div className="member-actions-dropdown" role="menu">
+                          <button
+                            type="button"
+                            className="member-dropdown-item"
+                            onClick={() => {
+                              setActiveMenuMemberId(null);
+                              if (onNavigateToTasks) {
+                                onNavigateToTasks({ assigneeId: m.uid, status: 'all', view: 'list' });
+                              } else {
+                                onGoToKanban();
+                              }
+                            }}
+                          >
+                            📋 View All Tasks
+                          </button>
+                          {!m.isCurrentUser && onOpenDirectMessage && (
+                            <button
+                              type="button"
+                              className="member-dropdown-item"
+                              onClick={() => {
+                                setActiveMenuMemberId(null);
+                                onOpenDirectMessage(m.uid);
+                              }}
+                            >
+                              ✉️ Direct Message
+                            </button>
+                          )}
+                          {canManageTeam && (
+                            <button
+                              type="button"
+                              className="member-dropdown-item"
+                              onClick={() => {
+                                setActiveMenuMemberId(null);
+                                setIsManageTeamOpen(true);
+                              }}
+                            >
+                              👥 Manage Team
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       </div>

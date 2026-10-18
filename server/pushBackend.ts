@@ -124,23 +124,20 @@ export class PushBackend {
 
     // Check if subscription with this endpoint already exists
     let existingId: string | null = null;
-    let existingUserIds: string[] = [];
     for (const [id, s] of this.subscriptions.entries()) {
       if (s.endpoint === subData.endpoint) {
         existingId = id;
-        existingUserIds = Array.isArray(s.userIds) ? [...s.userIds] : [s.userId];
         break;
       }
     }
 
     const subId = existingId || `sub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
-    const allUserIds = Array.from(new Set([...existingUserIds, subData.userId]));
 
     const subscription: StoredPushSubscription = {
       id: subId,
       userId: subData.userId,
-      userIds: allUserIds,
+      userIds: [subData.userId],
       endpoint: subData.endpoint,
       keys: {
         p256dh: subData.keys.p256dh,
@@ -260,14 +257,7 @@ export class PushBackend {
    * Send Web Push notification to all active devices of an authenticated user.
    */
   public async sendPushToUser(userId: string, payload: PushPayload): Promise<PushSendResult[]> {
-    let userSubs = this.getSubscriptionsForUser(userId);
-    // In dev / demo environment, fallback to active registered device subscriptions so notification reaches the browser
-    if (userSubs.length === 0 && process.env.NODE_ENV !== 'test') {
-      const allActive = this.getAllSubscriptions().filter(s => s.isActive);
-      if (allActive.length > 0) {
-        userSubs = allActive;
-      }
-    }
+    const userSubs = this.getSubscriptionsForUser(userId);
 
     if (userSubs.length === 0) {
       return [];

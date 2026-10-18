@@ -34,7 +34,7 @@ export interface TaskFormData {
 
 export interface TaskFilterOptions {
   searchQuery?: string;
-  status?: TaskStatus | 'all';
+  status?: TaskStatus | 'all' | 'pending';
   priority?: TaskPriority | 'all';
   assigneeId?: string | 'all' | 'unassigned';
   dueDateRange?: 'all' | 'overdue' | 'today' | 'this_week' | 'upcoming';

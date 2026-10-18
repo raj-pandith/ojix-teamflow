@@ -113,8 +113,12 @@ export function useTasks(projectId?: string) {
     }
 
     // Status filter
-    if (filters.status && filters.status !== 'all' && task.status !== filters.status) {
-      return false;
+    if (filters.status && filters.status !== 'all') {
+      if (filters.status === 'pending') {
+        if (task.status === 'done' || task.status === 'blocked') return false;
+      } else if (task.status !== filters.status) {
+        return false;
+      }
     }
 
     // Priority filter

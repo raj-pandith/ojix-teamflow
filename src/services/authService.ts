@@ -1,5 +1,5 @@
 import { UserProfile, DemoPersona } from '../types/auth';
-import { DEMO_PERSONAS, INITIAL_USERS } from './mockData';
+import { INITIAL_USERS } from './mockData';
 import { storageEngine } from './storageEngine';
 
 const AUTH_STORAGE_KEY = 'ojix_teamflow_current_user_uid';
@@ -43,19 +43,11 @@ class AuthService {
   }
 
   public getPersonas(): readonly DemoPersona[] {
-    const allUsers = storageEngine.getUsers();
-    return allUsers.map(u => {
-      const existingDemo = DEMO_PERSONAS.find(p => p.uid === u.uid);
-      if (existingDemo) return existingDemo;
-      return {
-        uid: u.uid,
-        email: u.email,
-        displayName: u.displayName,
-        role: u.role,
-        roleLabel: u.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        description: `Custom user account (${u.role})`,
-      };
-    });
+    return storageEngine.getPersonas();
+  }
+
+  public getPersona(uid: string): DemoPersona | undefined {
+    return storageEngine.getPersona(uid);
   }
 
   public switchPersona(uid: string): UserProfile {
@@ -99,7 +91,7 @@ class AuthService {
   }
 
   public resetDemoData(): void {
-    storageEngine.initialize(true);
+    storageEngine.clearAllData(true);
     this.restoreSession();
     this.notify();
   }

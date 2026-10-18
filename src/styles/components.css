@@ -657,9 +657,60 @@
   color: var(--text-primary);
 }
 
-.modal-body {
-  padding: var(--space-6);
+.member-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 180px;
   overflow-y: auto;
+  padding: var(--space-2);
+  background: var(--bg-surface-secondary, #161b22);
+  border: 1px solid var(--border-subtle, #30363d);
+  border-radius: var(--radius-md, 8px);
+}
+
+.member-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-size: var(--text-sm, 13px);
+  color: var(--text-primary, #f0f6fc);
+}
+
+.member-checkbox-item:hover {
+  background: var(--bg-surface-hover, rgba(255, 255, 255, 0.04));
+}
+
+.member-checkbox-item.admin-locked {
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px dashed rgba(59, 130, 246, 0.3);
+  cursor: default;
+}
+
+.member-checkbox-item.admin-locked input[type="checkbox"] {
+  cursor: not-allowed;
+  accent-color: var(--brand-primary, #6366f1);
+}
+
+.member-cb-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.member-cb-role {
+  font-size: var(--text-xs, 12px);
+  color: var(--text-secondary, #8b949e);
+}
+
+.member-checkbox-item.admin-locked .member-cb-role {
+  color: #60a5fa;
+  font-weight: 500;
 }
 
 .modal-actions {
@@ -1894,149 +1945,666 @@
   color: var(--text-primary);
 }
 
-/* Team Workload & Allocation Panel */
-.team-allocations-list {
+/* ==========================================================================
+   Redesigned Modern SaaS Team Allocation Section
+   Matches Reference Mockup Aesthetic: Compact, Clean Pastel Badges, Rounded Cards
+   ========================================================================== */
+
+.team-allocation-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Header & Summary Badges */
+.team-allocation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.team-allocation-title-group {
+  display: flex;
+  align-items: center;
   gap: var(--space-3);
 }
 
-.team-member-row {
+.team-allocation-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.team-allocation-title-text {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+}
+
+.team-allocation-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.team-allocation-subtitle {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 2px 0 0 0;
+}
+
+.team-allocation-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.team-allocation-summary-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summary-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  line-height: 1.2;
   transition: all var(--transition-fast);
 }
 
-.team-member-row:hover {
-  border-color: var(--border-prominent);
-  background: var(--bg-surface-hover);
+.summary-badge-pill .summary-badge-icon {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
 }
 
-.team-member-row-header {
+.summary-badge-pill .summary-badge-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-badge-pill .summary-badge-count {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.summary-badge-pill .summary-badge-label {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+/* Pastel Color Themes for Badges */
+.badge-pastel-blue {
+  background: #EFF6FF !important;
+  border-color: #DBEAFE !important;
+  color: #1D4ED8 !important;
+}
+
+.badge-pastel-amber {
+  background: #FEFCE8 !important;
+  border-color: #FEF08A !important;
+  color: #B45309 !important;
+}
+
+.badge-pastel-green {
+  background: #ECFDF5 !important;
+  border-color: #A7F3D0 !important;
+  color: #047857 !important;
+}
+
+.badge-pastel-red {
+  background: #FEF2F2 !important;
+  border-color: #FECACA !important;
+  color: #B91C1C !important;
+}
+
+/* Search & Filters Toolbar */
+.team-allocation-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.team-member-info {
+.team-search-wrapper {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
+  min-width: 240px;
+  flex: 1;
+  max-width: 360px;
 }
 
-.member-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: var(--accent-primary-subtle);
-  color: var(--accent-primary);
-  border: 1px solid var(--accent-primary-border);
+.team-search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.team-search-input {
+  width: 100%;
+  padding: 8px 65px 8px 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all var(--transition-fast);
+}
+
+.team-search-input:focus {
+  outline: none;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.team-search-shortcut {
+  position: absolute;
+  right: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+
+.team-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.team-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface-elevated);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.team-filter-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.team-filter-pill-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.team-filter-pill-btn.active {
+  background: var(--bg-surface);
+  border-color: #BFDBFE;
+  color: #2563EB;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+}
+
+.team-sort-select-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 4px 10px;
+  transition: border-color var(--transition-fast);
+}
+
+.team-sort-select-wrapper:focus-within {
+  border-color: #2563EB;
+}
+
+.team-sort-icon {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.team-sort-select {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  padding-right: 4px;
+}
+
+/* Member Rows List */
+.team-allocations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Compact Modern Member Row Card */
+.team-member-row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 12px 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.team-member-row-card:hover {
+  border-color: var(--border-prominent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+/* Distinct Highlight for Logged-In User ("You") */
+.team-member-row-card.is-current-user {
+  border-left: 4px solid #2563EB;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.02) 0%, var(--bg-surface) 100%);
+}
+
+/* Member Identity Section (Left) */
+.member-col-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 220px;
+  flex: 1 1 240px;
+}
+
+.member-avatar-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: var(--text-xs);
+  font-size: 16px;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
-.member-avatar-unassigned {
-  background: var(--status-blocked-subtle);
-  color: var(--status-blocked);
-  border-color: var(--status-blocked-border);
-}
-
-.member-details-text {
+.member-details-box {
   display: flex;
   flex-direction: column;
+  gap: 3px;
   min-width: 0;
 }
 
-.member-name {
-  font-size: var(--text-sm);
-  font-weight: 600;
+.member-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.member-name-text {
+  font-size: 14.5px;
+  font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.member-role {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
+.member-you-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 12px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1D4ED8;
 }
 
-.member-stats {
+.member-meta-row {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.member-role-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1.5px 8px;
+  border-radius: 6px;
+  line-height: 1.25;
+}
+
+.member-role-pill.role-lead {
+  background: #F3E8FF;
+  border: 1px solid #E9D5FF;
+  color: #7E22CE;
+}
+
+.member-role-pill.role-member {
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  color: #1D4ED8;
+}
+
+.member-role-pill.role-viewer {
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #047857;
+}
+
+.member-role-pill.role-admin {
+  background: #FEF3C7;
+  border: 1px solid #FDE68A;
+  color: #B45309;
+}
+
+.member-presence-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.presence-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.presence-dot.online {
+  background: #10B981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.presence-dot.offline {
+  background: #94A3B8;
+}
+
+/* Direct Message Action Button */
+.member-col-message {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
 }
 
-.stat-pill {
-  font-size: var(--text-xs);
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
+.member-msg-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.member-msg-btn:hover {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+  color: #2563EB;
+  transform: translateY(-1px);
+}
+
+/* 4 Interactive Task Statistic Badges */
+.member-col-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.stat-badge-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--bg-surface-elevated);
+  text-decoration: none;
+}
+
+.stat-badge-btn:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.stat-badge-btn:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 1px;
+}
+
+.stat-badge-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stat-badge-icon {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+}
+
+.stat-badge-count {
+  font-family: var(--font-sans);
+}
+
+.stat-badge-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  margin-top: 2px;
+  opacity: 0.9;
+  line-height: 1;
+}
+
+/* Actions Menu & Chevron Section (Right) */
+.member-col-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.member-nav-arrow-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.member-nav-arrow-btn:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+}
+
+.member-menu-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.member-menu-btn:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+}
+
+.member-actions-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.stat-pill.stat-done {
-  background: var(--status-done-subtle);
-  border-color: var(--status-done-border);
-  color: var(--status-done);
-}
-
-.stat-pill.stat-blocked {
-  background: var(--status-blocked-subtle);
-  border-color: var(--status-blocked-border);
-  color: var(--status-blocked);
-}
-
-.stat-pill.stat-unassigned {
-  background: var(--status-overdue-subtle);
-  border-color: var(--status-overdue-border);
-  color: var(--status-overdue);
-}
-
-.workload-bar-track {
-  width: 100%;
-  height: 6px;
-  background: var(--bg-surface);
-  border-radius: var(--radius-full);
-  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  padding: 4px;
+  min-width: 160px;
+  z-index: 50;
   display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.workload-bar-segment {
-  height: 100%;
-  transition: width 0.3s ease;
+.member-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
 }
 
-.workload-bar-done {
-  background: var(--status-done);
+.member-dropdown-item:hover {
+  background: var(--bg-surface-elevated);
+  color: #2563EB;
 }
 
-.workload-bar-active {
-  background: var(--status-inprogress);
+/* Unassigned Work Row */
+.team-unassigned-row {
+  background: #FFFBEB;
+  border-color: #FDE68A;
 }
 
-.workload-bar-blocked {
-  background: var(--status-blocked);
+.team-unassigned-row:hover {
+  border-color: #F59E0B;
 }
 
-.workload-bar-backlog {
-  background: var(--border-prominent);
+.unassigned-avatar {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+/* Responsive Rules for Team Allocation */
+@media (max-width: 1024px) {
+  .team-member-row-card {
+    gap: var(--space-3);
+    padding: 12px 14px;
+  }
+  .stat-badge-btn {
+    min-width: 68px;
+    padding: 5px 8px;
+  }
+  .stat-badge-top {
+    font-size: 12.5px;
+  }
+  .stat-badge-label {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .team-member-row-card {
+    flex-wrap: wrap;
+  }
+  .member-col-identity {
+    flex: 1 1 100%;
+  }
+  .member-col-stats {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .team-allocation-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .team-search-wrapper {
+    max-width: 100%;
+  }
+  .team-toolbar-controls {
+    justify-content: space-between;
+  }
 }
 
 /* Work Triage Drawer */

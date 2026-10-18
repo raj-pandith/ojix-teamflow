@@ -527,6 +527,27 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
       return;
     }
 
+    // POST /api/clear-all-data or POST /api/sync/clear: Clear all server-synced messages, logs, and notifications
+    if (req.method === 'POST' && (url === '/api/clear-all-data' || url === '/api/sync/clear')) {
+      try {
+        sharedSyncData.notifications = [];
+        sharedSyncData.logs = [];
+        sharedSyncData.directMessages = [];
+        saveSyncData(sharedSyncData);
+        broadcastRealtimeEvent('sync', {
+          notifications: [],
+          logs: [],
+          directMessages: [],
+        });
+        broadcastRealtimeEvent('cleared', { timestamp: Date.now() });
+        sendJson(res, 200, { success: true, message: 'All server synced data cleared.' });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Clear failed';
+        sendJson(res, 500, { error: message });
+      }
+      return;
+    }
+
     next();
   });
 }

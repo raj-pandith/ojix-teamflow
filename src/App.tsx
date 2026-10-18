@@ -20,9 +20,10 @@ import { MessageCenterView } from './features/messages/MessageCenterView';
 import { ProjectDeletionSummaryModal } from './features/messages/ProjectDeletionSummaryModal';
 import { PushNotificationBanner } from './components/notifications/PushNotificationBanner';
 import { TaskDetailModal } from './components/tasks/TaskDetailModal';
+import { UserPersonaModal } from './components/users/UserPersonaModal';
 import { useMessages } from './hooks/useMessages';
 import { storageEngine } from './services/storageEngine';
-import { Task } from './types/task';
+import { Task, TaskStatus } from './types/task';
 import { AppNotification } from './types/message';
 import './styles/global.css';
 
@@ -63,10 +64,13 @@ const MainApp: React.FC = () => {
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [inspectedTask, setInspectedTask] = useState<{ task: Task; commentId?: string | null } | null>(null);
   const [deletionSummaryNotif, setDeletionSummaryNotif] = useState<AppNotification | null>(null);
+  const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
 
   const canMutate = currentUser?.role !== 'viewer';
   const canCreateProject = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
   const canCreateTask = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+
+  const [kanbanAssigneeFilter, setKanbanAssigneeFilter] = useState<string>('all');
 
   const handleOpenMessages = useCallback((conversationId?: string | null) => {
     if (conversationId) {
@@ -75,6 +79,32 @@ const MainApp: React.FC = () => {
     }
     setCurrentTab('messages');
   }, []);
+
+  const handleOpenDirectMessage = useCallback((memberId: string) => {
+    if (!currentUser) return;
+    const conversationId = `conv-${[currentUser.uid, memberId].sort().join('-')}`;
+    handleOpenMessages(conversationId);
+  }, [currentUser, handleOpenMessages]);
+
+  const handleNavigateToTasks = useCallback(({
+    assigneeId = 'all',
+    status = 'all',
+    view = 'list',
+  }: {
+    assigneeId?: string;
+    status?: TaskStatus | 'all' | 'pending';
+    view?: 'list' | 'kanban';
+  }) => {
+    setFilters({
+      searchQuery: '',
+      status: status,
+      priority: 'all',
+      assigneeId: assigneeId,
+      dueDateRange: 'all',
+    });
+    setKanbanAssigneeFilter(assigneeId);
+    setCurrentTab(view);
+  }, [setFilters]);
 
   const handleSelectTaskFromDashboard = (task: Task) => {
     if (task.projectId && task.projectId !== activeProjectId) {
@@ -135,6 +165,7 @@ const MainApp: React.FC = () => {
         unreadMessagesCount={totalUnreadCount}
         isMobileOpen={isMobileNavOpen}
         onCloseMobile={() => setIsMobileNavOpen(false)}
+        onOpenProfile={() => setIsPersonaModalOpen(true)}
       />
 
       {/* Main Shell */}
@@ -157,6 +188,7 @@ const MainApp: React.FC = () => {
           canMutate={canMutate}
           canCreateTask={canCreateTask}
           onToggleMobileNav={() => setIsMobileNavOpen(prev => !prev)}
+          onOpenPersonaModal={() => setIsPersonaModalOpen(true)}
         />
 
         <main className="content-viewport animate-fade-in">
@@ -174,6 +206,7 @@ const MainApp: React.FC = () => {
                 onDeleteTask={deleteTask}
                 highlightedTaskId={highlightedTaskId}
                 onClearHighlight={() => setHighlightedTaskId(null)}
+                initialAssigneeFilter={kanbanAssigneeFilter}
                 onOpenNewTask={() => {
                   if (!canCreateTask) return;
                   if (!activeProject) {
@@ -223,6 +256,8 @@ const MainApp: React.FC = () => {
               onDeleteProject={deleteProject}
               onRequestDelete={(id, name) => setProjectToDelete({ id, name })}
               currentUser={currentUser}
+              onNavigateToTasks={handleNavigateToTasks}
+              onOpenDirectMessage={handleOpenDirectMessage}
             />
           )}
 
@@ -357,6 +392,20 @@ const MainApp: React.FC = () => {
           setDeletionSummaryNotif(notif);
         }}
       />
+
+      {/* User Persona & Permitted Projects Profile Modal */}
+      {currentUser && (
+        <UserPersonaModal
+          isOpen={isPersonaModalOpen}
+          onClose={() => setIsPersonaModalOpen(false)}
+          user={currentUser}
+          onSelectProject={id => {
+            setActiveProjectId(id);
+            setCurrentTab('kanban');
+          }}
+          currentUserId={currentUser.uid}
+        />
+      )}
     </div>
   );
 };
