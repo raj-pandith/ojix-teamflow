@@ -68,8 +68,8 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
             alignItems: 'center',
             gap: '16px',
             padding: '16px',
-            background: 'var(--bg-surface-elevated, #1c2128)',
-            border: '1px solid var(--border-default, #30363d)',
+            background: 'var(--bg-surface-elevated, #FAF5F0)',
+            border: '1px solid var(--border-subtle, #E8DED5)',
             borderRadius: 'var(--radius-md, 8px)',
             marginBottom: '18px',
           }}
@@ -80,7 +80,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
               width: '56px',
               height: '56px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--accent-primary, #6366f1), #8b5cf6)',
+              background: 'linear-gradient(135deg, var(--accent-primary, #CC642D), #B55322)',
               color: '#fff',
               fontSize: '22px',
               fontWeight: 700,
@@ -88,7 +88,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             }}
           >
             {user.displayName.charAt(0).toUpperCase()}
@@ -100,7 +100,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                   fontSize: '18px',
                   fontWeight: 700,
                   margin: 0,
-                  color: 'var(--color-text-primary, #f0f6fc)',
+                  color: 'var(--color-text-primary, #1E293B)',
                 }}
               >
                 {user.displayName}
@@ -188,7 +188,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                   fontSize: '14px',
                   fontWeight: 700,
                   margin: 0,
-                  color: 'var(--color-text-primary, #f0f6fc)',
+                  color: 'var(--color-text-primary, #1E293B)',
                 }}
               >
                 Permitted Projects
@@ -197,9 +197,9 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                 style={{
                   fontSize: '11px',
                   fontWeight: 700,
-                  background: 'var(--surface-elevated, #21262d)',
-                  color: 'var(--color-text-primary, #f0f6fc)',
-                  border: '1px solid var(--border-default, #30363d)',
+                  background: 'var(--bg-surface-elevated, #FAF5F0)',
+                  color: 'var(--color-text-primary, #1E293B)',
+                  border: '1px solid var(--border-subtle, #E8DED5)',
                   borderRadius: '10px',
                   padding: '1px 7px',
                 }}
@@ -211,7 +211,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
               <span
                 style={{
                   fontSize: '11px',
-                  color: 'var(--accent-primary-light, #818cf8)',
+                  color: 'var(--accent-primary, #CC642D)',
                   fontWeight: 600,
                 }}
               >
@@ -223,7 +223,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
           <p
             style={{
               fontSize: '12px',
-              color: 'var(--color-text-secondary, #8b949e)',
+              color: 'var(--color-text-secondary, #64748B)',
               margin: '0 0 10px 0',
             }}
           >
@@ -248,16 +248,16 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                 style={{
                   textAlign: 'center',
                   padding: '24px 16px',
-                  background: 'var(--surface-sunken, #0d1117)',
+                  background: 'var(--bg-surface-elevated, #FAF5F0)',
                   borderRadius: '6px',
-                  border: '1px dashed var(--border-default, #30363d)',
+                  border: '1px dashed var(--border-subtle, #E8DED5)',
                 }}
               >
                 <div style={{ fontSize: '24px', marginBottom: '6px' }}>📭</div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary, #f0f6fc)' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary, #1E293B)' }}>
                   No Permitted Projects Yet
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary, #8b949e)', marginTop: '4px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary, #64748B)', marginTop: '4px' }}>
                   This user has not yet been invited to contribute to any project. Project Leads or Admins can add them via Team Allocation.
                 </div>
               </div>
@@ -265,14 +265,14 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
               allProjects.map((project: Project) => {
                 const isOwner = project.ownerId === user.uid;
                 const roleBadgeText = isOwner
-                  ? 'Project Owner'
-                  : user.role === 'workspace_admin'
-                  ? 'Global Admin'
-                  : user.role === 'project_lead'
-                  ? 'Co-Lead'
-                  : user.role === 'viewer'
-                  ? 'Viewer'
-                  : 'Invited Contributor';
+                    ? 'Project Owner'
+                    : user.role === 'workspace_admin'
+                    ? 'Global Admin'
+                    : user.role === 'project_lead'
+                    ? 'Co-Lead'
+                    : user.role === 'viewer'
+                    ? 'Viewer'
+                    : 'Invited Contributor';
 
                 return (
                   <div
@@ -283,8 +283,8 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '10px 12px',
-                      background: 'var(--surface-elevated, #21262d)',
-                      border: '1px solid var(--border-default, #30363d)',
+                      background: 'var(--bg-surface, #FFFFFF)',
+                      border: '1px solid var(--border-subtle, #E8DED5)',
                       borderRadius: '6px',
                       gap: '10px',
                     }}
@@ -295,7 +295,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                           style={{
                             fontSize: '13px',
                             fontWeight: 600,
-                            color: 'var(--color-text-primary, #f0f6fc)',
+                            color: 'var(--color-text-primary, #1E293B)',
                           }}
                         >
                           {project.name}

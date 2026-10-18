@@ -1,26 +1,26 @@
 :root {
-  /* Warm Editorial Canvas & SaaS Layout Layers (Palette: #F8F1EC, #CC642D, #101D30, #E8DED5, #FFFFFF) */
+  /* Warm Editorial Canvas & SaaS Layout Layers (Palette: #F8F1EC, #CC642D, #1E293B, #E8DED5, #FFFFFF) */
   --bg-canvas: #F8F1EC;
   --bg-canvas-subtle: #F3EAE3;
   --bg-surface: #FFFFFF;
   --bg-surface-elevated: #FAF5F0;
   --bg-surface-hover: #F2E8E0;
   --bg-surface-active: #EADFD5;
-  --bg-overlay: rgba(16, 29, 48, 0.65);
+  --bg-overlay: rgba(15, 23, 42, 0.45);
 
-  /* Deep Midnight-Navy Card & Surface Tokens */
-  --bg-midnight: #101D30;
-  --bg-midnight-elevated: #18283E;
-  --bg-midnight-hover: #1F324D;
-  --bg-midnight-border: rgba(232, 222, 213, 0.16);
+  /* Light Editorial Elevated Surfaces (Replaces dark midnight theme) */
+  --bg-midnight: #FFFFFF;
+  --bg-midnight-elevated: #FAF5F0;
+  --bg-midnight-hover: #F2E8E0;
+  --bg-midnight-border: #E8DED5;
 
-  /* Dark Midnight-Navy Sidebar Tokens */
-  --sidebar-bg: #101D30;
-  --sidebar-active-bg: #1C2D45;
-  --sidebar-hover-bg: #16263D;
-  --sidebar-border: #1E314B;
-  --sidebar-text: #F8F1EC;
-  --sidebar-text-muted: #8E9EA5;
+  /* Crisp Light Theme Sidebar Tokens (Replaces dark midnight sidebar) */
+  --sidebar-bg: #FAF6F2;
+  --sidebar-active-bg: #F3EAE3;
+  --sidebar-hover-bg: #F7EFE9;
+  --sidebar-border: #E8DED5;
+  --sidebar-text: #1E293B;
+  --sidebar-text-muted: #64748B;
   --sidebar-brand-accent: #CC642D;
 
   /* Clean Warm Topbar Tokens */
@@ -41,7 +41,7 @@
   --border-focus: #CC642D;
 
   /* Text Aliases */
-  --color-text-primary: #101D30;
+  --color-text-primary: #1E293B;
   --color-text-secondary: #566579;
 
   /* Typography: Oversized Bold Headings & Technical Labels */
@@ -67,8 +67,8 @@
   --text-3xl: clamp(1.65rem, 1.45rem + 1vw, 2.125rem);         /* 26-34px */
   --text-4xl: clamp(2rem, 1.65rem + 1.6vw, 2.75rem);           /* 32-44px */
 
-  /* Text Contrast Hierarchy (Deep Midnight-Navy Typography #101D30) */
-  --text-primary: #101D30;
+  /* Text Contrast Hierarchy (Crisp Slate Charcoal Typography #1E293B) */
+  --text-primary: #1E293B;
   --text-secondary: #566579;
   --text-muted: #8E9EA5;
   --text-inverse: #FFFFFF;
