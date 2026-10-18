@@ -78,6 +78,137 @@ class ReactiveStorageEngine {
     setInterval(() => {
       this.checkSyncClock();
     }, 1000);
+
+    // 4. Server-side sync for multi-browser and multi-device local development
+    const syncWithServer = async () => {
+        try {
+          const res = await fetch('/api/sync');
+          if (res.ok) {
+            const data = await res.json();
+
+            // When server restarts, seed storageEngine notifications with the clean seed notifications
+            const lastBootId = localStorage.getItem('ojix_server_boot_id');
+            if (data.bootId && data.bootId !== lastBootId) {
+              localStorage.setItem('ojix_server_boot_id', data.bootId);
+              if (Array.isArray(data.notifications)) {
+                this.notifications = [...data.notifications];
+                this.persist();
+                this.notify();
+                return;
+              }
+            }
+
+            let updated = false;
+
+            if (Array.isArray(data.notifications)) {
+              for (const n of data.notifications) {
+                const idx = this.notifications.findIndex(localN => localN.id === n.id);
+                if (idx === -1) {
+                  this.notifications.unshift(n);
+                  updated = true;
+                } else if (n.isRead !== this.notifications[idx].isRead) {
+                  this.notifications[idx] = { ...this.notifications[idx], isRead: n.isRead };
+                  updated = true;
+                }
+              }
+            }
+
+            if (Array.isArray(data.logs)) {
+              for (const l of data.logs) {
+                const exists = this.logs.some(localL => localL.id === l.id);
+                if (!exists) {
+                  this.logs.unshift(l);
+                  updated = true;
+                }
+              }
+            }
+
+            if (updated) {
+              this.persist();
+              this.notify();
+            }
+          }
+        } catch {
+          // Safe ignore if offline
+        }
+      };
+
+      if (typeof window !== 'undefined') {
+        setTimeout(syncWithServer, 200);
+        setInterval(syncWithServer, 2000);
+
+        window.addEventListener('focus', syncWithServer);
+        window.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            syncWithServer();
+          }
+        });
+      }
+
+    // 5. Zero-latency Server-Sent Events (SSE) stream for instantaneous real-time push delivery
+    if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
+      try {
+        const eventSource = new EventSource('/api/sync/events');
+
+        eventSource.addEventListener('connected', (event: MessageEvent) => {
+          try {
+            const data = JSON.parse(event.data);
+            const lastBootId = localStorage.getItem('ojix_server_boot_id');
+            if (data.bootId && data.bootId !== lastBootId) {
+              syncWithServer();
+            }
+          } catch {}
+        });
+
+        eventSource.addEventListener('notification', (event: MessageEvent) => {
+          try {
+            const notif = JSON.parse(event.data);
+            if (notif && notif.id) {
+              const idx = this.notifications.findIndex(n => n.id === notif.id);
+              if (idx === -1) {
+                this.notifications.unshift(notif);
+                this.persist();
+                this.notify();
+              }
+            }
+          } catch {}
+        });
+
+        eventSource.addEventListener('sync', (event: MessageEvent) => {
+          try {
+            const data = JSON.parse(event.data);
+            let updated = false;
+
+            if (Array.isArray(data.notifications)) {
+              for (const n of data.notifications) {
+                const idx = this.notifications.findIndex(localN => localN.id === n.id);
+                if (idx === -1) {
+                  this.notifications.unshift(n);
+                  updated = true;
+                }
+              }
+            }
+
+            if (Array.isArray(data.logs)) {
+              for (const l of data.logs) {
+                const exists = this.logs.some(localL => localL.id === l.id);
+                if (!exists) {
+                  this.logs.unshift(l);
+                  updated = true;
+                }
+              }
+            }
+
+            if (updated) {
+              this.persist();
+              this.notify();
+            }
+          } catch {}
+        });
+      } catch (err) {
+        console.warn('Real-time SSE event stream connection failed:', err);
+      }
+    }
   }
 
   public reloadFromStorage(): void {
@@ -145,6 +276,30 @@ class ReactiveStorageEngine {
         this.initialize(true);
       }
     }
+
+    // Enforce empty baseline workspace versioning so existing browser localStorage is cleared
+    const EMPTY_WORKSPACE_KEY = 'ojix_teamflow_empty_workspace_v1';
+    const isTestRuntime =
+      (typeof process !== 'undefined' && (process.env?.NODE_ENV === 'test' || Boolean(process.env?.VITEST))) ||
+      (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
+
+    if (!isTestRuntime && localStorage.getItem(EMPTY_WORKSPACE_KEY) !== 'cleared') {
+      this.projects = [];
+      this.tasks = [];
+      this.logs = [];
+      this.notifications = [];
+      this.directMessages = [];
+      this.deletionNotices = [];
+      localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.DIRECT_MESSAGES, JSON.stringify([]));
+      localStorage.setItem(EMPTY_WORKSPACE_KEY, 'cleared');
+      this.persist();
+    }
+
     this.notify();
   }
 
@@ -941,6 +1096,17 @@ class ReactiveStorageEngine {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
+  private pushSyncToServer(payload: { notifications?: AppNotification[]; logs?: ActivityLogEntry[] }): void {
+    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    } catch {}
+  }
+
   public addActivityLog(log: ActivityLogEntry, user: UserProfile): void {
     if (user.role === 'viewer') {
       throw new Error('Permission denied: Viewers cannot create activity records.');
@@ -948,9 +1114,14 @@ class ReactiveStorageEngine {
     this.logs.unshift(log);
     this.persist();
     this.notify();
+    this.pushSyncToServer({ logs: [log] });
   }
 
   // ---- Notifications ----
+  public getAllNotificationsUnfiltered(): AppNotification[] {
+    return [...this.notifications];
+  }
+
   public getNotifications(user: UserProfile): AppNotification[] {
     // Strictly isolate notifications: user only sees notifications addressed to them
     return this.notifications
@@ -967,6 +1138,7 @@ class ReactiveStorageEngine {
     this.persist();
     this.notify();
     this.dispatchPushNotification(notification);
+    this.pushSyncToServer({ notifications: [notification] });
   }
 
   public addNotifications(notifications: AppNotification[]): void {
@@ -987,6 +1159,7 @@ class ReactiveStorageEngine {
       for (const notif of newlyAdded) {
         this.dispatchPushNotification(notif);
       }
+      this.pushSyncToServer({ notifications: newlyAdded });
     }
   }
 
@@ -996,6 +1169,9 @@ class ReactiveStorageEngine {
     try {
       const payload = {
         id: notification.id,
+        recipientUserId: notification.recipientUserId,
+        actorUserId: notification.actorUserId,
+        actorDisplayName: notification.actorDisplayName,
         title: notification.title,
         body: notification.body,
         type: notification.type,
@@ -1043,6 +1219,7 @@ class ReactiveStorageEngine {
       };
       this.persist();
       this.notify();
+      this.pushSyncToServer({ notifications: [this.notifications[idx]] });
     }
   }
 

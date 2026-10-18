@@ -332,6 +332,39 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       </div>
 
       {/* B. Board Columns Container */}
+      {!project && (
+        <div
+          className="empty-project-hero"
+          style={{
+            margin: '20px 24px',
+            padding: '40px 24px',
+            background: 'var(--surface-primary, #161b22)',
+            border: '1px dashed var(--border-default, #30363d)',
+            borderRadius: '12px',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: '36px', marginBottom: '12px' }}>📁</div>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary, #f0f6fc)', marginBottom: '8px' }}>
+            No Projects Yet
+          </h2>
+          <p style={{ color: 'var(--text-secondary, #8b949e)', maxWidth: '440px', margin: '0 auto 20px', fontSize: '14px', lineHeight: 1.5 }}>
+            All seed data has been removed. Create your first project to begin adding tasks, assigning team members, and organizing your sprint board.
+          </p>
+          {canMutate && onOpenNewTask && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onOpenNewTask}
+              id="kanban-create-first-project-btn"
+              style={{ padding: '8px 20px', fontWeight: 600 }}
+            >
+              + Create Project
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="kanban-board-container">
         {/* Mobile Column Quick Switcher */}
         <div className="kanban-mobile-tabs" role="tablist" aria-label="Columns">

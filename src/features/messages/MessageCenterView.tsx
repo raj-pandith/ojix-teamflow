@@ -9,6 +9,7 @@ import { ProjectDeletionSummaryModal } from './ProjectDeletionSummaryModal';
 import { DirectMessageModal } from './DirectMessageModal';
 import { WebPushSettingsModal } from './WebPushSettingsModal';
 import { nativePushService } from '../../services/nativePushService';
+import { webPushClient } from '../../services/webPushClient';
 
 type MessageFilterTab = 'all' | 'unread' | 'notifications' | 'direct_messages' | 'sent';
 
@@ -215,6 +216,10 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               onClick={async () => {
                 const res = await nativePushService.requestPermission();
                 setDesktopPermission(res);
+                if (res === 'granted' && currentUser) {
+                  await webPushClient.subscribeUser(currentUser);
+                  await webPushClient.autoSyncSubscription(currentUser);
+                }
               }}
               id="enable-desktop-push-btn"
               title="Enable native alerts outside the browser on your desktop"
@@ -255,6 +260,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 const p = await nativePushService.requestPermission();
                 setDesktopPermission(p);
               }
+              await webPushClient.autoSyncSubscription(currentUser);
               // Dispatch an on-screen push alert and native OS notification
               storageEngine.addNotification({
                 id: `notif-sample-${Date.now().toString(36)}`,

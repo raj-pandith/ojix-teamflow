@@ -121,7 +121,13 @@ const MainApp: React.FC = () => {
         <StickyDeletionBanner notices={deletionNotices} onDismiss={dismissNotice} />
         <Topbar
           onOpenTriage={() => setIsTriageOpen(true)}
-          onOpenNewTask={() => setIsCreateTaskOpen(true)}
+          onOpenNewTask={() => {
+            if (!activeProject) {
+              setIsCreateProjectOpen(true);
+            } else {
+              setIsCreateTaskOpen(true);
+            }
+          }}
           onOpenAddUser={() => setIsInviteUserOpen(true)}
           onOpenMessages={() => setCurrentTab('messages')}
           unreadMessagesCount={totalUnreadCount}
@@ -142,7 +148,13 @@ const MainApp: React.FC = () => {
                 onDeleteTask={deleteTask}
                 highlightedTaskId={highlightedTaskId}
                 onClearHighlight={() => setHighlightedTaskId(null)}
-                onOpenNewTask={() => setIsCreateTaskOpen(true)}
+                onOpenNewTask={() => {
+                  if (!activeProject) {
+                    setIsCreateProjectOpen(true);
+                  } else {
+                    setIsCreateTaskOpen(true);
+                  }
+                }}
                 onSwitchToListView={() => setCurrentTab('list')}
               />
             </div>

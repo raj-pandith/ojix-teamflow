@@ -117,6 +117,60 @@ class WebPushClientService {
   }
 
   /**
+   * Automatically synchronize the current user with the browser's PushManager subscription
+   * if Notification.permission is already granted.
+   */
+  public async autoSyncSubscription(user: UserProfile): Promise<boolean> {
+    if (!this.isSupported() || Notification.permission !== 'granted') {
+      return false;
+    }
+
+    try {
+      const reg = await this.registerServiceWorker();
+      if (!reg) return false;
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const publicKey = await this.getVapidPublicKey();
+        if (!publicKey) return false;
+        const appServerKey = urlBase64ToUint8Array(publicKey);
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: appServerKey as any,
+        });
+      }
+
+      if (!sub) return false;
+
+      const rawKey = sub.getKey('p256dh');
+      const rawAuth = sub.getKey('auth');
+      if (!rawKey || !rawAuth) return false;
+
+      const p256dh = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(rawKey))));
+      const auth = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(rawAuth))));
+
+      const payload = {
+        userId: user.uid,
+        endpoint: sub.endpoint,
+        keys: { p256dh, auth },
+        userAgent: navigator.userAgent,
+        deviceLabel: this.detectDeviceLabel(),
+      };
+
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      return res.ok;
+    } catch (err) {
+      console.warn('[WebPushClient] AutoSync error:', err);
+      return false;
+    }
+  }
+
+  /**
    * Subscribe this browser to native Web Push notifications via VAPID.
    * Only called on explicit user action.
    */

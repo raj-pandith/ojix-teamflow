@@ -110,6 +110,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // GET /api/sync
+  if (req.method === 'GET' && url.startsWith('/api/sync')) {
+    sendJson(res, 200, { notifications: [], logs: [] });
+    return;
+  }
+
+  // POST /api/sync
+  if (req.method === 'POST' && url === '/api/sync') {
+    try {
+      const body = await parseJsonBody<any>(req);
+      sendJson(res, 200, { success: true, received: body });
+    } catch (err: any) {
+      sendJson(res, 500, { error: err.message || 'Sync failed' });
+    }
+    return;
+  }
+
   // POST /api/push/test
   if (req.method === 'POST' && url === '/api/push/test') {
     try {

@@ -23,6 +23,18 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleMobileNav,
 }) => {
   const { currentUser, personas, switchPersona, resetDemoData } = useAuth();
+  const [permission, setPermission] = React.useState<NotificationPermission>(() => {
+    return typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'granted';
+  });
+
+  const handleEnableAlerts = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const p = await Notification.requestPermission();
+        setPermission(p);
+      } catch {}
+    }
+  };
 
   return (
     <header className="topbar">
@@ -47,6 +59,23 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       <div className="topbar-right">
+        {/* Enable Desktop Alerts quick-prompt if not yet granted */}
+        {permission === 'default' && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleEnableAlerts}
+            id="enable-alerts-btn"
+            style={{
+              borderColor: 'var(--accent-primary, #6366f1)',
+              color: 'var(--accent-primary-light, #818cf8)',
+            }}
+            title="Enable native desktop browser notifications"
+          >
+            🔔 Enable Alerts
+          </Button>
+        )}
+
         {/* Add User Button (Workspace Admin only per RBAC) */}
         {currentUser?.role === 'workspace_admin' && onOpenAddUser && (
           <Button

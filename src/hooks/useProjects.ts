@@ -8,7 +8,7 @@ export function useProjects() {
   const { currentUser } = useAuth();
   const { showToast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState<string>('proj-infra-01');
+  const [activeProjectId, setActiveProjectId] = useState<string>('');
   const [deletionNotices, setDeletionNotices] = useState<ProjectDeletionNotice[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -34,6 +34,8 @@ export function useProjects() {
       // Auto-select first project if active is missing
       if (list.length > 0 && !list.some(p => p.id === activeProjectId)) {
         setActiveProjectId(list[0].id);
+      } else if (list.length === 0) {
+        setActiveProjectId('');
       }
     });
 

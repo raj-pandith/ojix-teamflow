@@ -1,6 +1,62 @@
 import type { Plugin, ViteDevServer, PreviewServer } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'http';
+import fs from 'fs';
+import path from 'path';
 import { pushBackend } from './pushBackend';
+
+interface SharedSyncData {
+  notifications: any[];
+  logs: any[];
+}
+
+const syncFilePath = path.resolve(process.cwd(), '.server-sync.json');
+
+export const SERVER_BOOT_TIME = Date.now();
+export const SERVER_BOOT_ID = `server-boot-${SERVER_BOOT_TIME}`;
+
+export const DEFAULT_SEED_NOTIFICATIONS: any[] = [];
+
+function loadSyncData(): SharedSyncData {
+  try {
+    // When server restarts, start with 0 seeded notifications
+    const seededData: SharedSyncData = {
+      notifications: [],
+      logs: [],
+    };
+    fs.writeFileSync(syncFilePath, JSON.stringify(seededData, null, 2), 'utf8');
+    return seededData;
+  } catch {
+    return { notifications: [], logs: [] };
+  }
+}
+
+
+function saveSyncData(data: SharedSyncData) {
+  try {
+    fs.writeFileSync(syncFilePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch {}
+}
+
+const sharedSyncData: SharedSyncData = loadSyncData();
+
+interface SseConnection {
+  id: string;
+  userId?: string;
+  res: ServerResponse;
+}
+
+const sseConnections = new Set<SseConnection>();
+
+export function broadcastRealtimeEvent(eventType: string, data: unknown) {
+  const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseConnections) {
+    try {
+      client.res.write(payload);
+    } catch {
+      sseConnections.delete(client);
+    }
+  }
+}
 
 // Helper to parse JSON body from incoming HTTP request
 function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
@@ -51,12 +107,50 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
     const url = req.url || '';
 
     // Handle CORS preflight
-    if (req.method === 'OPTIONS' && url.startsWith('/api/push')) {
+    if (req.method === 'OPTIONS' && (url.startsWith('/api/push') || url.startsWith('/api/sync'))) {
       res.statusCode = 204;
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.end();
+      return;
+    }
+
+    // 0. GET /api/sync/events — Real-Time Zero-Latency Server-Sent Events (SSE) Stream
+    if (req.method === 'GET' && url.startsWith('/api/sync/events')) {
+      const parsedUrl = new URL(url, 'http://localhost');
+      const userId = parsedUrl.searchParams.get('userId') || '';
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+      });
+
+      res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', bootId: SERVER_BOOT_ID, timestamp: Date.now() })}\n\n`);
+
+      const connection: SseConnection = {
+        id: `sse-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        userId,
+        res,
+      };
+
+      sseConnections.add(connection);
+
+      const heartbeat = setInterval(() => {
+        try {
+          res.write(': keep-alive\n\n');
+        } catch {
+          clearInterval(heartbeat);
+          sseConnections.delete(connection);
+        }
+      }, 15000);
+
+      req.on('close', () => {
+        clearInterval(heartbeat);
+        sseConnections.delete(connection);
+      });
       return;
     }
 
@@ -171,10 +265,95 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
           return;
         }
 
+        // Store notification in shared sync store for multi-browser & multi-device sync
+        const notif = {
+          id: body.payload.id || `notif-${Date.now()}`,
+          recipientUserId: body.recipientUserId,
+          actorUserId: body.payload.actorUserId || '',
+          actorDisplayName: body.payload.actorDisplayName || 'Team Member',
+          type: body.payload.type || 'TASK_COMMENT_MENTION',
+          title: body.payload.title || 'OJIX TeamFlow Alert',
+          body: body.payload.body || '',
+          projectId: body.payload.projectId || null,
+          projectName: body.payload.projectName || null,
+          taskId: body.payload.taskId || null,
+          taskTitle: body.payload.taskTitle || null,
+          commentId: body.payload.commentId || null,
+          conversationId: body.payload.conversationId || null,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        };
+
+        const exists = sharedSyncData.notifications.some(n => n.id === notif.id);
+        if (!exists) {
+          sharedSyncData.notifications.unshift(notif);
+          saveSyncData(sharedSyncData);
+        }
+
+        // Broadcast to all active browsers in real time (< 10ms)
+        broadcastRealtimeEvent('notification', notif);
+
         const results = await pushBackend.sendPushToUser(body.recipientUserId, body.payload);
         sendJson(res, 200, { success: true, count: results.length, results });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Send push failed';
+        sendJson(res, 500, { error: message });
+      }
+      return;
+    }
+
+    // 7. GET /api/sync
+    if (req.method === 'GET' && url.startsWith('/api/sync')) {
+      sendJson(res, 200, {
+        bootId: SERVER_BOOT_ID,
+        notifications: sharedSyncData.notifications,
+        logs: sharedSyncData.logs,
+      });
+      return;
+    }
+
+    // 8. POST /api/sync
+    if (req.method === 'POST' && url === '/api/sync') {
+      try {
+        const body = await parseJsonBody<{
+          notifications?: any[];
+          logs?: any[];
+        }>(req);
+
+        let changed = false;
+        if (Array.isArray(body.notifications)) {
+          for (const n of body.notifications) {
+            if (!n || !n.id) continue;
+            const idx = sharedSyncData.notifications.findIndex(item => item.id === n.id);
+            if (idx === -1) {
+              sharedSyncData.notifications.unshift(n);
+              changed = true;
+            } else if (n.isRead !== sharedSyncData.notifications[idx].isRead) {
+              sharedSyncData.notifications[idx] = { ...sharedSyncData.notifications[idx], isRead: n.isRead };
+              changed = true;
+            }
+          }
+        }
+
+        if (Array.isArray(body.logs)) {
+          for (const l of body.logs) {
+            if (!l || !l.id) continue;
+            const exists = sharedSyncData.logs.some(item => item.id === l.id);
+            if (!exists) {
+              sharedSyncData.logs.unshift(l);
+              changed = true;
+            }
+          }
+        }
+
+        if (changed) {
+          saveSyncData(sharedSyncData);
+          broadcastRealtimeEvent('sync', { notifications: body.notifications, logs: body.logs });
+        }
+
+        sendJson(res, 200, sharedSyncData);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Sync failed';
         sendJson(res, 500, { error: message });
       }
       return;

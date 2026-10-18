@@ -59,20 +59,35 @@ export function resolveCommentMentions(
     u => u.uid !== commenter.uid && u.status === 'active'
   );
 
+  // Check direct full display name mentions in commentText (e.g. "@Marcus Vance" or "@Sarah Chen")
+  const commentLower = commentText.toLowerCase();
+  for (const user of candidateUsers) {
+    const fullPattern = `@${user.displayName.toLowerCase()}`;
+    if (commentLower.includes(fullPattern)) {
+      const hasAccess = !project || project.memberIds.includes(user.uid) || user.role === 'workspace_admin';
+      if (hasAccess) {
+        resolvedUsersMap.set(user.uid, user);
+      }
+    }
+  }
+
   for (const token of tokens) {
     const matches = candidateUsers.filter(u => {
       const emailLower = u.email.toLowerCase();
       const localPart = emailLower.split('@')[0];
       const nameNoSpaces = u.displayName.toLowerCase().replace(/\s+/g, '');
       const nameWithDots = u.displayName.toLowerCase().replace(/\s+/g, '.');
-      const firstName = u.displayName.toLowerCase().split(/\s+/)[0];
+      const parts = u.displayName.toLowerCase().split(/\s+/);
+      const firstName = parts[0];
+      const lastName = parts.length > 1 ? parts[parts.length - 1] : '';
 
       return (
         emailLower === token ||
         localPart === token ||
         nameNoSpaces === token ||
         nameWithDots === token ||
-        firstName === token
+        firstName === token ||
+        (Boolean(lastName) && lastName === token)
       );
     });
 

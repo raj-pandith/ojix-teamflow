@@ -58,6 +58,43 @@ class NativePushService {
     }
   }
 
+  public playChime(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } catch {}
+  }
+
+  public autoRequestPermissionOnInteraction(): void {
+    if (typeof window === 'undefined' || !this.isSupported()) return;
+    if (Notification.permission === 'default') {
+      const ask = () => {
+        Notification.requestPermission()
+          .then(perm => {
+            if (perm === 'granted') {
+              this.registerServiceWorker();
+            }
+          })
+          .catch(() => {});
+        window.removeEventListener('click', ask);
+      };
+      window.addEventListener('click', ask, { once: true });
+    }
+  }
+
   public async triggerOSNotification(
     title: string,
     options: {
@@ -71,6 +108,9 @@ class NativePushService {
       return false;
     }
 
+    // Play subtle audio alert chime
+    this.playChime();
+
     const payload = {
       body: options.body,
       tag: options.tag || `teamflow-${Date.now()}`,
@@ -81,7 +121,22 @@ class NativePushService {
       silent: false,
     };
 
-    // 1. Try Service Worker showNotification (primary OS-level delivery mechanism)
+    // 1. Direct Window Notification (Instantaneous zero-latency desktop toast on Windows / macOS)
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        const nativeNotif = new window.Notification(title, payload);
+        nativeNotif.onclick = () => {
+          window.focus();
+          options.onClick?.();
+          nativeNotif.close();
+        };
+        return true;
+      }
+    } catch (windowErr) {
+      console.debug('Window Notification fallback to Service Worker:', windowErr);
+    }
+
+    // 2. Service Worker showNotification fallback
     try {
       if (!this.swRegistration && 'serviceWorker' in navigator) {
         await this.registerServiceWorker();
@@ -92,22 +147,10 @@ class NativePushService {
         return true;
       }
     } catch (swErr) {
-      console.warn('Service Worker showNotification fallback to window.Notification:', swErr);
+      console.warn('Service Worker showNotification fallback failed:', swErr);
     }
 
-    // 2. Direct Window Notification fallback (calls native OS notification manager)
-    try {
-      const nativeNotif = new window.Notification(title, payload);
-      nativeNotif.onclick = () => {
-        window.focus();
-        options.onClick?.();
-        nativeNotif.close();
-      };
-      return true;
-    } catch (err) {
-      console.warn('Native OS notification failed:', err);
-      return false;
-    }
+    return false;
   }
 }
 

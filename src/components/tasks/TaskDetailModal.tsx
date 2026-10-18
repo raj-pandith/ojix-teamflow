@@ -118,6 +118,31 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
+  const findMentionedUser = (token: string): UserProfile | undefined => {
+    const clean = token.replace(/^@/, '').trim().toLowerCase();
+    if (!clean) return undefined;
+    return users.find(u => {
+      const emailLower = u.email.toLowerCase();
+      const localPart = emailLower.split('@')[0];
+      const nameLower = u.displayName.toLowerCase();
+      const parts = nameLower.split(/\s+/);
+      const firstName = parts[0];
+      const lastName = parts.length > 1 ? parts[parts.length - 1] : '';
+      const nameNoSpaces = nameLower.replace(/\s+/g, '');
+      const nameWithDots = nameLower.replace(/\s+/g, '.');
+
+      return (
+        clean === nameLower ||
+        clean === emailLower ||
+        clean === localPart ||
+        clean === nameNoSpaces ||
+        clean === nameWithDots ||
+        clean === firstName ||
+        (Boolean(lastName) && clean === lastName)
+      );
+    });
+  };
+
   const handleSelectMention = (sUser: UserProfile) => {
     if (!textareaRef.current) return;
     const cursorPos = textareaRef.current.selectionStart;
@@ -125,8 +150,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const textAfterCursor = newComment.slice(cursorPos);
     const atIndex = textBeforeCursor.lastIndexOf('@');
     if (atIndex !== -1) {
-      const localPart = sUser.email.split('@')[0];
-      const inserted = `@${localPart} `;
+      const inserted = `@${sUser.displayName} `;
       const updated = textBeforeCursor.slice(0, atIndex) + inserted + textAfterCursor;
       setNewComment(updated);
       setShowMentionSuggestions(false);
@@ -142,24 +166,49 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   };
 
   const renderCommentWithMentions = (text: string) => {
-    const parts = text.split(/(@[a-zA-Z0-9._-]+(?:@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)?)/g);
+    if (!text) return null;
+
+    // Dynamically build regex to match full display names first, followed by email and token patterns
+    const escapedNames = users
+      .map(u => u.displayName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length);
+
+    const namePatterns = escapedNames.length > 0 ? `${escapedNames.join('|')}|` : '';
+    const mentionRegex = new RegExp(
+      `(@(?:${namePatterns}[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9._-]+|[a-zA-Z0-9._-]+))`,
+      'gi'
+    );
+
+    const parts = text.split(mentionRegex);
     return parts.map((part, i) => {
       if (part.startsWith('@')) {
+        const matchedUser = findMentionedUser(part);
+        const displayName = matchedUser ? matchedUser.displayName : part.slice(1);
+        const emailInfo = matchedUser ? ` • ${matchedUser.email}` : '';
+
         return (
           <span
             key={i}
             className="comment-mention-pill"
+            title={matchedUser ? `${matchedUser.displayName}${emailInfo} (${matchedUser.role.replace('_', ' ')})` : part}
             style={{
-              display: 'inline-block',
-              background: 'rgba(99, 102, 241, 0.2)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              background: 'rgba(99, 102, 241, 0.18)',
               color: 'var(--accent-primary-light, #818cf8)',
               fontWeight: 600,
-              padding: '1px 6px',
-              borderRadius: '4px',
+              padding: '2px 8px',
+              borderRadius: '6px',
               margin: '0 2px',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              fontSize: '12px',
+              verticalAlign: 'baseline',
             }}
           >
-            {part}
+            <span style={{ opacity: 0.75 }}>@</span>
+            <span>{displayName}</span>
           </span>
         );
       }
@@ -343,7 +392,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     Mention a team member:
                   </div>
                   {suggestions.map(sUser => {
-                    const localPart = sUser.email.split('@')[0];
                     return (
                       <button
                         key={sUser.uid}
@@ -372,11 +420,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         onClick={() => handleSelectMention(sUser)}
                       >
                         <span style={{ fontWeight: 600 }}>{sUser.displayName}</span>
-                        <span style={{ color: 'var(--accent-primary-light, #818cf8)', fontSize: '12px' }}>
-                          @{localPart}
+                        <span style={{ color: 'var(--text-muted, #8b949e)', fontSize: '12px' }}>
+                          ({sUser.email})
                         </span>
-                        <span style={{ color: 'var(--text-muted, #8b949e)', fontSize: '11px', marginLeft: 'auto' }}>
-                          ({sUser.role.replace('_', ' ')})
+                        <span style={{ color: 'var(--accent-primary-light, #818cf8)', fontSize: '11px', marginLeft: 'auto' }}>
+                          {sUser.role.replace('_', ' ')}
                         </span>
                       </button>
                     );

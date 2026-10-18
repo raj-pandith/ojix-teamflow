@@ -109,5 +109,21 @@ self.addEventListener('push', event => {
     silent: false,
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  const showNotificationPromise = self.registration.showNotification(title, options);
+
+  // Broadcast to open browser windows so the active UI and storage engine instantly receive the event
+  const broadcastPromise = self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then(clients => {
+      for (const client of clients) {
+        client.postMessage({
+          type: 'PUSH_NOTIFICATION_RECEIVED',
+          payload: payload,
+        });
+      }
+    })
+    .catch(() => {});
+
+  event.waitUntil(Promise.all([showNotificationPromise, broadcastPromise]));
 });
+

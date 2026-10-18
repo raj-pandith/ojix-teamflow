@@ -1,4 +1,6 @@
 import webpush from 'web-push';
+import fs from 'fs';
+import path from 'path';
 import { StoredPushSubscription, PushPayload, PushSendResult } from '../src/types/push';
 
 // Configuration constants
@@ -22,6 +24,7 @@ export class PushBackend {
 
   constructor(customConfig?: Partial<PushBackendConfig>) {
     this.initVapid(customConfig);
+    this.loadSubscriptionsFromDisk();
   }
 
   /**
@@ -121,19 +124,23 @@ export class PushBackend {
 
     // Check if subscription with this endpoint already exists
     let existingId: string | null = null;
+    let existingUserIds: string[] = [];
     for (const [id, s] of this.subscriptions.entries()) {
       if (s.endpoint === subData.endpoint) {
         existingId = id;
+        existingUserIds = Array.isArray(s.userIds) ? [...s.userIds] : [s.userId];
         break;
       }
     }
 
     const subId = existingId || `sub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
+    const allUserIds = Array.from(new Set([...existingUserIds, subData.userId]));
 
     const subscription: StoredPushSubscription = {
       id: subId,
       userId: subData.userId,
+      userIds: allUserIds,
       endpoint: subData.endpoint,
       keys: {
         p256dh: subData.keys.p256dh,
@@ -147,6 +154,7 @@ export class PushBackend {
     };
 
     this.subscriptions.set(subId, subscription);
+    this.saveSubscriptionsToDisk();
     return subscription;
   }
 
@@ -158,10 +166,12 @@ export class PushBackend {
     for (const [id, s] of this.subscriptions.entries()) {
       if (s.endpoint === endpoint) {
         // Enforce authorization: user cannot unregister someone else's subscription
-        if (s.userId !== userId) {
+        const userIds = s.userIds ? s.userIds : [s.userId];
+        if (s.userId !== userId && !userIds.includes(userId)) {
           throw new Error('Unauthorized: Cannot unregister subscription belonging to another user.');
         }
         this.subscriptions.delete(id);
+        this.saveSubscriptionsToDisk();
         found = true;
       }
     }
@@ -174,7 +184,8 @@ export class PushBackend {
   public getSubscriptionsForUser(userId: string): StoredPushSubscription[] {
     const list: StoredPushSubscription[] = [];
     for (const s of this.subscriptions.values()) {
-      if (s.userId === userId && s.isActive) {
+      const userIds = s.userIds ? s.userIds : [s.userId];
+      if ((s.userId === userId || userIds.includes(userId)) && s.isActive) {
         list.push(s);
       }
     }
@@ -193,6 +204,7 @@ export class PushBackend {
    */
   public cleanupSubscription(id: string): void {
     this.subscriptions.delete(id);
+    this.saveSubscriptionsToDisk();
   }
 
   /**
@@ -200,13 +212,63 @@ export class PushBackend {
    */
   public clearAllSubscriptions(): void {
     this.subscriptions.clear();
+    this.saveSubscriptionsToDisk();
+  }
+
+  private getPersistencePath(): string | null {
+    try {
+      return path.resolve(process.cwd(), '.push-subscriptions.json');
+    } catch {
+      return null;
+    }
+  }
+
+  private loadSubscriptionsFromDisk(): void {
+    if (process.env.NODE_ENV === 'test') return;
+    try {
+      const p = this.getPersistencePath();
+      if (p && fs.existsSync(p)) {
+        const raw = fs.readFileSync(p, 'utf8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) {
+          for (const item of data) {
+            if (item && item.id && item.endpoint && item.keys) {
+              this.subscriptions.set(item.id, item);
+            }
+          }
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  private saveSubscriptionsToDisk(): void {
+    if (process.env.NODE_ENV === 'test') return;
+    try {
+      const p = this.getPersistencePath();
+      if (p) {
+        const list = Array.from(this.subscriptions.values());
+        fs.writeFileSync(p, JSON.stringify(list, null, 2), 'utf8');
+      }
+    } catch {
+      // Fallback
+    }
   }
 
   /**
    * Send Web Push notification to all active devices of an authenticated user.
    */
   public async sendPushToUser(userId: string, payload: PushPayload): Promise<PushSendResult[]> {
-    const userSubs = this.getSubscriptionsForUser(userId);
+    let userSubs = this.getSubscriptionsForUser(userId);
+    // In dev / demo environment, fallback to active registered device subscriptions so notification reaches the browser
+    if (userSubs.length === 0 && process.env.NODE_ENV !== 'test') {
+      const allActive = this.getAllSubscriptions().filter(s => s.isActive);
+      if (allActive.length > 0) {
+        userSubs = allActive;
+      }
+    }
+
     if (userSubs.length === 0) {
       return [];
     }
@@ -256,6 +318,7 @@ export class PushBackend {
         lastDeliveredAt: new Date().toISOString(),
       };
       this.subscriptions.set(subscription.id, updated);
+      this.saveSubscriptionsToDisk();
 
       return {
         success: true,

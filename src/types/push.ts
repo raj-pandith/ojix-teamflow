@@ -10,6 +10,7 @@ export interface PushSubscriptionKeys {
 export interface StoredPushSubscription {
   readonly id: string;
   readonly userId: string;
+  readonly userIds?: readonly string[];
   readonly endpoint: string;
   readonly keys: PushSubscriptionKeys;
   readonly userAgent?: string;

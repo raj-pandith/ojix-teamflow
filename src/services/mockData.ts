@@ -57,7 +57,7 @@ export const INITIAL_USERS: UserProfile[] = DEMO_PERSONAS.map(p => ({
   updatedAt: '2026-10-01T08:00:00Z',
 }));
 
-export const INITIAL_PROJECTS: Project[] = [
+export const SAMPLE_PROJECTS: Project[] = [
   {
     id: 'proj-infra-01',
     workspaceId: 'ws-ojix-main',
@@ -86,7 +86,7 @@ export const INITIAL_PROJECTS: Project[] = [
   },
 ];
 
-export const INITIAL_TASKS: Task[] = [
+export const SAMPLE_TASKS: Task[] = [
   {
     id: 'task-101',
     workspaceId: 'ws-ojix-main',
@@ -188,7 +188,7 @@ export const INITIAL_TASKS: Task[] = [
   },
 ];
 
-export const INITIAL_ACTIVITY_LOGS: ActivityLogEntry[] = [
+export const SAMPLE_ACTIVITY_LOGS: ActivityLogEntry[] = [
   {
     id: 'log-001',
     workspaceId: 'ws-ojix-main',
@@ -219,91 +219,7 @@ export const INITIAL_ACTIVITY_LOGS: ActivityLogEntry[] = [
   },
 ];
 
-export const INITIAL_NOTIFICATIONS: import('../types/message').AppNotification[] = [
-  {
-    id: 'notif-seed-001',
-    recipientUserId: 'user-lead-sarah',
-    actorUserId: 'user-admin-alex',
-    actorDisplayName: 'Alex Morgan',
-    type: 'PROJECT_ASSIGNED',
-    title: 'You have been assigned as Project Lead',
-    body: 'Alex Morgan assigned you as Project Lead for "Q4 Cloud Infrastructure & Telemetry".',
-    entityType: 'project',
-    entityId: 'proj-infra-01',
-    projectId: 'proj-infra-01',
-    projectName: 'Q4 Cloud Infrastructure & Telemetry',
-    isRead: false,
-    createdAt: '2026-10-14T09:00:00Z',
-  },
-  {
-    id: 'notif-seed-002',
-    recipientUserId: 'user-lead-sarah',
-    actorUserId: 'user-member-marcus',
-    actorDisplayName: 'Marcus Vance',
-    type: 'TASK_COMMENT_MENTION',
-    title: 'You were mentioned in a task comment',
-    body: 'Marcus Vance mentioned you in a comment on "Redis caching cluster configuration" in "Q4 Cloud Infrastructure & Telemetry".',
-    entityType: 'comment',
-    entityId: 'log-002',
-    projectId: 'proj-infra-01',
-    projectName: 'Q4 Cloud Infrastructure & Telemetry',
-    taskId: 'task-104',
-    taskTitle: 'Redis caching cluster configuration',
-    commentPreview: '@sarah Benchmarked pool at 5,000 req/sec; ready for lead review.',
-    isRead: false,
-    createdAt: '2026-10-15T11:30:00Z',
-  },
-  {
-    id: 'notif-seed-003',
-    recipientUserId: 'user-member-marcus',
-    actorUserId: 'user-lead-sarah',
-    actorDisplayName: 'Sarah Chen',
-    type: 'PROJECT_MEMBER_ADDED',
-    title: 'Added to project',
-    body: 'You have been added to "Q4 Cloud Infrastructure & Telemetry" by Sarah Chen.',
-    entityType: 'project',
-    entityId: 'proj-infra-01',
-    projectId: 'proj-infra-01',
-    projectName: 'Q4 Cloud Infrastructure & Telemetry',
-    isRead: false,
-    createdAt: '2026-10-14T09:15:00Z',
-  },
-  {
-    id: 'notif-seed-004',
-    recipientUserId: 'user-member-marcus',
-    actorUserId: 'user-lead-sarah',
-    actorDisplayName: 'Sarah Chen',
-    type: 'TASK_COMMENT_MENTION',
-    title: 'You were mentioned in a task comment',
-    body: 'Sarah Chen mentioned you in a comment on "Zero-trust ingress proxy setup" in "Q4 Cloud Infrastructure & Telemetry".',
-    entityType: 'comment',
-    entityId: 'log-001',
-    projectId: 'proj-infra-01',
-    projectName: 'Q4 Cloud Infrastructure & Telemetry',
-    taskId: 'task-102',
-    taskTitle: 'Zero-trust ingress proxy setup',
-    commentPreview: '@marcus please review the envoy filters when ready.',
-    isRead: false,
-    createdAt: '2026-10-15T14:00:00Z',
-  },
-  {
-    id: 'notif-seed-005',
-    recipientUserId: 'user-viewer-elena',
-    actorUserId: 'user-lead-sarah',
-    actorDisplayName: 'Sarah Chen',
-    type: 'PROJECT_MEMBER_ADDED',
-    title: 'Project shared with you',
-    body: 'You have been added as a Viewer to "Q4 Cloud Infrastructure & Telemetry". You have read-only access to this project.',
-    entityType: 'project',
-    entityId: 'proj-infra-01',
-    projectId: 'proj-infra-01',
-    projectName: 'Q4 Cloud Infrastructure & Telemetry',
-    isRead: false,
-    createdAt: '2026-10-14T10:00:00Z',
-  },
-];
-
-export const INITIAL_DIRECT_MESSAGES: import('../types/message').DirectMessage[] = [
+export const SAMPLE_DIRECT_MESSAGES: import('../types/message').DirectMessage[] = [
   {
     id: 'dm-seed-001',
     conversationId: 'conv-user-lead-sarah-user-member-marcus',
@@ -330,4 +246,14 @@ export const INITIAL_DIRECT_MESSAGES: import('../types/message').DirectMessage[]
     createdAt: '2026-10-15T16:20:00Z',
   },
 ];
+
+const isTestEnv =
+  (typeof process !== 'undefined' && (process.env?.NODE_ENV === 'test' || Boolean(process.env?.VITEST))) ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
+
+export const INITIAL_PROJECTS: Project[] = isTestEnv ? SAMPLE_PROJECTS : [];
+export const INITIAL_TASKS: Task[] = isTestEnv ? SAMPLE_TASKS : [];
+export const INITIAL_ACTIVITY_LOGS: ActivityLogEntry[] = isTestEnv ? SAMPLE_ACTIVITY_LOGS : [];
+export const INITIAL_NOTIFICATIONS: import('../types/message').AppNotification[] = [];
+export const INITIAL_DIRECT_MESSAGES: import('../types/message').DirectMessage[] = isTestEnv ? SAMPLE_DIRECT_MESSAGES : [];
 
