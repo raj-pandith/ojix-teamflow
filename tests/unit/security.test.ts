@@ -48,6 +48,23 @@ describe('Security & RBAC Boundary Enforcement', () => {
     ).rejects.toThrow(/Permission denied: Viewers cannot create tasks/);
   });
 
+  it('NEG-02c: Member cannot create a task in any project', async () => {
+    await expect(
+      taskService.createTask(
+        'proj-infra-01',
+        {
+          title: 'Illegal task from member',
+          description: 'Should be rejected',
+          priority: 'low',
+          status: 'todo',
+          assigneeId: null,
+          dueDate: '2026-10-30',
+        },
+        memberUser
+      )
+    ).rejects.toThrow(/Permission denied: Members cannot create tasks/);
+  });
+
   it('NEG-02b: Viewer cannot transition task status', async () => {
     await expect(
       taskService.transitionStatus('task-102', 'in_progress', undefined, viewerUser)
@@ -151,6 +168,22 @@ describe('Security & RBAC Boundary Enforcement', () => {
           memberIds: [memberUser.uid],
         },
         memberUser
+      )
+    ).rejects.toThrow(/Permission denied: Only Workspace Admins and Project Leads can create projects/);
+  });
+
+  it('Viewer cannot create projects (restricted to Admin and Lead)', async () => {
+    await expect(
+      projectService.createProject(
+        {
+          name: 'Unauthorized Viewer Project',
+          objective: 'Testing viewer restriction',
+          status: 'active',
+          startDate: '2026-10-01',
+          dueDate: '2026-12-01',
+          memberIds: [viewerUser.uid],
+        },
+        viewerUser
       )
     ).rejects.toThrow(/Permission denied: Only Workspace Admins and Project Leads can create projects/);
   });

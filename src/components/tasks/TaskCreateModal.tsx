@@ -22,8 +22,11 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
   isOpen,
   onClose,
   project,
+  currentUser,
   onCreateTask,
 }) => {
+  const canCreateTask = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
@@ -49,6 +52,10 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreateTask) {
+      setError('Permission denied: Members and Viewers cannot create new tasks.');
+      return;
+    }
     if (!title.trim()) {
       setError('Task title is required.');
       return;

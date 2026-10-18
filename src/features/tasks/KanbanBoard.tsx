@@ -20,6 +20,8 @@ interface KanbanBoardProps {
   onClearHighlight?: () => void;
   onOpenNewTask?: () => void;
   onSwitchToListView?: () => void;
+  canCreateProject?: boolean;
+  canCreateTask?: boolean;
 }
 
 // 5 Columns in exact requested order
@@ -43,7 +45,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onClearHighlight,
   onOpenNewTask,
   onSwitchToListView,
+  canCreateProject: propCanCreateProject,
+  canCreateTask: propCanCreateTask,
 }) => {
+  const canCreateProject =
+    propCanCreateProject !== undefined
+      ? propCanCreateProject
+      : (currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead');
+  const canCreateTask =
+    propCanCreateTask !== undefined
+      ? propCanCreateTask
+      : (currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [pendingBlockerTask, setPendingBlockerTask] = useState<Task | null>(null);
@@ -351,7 +363,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <p style={{ color: 'var(--text-secondary, #8b949e)', maxWidth: '440px', margin: '0 auto 20px', fontSize: '14px', lineHeight: 1.5 }}>
             All seed data has been removed. Create your first project to begin adding tasks, assigning team members, and organizing your sprint board.
           </p>
-          {canMutate && onOpenNewTask && (
+          {canCreateProject && onOpenNewTask && (
             <button
               type="button"
               className="btn btn-primary"
@@ -361,6 +373,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             >
               + Create Project
             </button>
+          )}
+          {!canCreateProject && (
+            <p style={{ color: 'var(--text-muted, #8b949e)', fontSize: '13px', margin: '0 auto' }}>
+              Members and Viewers cannot create projects. Contact a Workspace Admin or Project Lead to set up a project.
+            </p>
           )}
         </div>
       )}
@@ -423,7 +440,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     <h3 className="column-name">{col.label}</h3>
                     <span className="column-count-badge">{colTasks.length}</span>
                   </div>
-                  {canMutate && onOpenNewTask && (
+                  {canCreateTask && onOpenNewTask && (
                     <button
                       type="button"
                       className="btn-col-add-task"

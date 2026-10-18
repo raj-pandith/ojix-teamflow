@@ -67,6 +67,8 @@ const MainApp: React.FC = () => {
   const [deletionSummaryNotif, setDeletionSummaryNotif] = useState<AppNotification | null>(null);
 
   const canMutate = currentUser?.role !== 'viewer';
+  const canCreateProject = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+  const canCreateTask = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
   const handleOpenMessages = useCallback((conversationId?: string | null) => {
     if (conversationId) {
@@ -121,7 +123,11 @@ const MainApp: React.FC = () => {
         onSelectProject={id => {
           setActiveProjectId(id);
         }}
-        onOpenNewProject={() => setIsCreateProjectOpen(true)}
+        onOpenNewProject={() => {
+          if (canCreateProject) {
+            setIsCreateProjectOpen(true);
+          }
+        }}
         currentUser={currentUser}
         unreadMessagesCount={totalUnreadCount}
         isMobileOpen={isMobileNavOpen}
@@ -134,8 +140,11 @@ const MainApp: React.FC = () => {
         <Topbar
           onOpenTriage={() => setIsTriageOpen(true)}
           onOpenNewTask={() => {
+            if (!canCreateTask) return;
             if (!activeProject) {
-              setIsCreateProjectOpen(true);
+              if (canCreateProject) {
+                setIsCreateProjectOpen(true);
+              }
             } else {
               setIsCreateTaskOpen(true);
             }
@@ -144,6 +153,7 @@ const MainApp: React.FC = () => {
           onOpenMessages={() => handleOpenMessages()}
           unreadMessagesCount={totalUnreadCount}
           canMutate={canMutate}
+          canCreateTask={canCreateTask}
           onToggleMobileNav={() => setIsMobileNavOpen(prev => !prev)}
         />
 
@@ -153,6 +163,8 @@ const MainApp: React.FC = () => {
               <KanbanBoard
                 tasks={tasks}
                 canMutate={canMutate}
+                canCreateProject={canCreateProject}
+                canCreateTask={canCreateTask}
                 currentUser={currentUser}
                 project={activeProject}
                 onTransitionStatus={transitionStatus}
@@ -161,8 +173,11 @@ const MainApp: React.FC = () => {
                 highlightedTaskId={highlightedTaskId}
                 onClearHighlight={() => setHighlightedTaskId(null)}
                 onOpenNewTask={() => {
+                  if (!canCreateTask) return;
                   if (!activeProject) {
-                    setIsCreateProjectOpen(true);
+                    if (canCreateProject) {
+                      setIsCreateProjectOpen(true);
+                    }
                   } else {
                     setIsCreateTaskOpen(true);
                   }
@@ -265,8 +280,8 @@ const MainApp: React.FC = () => {
         }}
       />
 
-      {/* Task Creation Modal */}
-      {activeProject && currentUser && (
+      {/* Task Creation Modal (Workspace Admin and Project Lead only) */}
+      {activeProject && currentUser && canCreateTask && (
         <TaskCreateModal
           isOpen={isCreateTaskOpen}
           onClose={() => setIsCreateTaskOpen(false)}
@@ -276,12 +291,14 @@ const MainApp: React.FC = () => {
         />
       )}
 
-      {/* Project Creation Modal */}
-      <ProjectCreateModal
-        isOpen={isCreateProjectOpen}
-        onClose={() => setIsCreateProjectOpen(false)}
-        onCreateProject={createProject}
-      />
+      {/* Project Creation Modal (Workspace Admin and Project Lead only) */}
+      {canCreateProject && (
+        <ProjectCreateModal
+          isOpen={isCreateProjectOpen}
+          onClose={() => setIsCreateProjectOpen(false)}
+          onCreateProject={createProject}
+        />
+      )}
 
       {/* User Invitation Modal (Workspace Admin only) */}
       {currentUser && (

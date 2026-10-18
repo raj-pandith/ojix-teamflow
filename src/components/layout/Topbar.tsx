@@ -10,6 +10,7 @@ interface TopbarProps {
   onOpenMessages?: () => void;
   unreadMessagesCount?: number;
   canMutate: boolean;
+  canCreateTask?: boolean;
   onToggleMobileNav?: () => void;
 }
 
@@ -19,10 +20,14 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenAddUser,
   onOpenMessages,
   unreadMessagesCount,
-  canMutate,
+  canMutate: _canMutate,
+  canCreateTask,
   onToggleMobileNav,
 }) => {
   const { currentUser, personas, switchPersona, resetDemoData } = useAuth();
+  const canCreate = canCreateTask !== undefined
+    ? canCreateTask
+    : (currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead');
   const [permission, setPermission] = React.useState<NotificationPermission>(() => {
     return typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'granted';
   });
@@ -145,8 +150,8 @@ export const Topbar: React.FC<TopbarProps> = ({
           ⚡ Work Triage
         </Button>
 
-        {/* Create Task Button (Disabled for Viewers) */}
-        {canMutate && (
+        {/* Create Task Button (Workspace Admin and Project Lead only) */}
+        {canCreate && (
           <Button
             variant="primary"
             size="sm"

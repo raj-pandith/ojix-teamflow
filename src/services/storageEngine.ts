@@ -1118,6 +1118,9 @@ class ReactiveStorageEngine {
     if (index >= 0) {
       this.tasks[index] = task;
     } else {
+      if (user.role === 'member') {
+        throw new Error('Permission denied: Members cannot create tasks. Only Workspace Admins and Project Leads can create tasks.');
+      }
       this.tasks.push(task);
     }
     this.persist();

@@ -37,6 +37,10 @@ class TaskService {
       throw new Error('Permission denied: Viewers cannot create tasks.');
     }
 
+    if (user.role === 'member') {
+      throw new Error('Permission denied: Members cannot create tasks. Only Workspace Admins and Project Leads can create tasks.');
+    }
+
     const project = storageEngine.getProjectById(projectId, user);
     if (!project) {
       throw new Error(`Project ${projectId} not found.`);

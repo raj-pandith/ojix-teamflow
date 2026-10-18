@@ -15,6 +15,14 @@ class ProjectService {
   }
 
   public async createProject(data: ProjectFormData, user: UserProfile): Promise<Project> {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
+    }
+
+    if (user.role !== 'workspace_admin' && user.role !== 'project_lead') {
+      throw new Error('Permission denied: Only Workspace Admins and Project Leads can create projects.');
+    }
+
     const validation = validateProjectForm(data);
     if (!validation.isValid) {
       const firstError = Object.values(validation.errors)[0];
