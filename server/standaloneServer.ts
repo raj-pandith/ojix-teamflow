@@ -110,9 +110,21 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // GET /api/messages
+  // GET /api/messages — with pagination metadata support
   if (req.method === 'GET' && url.startsWith('/api/messages')) {
-    sendJson(res, 200, { success: true, count: 0, messages: [] });
+    const parsedUrl = new URL(url, 'http://localhost');
+    const page = Math.max(1, parseInt(parsedUrl.searchParams.get('page') || '1', 10) || 1);
+    const pageSize = Math.max(1, parseInt(parsedUrl.searchParams.get('pageSize') || parsedUrl.searchParams.get('limit') || '20', 10) || 20);
+    sendJson(res, 200, {
+      success: true,
+      count: 0,
+      total: 0,
+      page,
+      pageSize,
+      totalPages: 1,
+      hasMore: false,
+      messages: [],
+    });
     return;
   }
 

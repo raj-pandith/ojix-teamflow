@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   UserPlus,
   Search,
@@ -20,6 +20,7 @@ import { Badge } from '../common/Badge';
 import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
 import { Select } from '../common/Select';
+import { Pagination } from '../common/Pagination';
 import { storageEngine } from '../../services/storageEngine';
 import { formatDisplayDate } from '../../domain/timezone';
 import { useToast } from '../../hooks/useToast';
@@ -37,6 +38,12 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
+
+  // Pagination states
+  const [membersPage, setMembersPage] = useState(1);
+  const [membersPageSize, setMembersPageSize] = useState(10);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsPageSize, setLogsPageSize] = useState(10);
 
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -91,18 +98,37 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   }, [currentUser]);
 
   // Filtered users
-  const filteredUsers = users.filter(u => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = u.displayName.toLowerCase().includes(q);
-      const matchEmail = u.email.toLowerCase().includes(q);
-      const matchPhone = u.phone?.toLowerCase().includes(q) || false;
-      if (!matchName && !matchEmail && !matchPhone) return false;
-    }
-    if (roleFilter !== 'all' && u.role !== roleFilter) return false;
-    if (statusFilter !== 'all' && u.status !== statusFilter) return false;
-    return true;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = u.displayName.toLowerCase().includes(q);
+        const matchEmail = u.email.toLowerCase().includes(q);
+        const matchPhone = u.phone?.toLowerCase().includes(q) || false;
+        if (!matchName && !matchEmail && !matchPhone) return false;
+      }
+      if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+      if (statusFilter !== 'all' && u.status !== statusFilter) return false;
+      return true;
+    });
+  }, [users, searchQuery, roleFilter, statusFilter]);
+
+  // Reset page when search or filters change
+  useEffect(() => {
+    setMembersPage(1);
+  }, [searchQuery, roleFilter, statusFilter]);
+
+  // Paginated users slice
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (membersPage - 1) * membersPageSize;
+    return filteredUsers.slice(startIndex, startIndex + membersPageSize);
+  }, [filteredUsers, membersPage, membersPageSize]);
+
+  // Paginated audit logs slice
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (logsPage - 1) * logsPageSize;
+    return logs.slice(startIndex, startIndex + logsPageSize);
+  }, [logs, logsPage, logsPageSize]);
 
   const totalUsers = users.length;
   const activeCount = users.filter(u => (u.status || 'active') === 'active').length;
@@ -334,7 +360,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map(user => {
+            {paginatedUsers.map(user => {
               const isSelf = user.uid === currentUser.uid;
               const isTerminated = user.status === 'terminated';
               const isBlocked = user.status === 'blocked';
@@ -426,6 +452,22 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             )}
           </tbody>
         </table>
+
+        {/* Member Directory Pagination */}
+        {filteredUsers.length > 0 && (
+          <Pagination
+            currentPage={membersPage}
+            totalItems={filteredUsers.length}
+            pageSize={membersPageSize}
+            onPageChange={setMembersPage}
+            pageSizeOptions={[10, 20, 50]}
+            onPageSizeChange={size => {
+              setMembersPageSize(size);
+              setMembersPage(1);
+            }}
+            itemLabel="members"
+          />
+        )}
       </div>
 
       {/* Right-Click & Action Context Menu Floating Popover */}
@@ -548,8 +590,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
           Immutable record of account creations, updates, suspensions, and terminations.
         </p>
 
-        <div className="activity-timeline" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', maxHeight: '280px', overflowY: 'auto' }}>
-          {logs.map(log => (
+        <div className="activity-timeline" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', maxHeight: '320px', overflowY: 'auto' }}>
+          {paginatedLogs.map(log => (
             <div key={log.id} className="timeline-item">
               <div className="timeline-marker" />
               <div className="timeline-content">
@@ -573,6 +615,22 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
               No user management actions recorded yet.
             </div>
+          )}
+
+          {logs.length > logsPageSize && (
+            <Pagination
+              currentPage={logsPage}
+              totalItems={logs.length}
+              pageSize={logsPageSize}
+              onPageChange={setLogsPage}
+              pageSizeOptions={[5, 10, 25]}
+              onPageSizeChange={size => {
+                setLogsPageSize(size);
+                setLogsPage(1);
+              }}
+              itemLabel="audit events"
+              compact
+            />
           )}
         </div>
       </div>

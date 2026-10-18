@@ -11,8 +11,20 @@ class DirectMessageService {
     return storageEngine.getDirectMessages(user, conversationId);
   }
 
-  public async fetchConversationMessages(user: UserProfile, conversationId: string): Promise<DirectMessage[]> {
-    return storageEngine.fetchConversationMessages(conversationId, user);
+  public async fetchConversationMessages(
+    user: UserProfile,
+    conversationId: string,
+    page: number = 1,
+    pageSize: number = 20
+  ): Promise<{
+    messages: DirectMessage[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    hasMore: boolean;
+  }> {
+    return storageEngine.fetchConversationMessages(conversationId, user, page, pageSize);
   }
 
   public async sendMessage(data: SendDirectMessageInput, sender: UserProfile): Promise<DirectMessage> {

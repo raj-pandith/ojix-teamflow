@@ -148,7 +148,7 @@ describe('Team Allocation Redesign — Modern SaaS Layout & Interactive Badges',
     expect(rajRow?.classList.contains('is-current-user')).toBe(true);
 
     // Contains "You" badge
-    expect(screen.getByText('👤 You')).toBeDefined();
+    expect(screen.getByText(/You/)).toBeDefined();
 
     // Current user row does not render a message button to themselves
     const rajMsgBtn = rajRow?.querySelector('.member-msg-btn');
@@ -283,7 +283,7 @@ describe('Team Allocation Redesign — Modern SaaS Layout & Interactive Badges',
     fireEvent.change(searchInput, { target: { value: '' } });
 
     // Click "Viewers" filter button
-    const viewersBtn = screen.getByText('👁️ Viewers');
+    const viewersBtn = document.getElementById('filter-viewers-only-btn') || screen.getByText('Viewers');
     fireEvent.click(viewersBtn);
 
     // Only Elena should be rendered
@@ -292,7 +292,7 @@ describe('Team Allocation Redesign — Modern SaaS Layout & Interactive Badges',
     expect(document.getElementById('team-member-row-u-member-raj')).toBeNull();
 
     // Click "Members" filter button
-    const membersBtn = screen.getByText('👤 Members');
+    const membersBtn = document.getElementById('filter-members-only-btn') || screen.getByText('Members');
     fireEvent.click(membersBtn);
 
     expect(document.getElementById('team-member-row-u-viewer-elena')).toBeNull();

@@ -2054,19 +2054,47 @@ class ReactiveStorageEngine {
     return newMsg;
   }
 
-  public async fetchConversationMessages(conversationId: string, user: UserProfile): Promise<DirectMessage[]> {
+  public async fetchConversationMessages(
+    conversationId: string,
+    user: UserProfile,
+    page: number = 1,
+    pageSize: number = 20
+  ): Promise<{
+    messages: DirectMessage[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    hasMore: boolean;
+  }> {
     if (user.status === 'blocked' || user.status === 'terminated') {
       throw new Error(`Permission denied: Your workspace account is ${user.status}. Message access revoked.`);
     }
 
+    let serverTotal = 0;
+    let serverTotalPages = 1;
+    let serverHasMore = false;
+    let fetchedFromBackend = false;
+    let backendMessages: DirectMessage[] = [];
+
     try {
       if (typeof fetch !== 'undefined') {
-        const res = await fetch(
-          `/api/messages?conversationId=${encodeURIComponent(conversationId)}&userId=${encodeURIComponent(user.uid)}`
-        );
+        const queryParams = new URLSearchParams({
+          conversationId,
+          userId: user.uid,
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        const res = await fetch(`/api/messages?${queryParams.toString()}`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.messages)) {
+            fetchedFromBackend = true;
+            backendMessages = data.messages;
+            serverTotal = typeof data.total === 'number' ? data.total : data.messages.length;
+            serverTotalPages = typeof data.totalPages === 'number' ? data.totalPages : Math.max(1, Math.ceil(serverTotal / pageSize));
+            serverHasMore = Boolean(data.hasMore);
+
             let updated = false;
             for (const m of data.messages) {
               const idx = this.directMessages.findIndex(localM => localM.id === m.id);
@@ -2087,7 +2115,63 @@ class ReactiveStorageEngine {
       }
     } catch {}
 
-    return this.getDirectMessages(user, conversationId);
+    if (fetchedFromBackend) {
+      return {
+        messages: backendMessages,
+        total: serverTotal,
+        page,
+        pageSize,
+        totalPages: serverTotalPages,
+        hasMore: serverHasMore,
+      };
+    }
+
+    // Local / Offline fallback pagination
+    const all = this.getDirectMessages(user, conversationId);
+    const total = all.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.max(1, Math.min(page, totalPages));
+    const startIndex = (safePage - 1) * pageSize;
+    const paged = all.slice(startIndex, startIndex + pageSize);
+
+    return {
+      messages: paged,
+      total,
+      page: safePage,
+      pageSize,
+      totalPages,
+      hasMore: safePage < totalPages,
+    };
+  }
+
+  public getDirectMessagesPaginated(
+    user: UserProfile,
+    conversationId?: string,
+    page: number = 1,
+    pageSize: number = 20
+  ): {
+    messages: DirectMessage[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    hasMore: boolean;
+  } {
+    const all = this.getDirectMessages(user, conversationId);
+    const total = all.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.max(1, Math.min(page, totalPages));
+    const startIndex = (safePage - 1) * pageSize;
+    const paged = all.slice(startIndex, startIndex + pageSize);
+
+    return {
+      messages: paged,
+      total,
+      page: safePage,
+      pageSize,
+      totalPages,
+      hasMore: safePage < totalPages,
+    };
   }
 
   public markDirectMessageRead(messageId: string, user: UserProfile): void {

@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Task, TaskStatus, TaskPriority, TaskFilterOptions, TaskFormData } from '../../types/task';
 import { UserProfile } from '../../types/auth';
 import { Project } from '../../types/project';
 import { Badge } from '../../components/common/Badge';
+import { Pagination } from '../../components/common/Pagination';
 import { TaskDetailModal } from '../../components/tasks/TaskDetailModal';
 import { BlockerModal } from '../../components/tasks/BlockerModal';
 import { storageEngine } from '../../services/storageEngine';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
 import { ALLOWED_TRANSITIONS, canUserMoveTask } from '../../domain/taskStateMachine';
-import { Search, X, AlertTriangle, ArrowRight, FolderOpen, User } from 'lucide-react';
+import { Search, X, AlertTriangle, ArrowRight, FolderOpen, User, RotateCcw, FilterX } from 'lucide-react';
 
 interface GroupedListViewProps {
   tasks: Task[];
@@ -39,6 +40,20 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
 
   const [users, setUsers] = useState<UserProfile[]>(() => storageEngine.getUsers());
 
+  // Pagination states
+  const [taskPage, setTaskPage] = useState(1);
+  const [taskPageSize, setTaskPageSize] = useState(10);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setTaskPage(1);
+  }, [filters]);
+
+  const paginatedTasks = useMemo(() => {
+    const startIndex = (taskPage - 1) * taskPageSize;
+    return tasks.slice(startIndex, startIndex + taskPageSize);
+  }, [tasks, taskPage, taskPageSize]);
+
   useEffect(() => {
     setUsers(storageEngine.getUsers());
     return storageEngine.subscribe(() => {
@@ -63,6 +78,24 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
     }
   };
 
+  const hasActiveFilters = Boolean(
+    filters.searchQuery ||
+    (filters.status && filters.status !== 'all') ||
+    (filters.priority && filters.priority !== 'all') ||
+    (filters.dueDateRange && filters.dueDateRange !== 'all') ||
+    (filters.assigneeId && filters.assigneeId !== 'all')
+  );
+
+  const handleResetFilters = () => {
+    onFilterChange({
+      searchQuery: '',
+      status: 'all',
+      priority: 'all',
+      assigneeId: 'all',
+      dueDateRange: 'all',
+    });
+  };
+
   return (
     <div className="grouped-list-view">
       {/* Universal Multi-Filter & Search Bar */}
@@ -79,23 +112,25 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
           />
           {filters.searchQuery && (
             <button
+              type="button"
               className="search-clear-btn"
               onClick={() => onFilterChange({ ...filters, searchQuery: '' })}
+              aria-label="Clear search"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           )}
         </div>
 
         <div className="filter-selects-row">
           <select
-            className="filter-select"
+            className={`filter-select ${filters.status && filters.status !== 'all' ? 'is-active-filter' : ''}`}
             value={filters.status || 'all'}
             onChange={e => onFilterChange({ ...filters, status: e.target.value as TaskStatus | 'all' | 'pending' })}
             id="filter-status-select"
           >
             <option value="all">All Statuses</option>
-            <option value="pending">Pending (Not Done / Not Blocked)</option>
+            <option value="pending">Pending (Active)</option>
             <option value="backlog">Backlog</option>
             <option value="todo">To Do</option>
             <option value="in_progress">In Progress</option>
@@ -105,7 +140,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
           </select>
 
           <select
-            className="filter-select"
+            className={`filter-select ${filters.priority && filters.priority !== 'all' ? 'is-active-filter' : ''}`}
             value={filters.priority || 'all'}
             onChange={e => onFilterChange({ ...filters, priority: e.target.value as TaskPriority | 'all' })}
             id="filter-priority-select"
@@ -118,7 +153,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
           </select>
 
           <select
-            className="filter-select"
+            className={`filter-select ${filters.dueDateRange && filters.dueDateRange !== 'all' ? 'is-active-filter' : ''}`}
             value={filters.dueDateRange || 'all'}
             onChange={e => onFilterChange({ ...filters, dueDateRange: e.target.value as TaskFilterOptions['dueDateRange'] })}
             id="filter-duedate-select"
@@ -130,7 +165,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
           </select>
 
           <select
-            className="filter-select"
+            className={`filter-select ${filters.assigneeId && filters.assigneeId !== 'all' ? 'is-active-filter' : ''}`}
             value={filters.assigneeId || 'all'}
             onChange={e => onFilterChange({ ...filters, assigneeId: e.target.value })}
             id="filter-assignee-select"
@@ -144,12 +179,14 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
             ))}
           </select>
 
-          {(filters.searchQuery || filters.status !== 'all' || filters.priority !== 'all' || filters.dueDateRange !== 'all' || (filters.assigneeId && filters.assigneeId !== 'all')) && (
+          {hasActiveFilters && (
             <button
+              type="button"
               className="btn-clear-all-filters"
-              onClick={() => onFilterChange({ searchQuery: '', status: 'all', priority: 'all', assigneeId: 'all', dueDateRange: 'all' })}
+              onClick={handleResetFilters}
             >
-              Reset Filters
+              <RotateCcw size={12} />
+              <span>Reset Filters</span>
             </button>
           )}
         </div>
@@ -160,16 +197,16 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
         <table className="tasks-table">
           <thead>
             <tr>
-              <th>Status</th>
-              <th>Task Title</th>
-              <th>Priority</th>
-              <th>Due Date</th>
-              <th>Assignee</th>
-              <th className="th-actions">Actions</th>
+              <th style={{ width: '15%' }}>Status</th>
+              <th style={{ width: '38%' }}>Task Title</th>
+              <th style={{ width: '12%' }}>Priority</th>
+              <th style={{ width: '13%' }}>Due Date</th>
+              <th style={{ width: '14%' }}>Assignee</th>
+              <th style={{ width: '8%', textAlign: 'right' }} className="th-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {tasks.map(task => {
+            {paginatedTasks.map(task => {
               const assignee = users.find(u => u.uid === task.assigneeId);
               const isOverdue = isTaskOverdue(task.dueDate, task.status);
               const allowedMoves = ALLOWED_TRANSITIONS[task.status] || [];
@@ -260,15 +297,52 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
               <tr>
                 <td colSpan={6} className="td-empty-table">
                   <div className="empty-table-state">
-                    <FolderOpen size={36} color="var(--accent-primary, #C9662F)" style={{ marginBottom: '8px' }} />
-                    <p className="empty-title">No tasks matching current filter</p>
-                    <p className="empty-subtitle">Try adjusting your search criteria or resetting filters.</p>
+                    <div className="empty-table-icon-circle">
+                      {hasActiveFilters ? (
+                        <FilterX size={26} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+                      ) : (
+                        <FolderOpen size={26} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+                      )}
+                    </div>
+                    <h4 className="empty-title">
+                      {hasActiveFilters ? 'No tasks matching current filter' : 'No tasks in this project yet'}
+                    </h4>
+                    <p className="empty-subtitle">
+                      {hasActiveFilters
+                        ? 'Try adjusting your search criteria or resetting filters to view all project deliverables.'
+                        : 'Get started by creating your first task to track milestones and deliverables.'}
+                    </p>
+                    {hasActiveFilters && (
+                      <button
+                        type="button"
+                        className="empty-action-btn"
+                        onClick={handleResetFilters}
+                      >
+                        <RotateCcw size={13} />
+                        <span>Reset Filters</span>
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+
+        {tasks.length > 0 && (
+          <Pagination
+            currentPage={taskPage}
+            totalItems={tasks.length}
+            pageSize={taskPageSize}
+            onPageChange={setTaskPage}
+            pageSizeOptions={[10, 20, 50]}
+            onPageSizeChange={size => {
+              setTaskPageSize(size);
+              setTaskPage(1);
+            }}
+            itemLabel="tasks"
+          />
+        )}
       </div>
 
       {/* Task Detail Modal */}

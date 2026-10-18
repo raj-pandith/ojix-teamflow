@@ -66,3 +66,12 @@ export interface SendDirectMessageInput {
   subject?: string;
   body: string;
 }
+
+export interface PaginatedResponse<T> {
+  readonly items: T[];
+  readonly total: number;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly totalPages: number;
+  readonly hasMore: boolean;
+}

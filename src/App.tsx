@@ -25,6 +25,7 @@ import { useMessages } from './hooks/useMessages';
 import { storageEngine } from './services/storageEngine';
 import { Task, TaskStatus } from './types/task';
 import { AppNotification } from './types/message';
+import { FolderKanban } from 'lucide-react';
 import { LoginPage } from './features/auth/LoginPage';
 import { ActivateAccountPage } from './features/auth/ActivateAccountPage';
 import './styles/global.css';
@@ -227,11 +228,41 @@ const MainApp: React.FC = () => {
           {currentTab === 'list' && (
             <div className="tab-view-list">
               <div className="view-header">
-                <div>
-                  <h1 className="view-title">
-                    {activeProject?.name ? `${activeProject.name} — All Tasks` : 'Task Directory'}
-                  </h1>
-                  <p className="view-subtitle">Filter by assignee, milestone, or urgency. Update status inline.</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <div className="view-header-breadcrumb">
+                      <span className="view-breadcrumb-item">
+                        <FolderKanban size={13} style={{ color: 'var(--brand-primary, #C9662F)' }} />
+                        <span>{activeProject?.name || 'Workspace'}</span>
+                      </span>
+                      <span className="view-breadcrumb-separator">/</span>
+                      <span className="view-breadcrumb-current">All Tasks</span>
+                    </div>
+                    <h1 className="view-title">
+                      {activeProject?.name ? `${activeProject.name} — All Tasks` : 'Task Directory'}
+                    </h1>
+                    <p className="view-subtitle">Filter by assignee, milestone, or urgency. Update status inline.</p>
+                  </div>
+                  {activeProject && (
+                    <div className="view-header-stats">
+                      <span className="view-stat-pill">
+                        <span className="view-stat-num">{tasks.length}</span>
+                        <span className="view-stat-lbl">Total Tasks</span>
+                      </span>
+                      <span className="view-stat-pill">
+                        <span className="view-stat-num" style={{ color: 'var(--status-inprogress, #2563EB)' }}>
+                          {tasks.filter(t => t.status === 'in_progress').length}
+                        </span>
+                        <span className="view-stat-lbl">In Progress</span>
+                      </span>
+                      <span className="view-stat-pill">
+                        <span className="view-stat-num" style={{ color: 'var(--status-done, #16A34A)' }}>
+                          {tasks.filter(t => t.status === 'done').length}
+                        </span>
+                        <span className="view-stat-lbl">Completed</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
               <GroupedListView

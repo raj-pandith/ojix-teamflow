@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, X, Trash2 } from 'lucide-react';
 
 interface ProjectDeleteModalProps {
   isOpen: boolean;
@@ -47,43 +47,66 @@ export const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
   return (
     <div className="modal-backdrop animate-fade-in" onClick={handleClose}>
       <div
-        className="modal-card animate-scale-in"
+        className="modal-container animate-scale-in"
         onClick={e => e.stopPropagation()}
-        style={{ maxWidth: '500px' }}
+        style={{ maxWidth: '520px' }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-project-modal-title"
       >
-        <div className="modal-header" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertTriangle size={20} style={{ color: 'var(--color-danger, #ef4444)' }} />
-            <h3 id="delete-project-modal-title" style={{ color: 'var(--color-danger, #ef4444)', margin: 0 }}>
+        <div className="modal-header modal-danger-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: '#FEE2E2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#DC2626',
+                flexShrink: 0,
+              }}
+            >
+              <AlertTriangle size={18} />
+            </div>
+            <h3 id="delete-project-modal-title" className="modal-danger-title">
               Delete Project
             </h3>
           </div>
-          <button className="btn-close-modal" onClick={handleClose} aria-label="Close dialog" style={{ display: 'flex', alignItems: 'center' }}>
+          <button className="modal-close-btn" onClick={handleClose} aria-label="Close dialog">
             <X size={18} />
           </button>
         </div>
 
-        <div className="modal-body" style={{ padding: 'var(--space-4)' }}>
-          <p style={{ margin: '0 0 var(--space-3) 0', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>
-            Are you sure you want to permanently delete project <strong style={{ color: 'var(--text-primary)' }}>"{projectName}"</strong>?
+        <div className="modal-body" style={{ padding: '24px' }}>
+          <p
+            style={{
+              margin: '0 0 16px 0',
+              color: '#1E293B',
+              fontSize: '15px',
+              lineHeight: 1.5,
+              fontWeight: 500,
+            }}
+          >
+            Are you sure you want to permanently delete project{' '}
+            <strong style={{ color: '#0F172A', fontWeight: 700 }}>"{projectName}"</strong>?
           </p>
 
           {/* Reason for Deletion Input */}
-          <div style={{ marginBottom: 'var(--space-3)' }}>
+          <div style={{ marginBottom: '16px' }}>
             <label
               htmlFor="delete-project-reason"
               style={{
                 display: 'block',
-                fontSize: 'var(--text-xs)',
+                fontSize: '13px',
                 fontWeight: 600,
-                color: 'var(--text-secondary)',
-                marginBottom: '6px',
+                color: '#1E293B',
+                marginBottom: '8px',
               }}
             >
-              Reason for Deletion <span style={{ color: 'var(--color-danger, #ef4444)' }}>*</span>
+              Reason for Deletion <span style={{ color: '#DC2626', fontWeight: 700 }}>*</span>
             </label>
             <textarea
               id="delete-project-reason"
@@ -98,18 +121,28 @@ export const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
               style={{
                 width: '100%',
                 resize: 'vertical',
-                borderColor: error ? 'var(--color-danger, #ef4444)' : undefined,
-                fontSize: '13px',
+                borderColor: error ? '#DC2626' : '#CBD5E1',
+                borderWidth: '1.5px',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                fontSize: '14px',
+                color: '#0F172A',
+                background: '#FFFFFF',
+                boxShadow: error ? '0 0 0 3px rgba(220, 38, 38, 0.15)' : 'none',
+                lineHeight: 1.5,
               }}
               autoFocus
             />
             {error && (
               <p
                 style={{
-                  color: 'var(--color-danger, #ef4444)',
+                  color: '#DC2626',
                   fontSize: '12px',
-                  margin: '4px 0 0',
-                  fontWeight: 500,
+                  margin: '6px 0 0',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
               >
                 ⚠️ {error}
@@ -117,38 +150,30 @@ export const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
             )}
           </div>
 
-          <div
-            style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.25)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-3)',
-              fontSize: 'var(--text-xs)',
-              color: 'var(--text-secondary)',
-              lineHeight: 1.5,
-            }}
-          >
-            <p style={{ margin: '0 0 6px 0', fontWeight: 600, color: 'var(--color-danger, #ef4444)' }}>
-              Important consequences:
+          <div className="consequences-alert-box">
+            <p className="consequences-title">
+              <AlertTriangle size={15} />
+              <span>Important consequences:</span>
             </p>
-            <ul style={{ margin: 0, paddingLeft: '18px' }}>
+            <ul className="consequences-list">
               <li>All tasks and activity logs under this project will be removed.</li>
               <li>A high-priority alert will be sent to this project's team members containing your deletion reason.</li>
             </ul>
           </div>
         </div>
 
-        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button type="button" className="btn btn-secondary" onClick={handleClose}>
+        <div className="modal-footer">
+          <button type="button" className="btn-dialog-cancel" onClick={handleClose}>
             Cancel
           </button>
           <button
             type="button"
-            className="btn btn-danger"
+            className="btn-dialog-danger"
             id="confirm-delete-project-btn"
             onClick={handleConfirm}
           >
-            🗑️ Yes, Delete Project
+            <Trash2 size={16} />
+            <span>Yes, Delete Project</span>
           </button>
         </div>
       </div>

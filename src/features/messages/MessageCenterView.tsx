@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Bell,
   MessageSquare,
@@ -24,6 +24,7 @@ import { useMessages } from '../../hooks/useMessages';
 import { AppNotification, DirectConversation, DirectMessage } from '../../types/message';
 import { storageEngine } from '../../services/storageEngine';
 import { Button } from '../../components/common/Button';
+import { Pagination } from '../../components/common/Pagination';
 import { formatDisplayDate } from '../../domain/timezone';
 import { ProjectDeletionSummaryModal } from './ProjectDeletionSummaryModal';
 import { DirectMessageModal } from './DirectMessageModal';
@@ -78,6 +79,20 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     nativePushService.getPermission()
   );
 
+  // Pagination states
+  const [notifPage, setNotifPage] = useState(1);
+  const [notifPageSize, setNotifPageSize] = useState(10);
+  const [sentPage, setSentPage] = useState(1);
+  const [sentPageSize, setSentPageSize] = useState(10);
+  const [chatPage, setChatPage] = useState(1);
+  const [chatPageSize, setChatPageSize] = useState(20);
+  const [chatPagination, setChatPagination] = useState<{
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+    isLoading: boolean;
+  }>({ total: 0, totalPages: 1, hasMore: false, isLoading: false });
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const setActiveTab = (tab: MessageFilterTab) => {
@@ -113,13 +128,44 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     }
   }, [activeTab, selectedConversationId, conversations]);
 
-  // Mark conversation read and fetch latest history from server when selected
+  // Reset pagination when tabs or searches change
+  useEffect(() => {
+    setNotifPage(1);
+    setSentPage(1);
+  }, [activeTab, searchQuery]);
+
+  // Reset chat page when conversation changes
+  useEffect(() => {
+    setChatPage(1);
+  }, [selectedConversationId]);
+
+  // Fetch only the requested set of conversation messages from backend
+  const loadConversationPage = useCallback(
+    async (convId: string, pageToLoad: number, pageSizeToLoad: number) => {
+      if (!convId || !currentUser) return;
+      setChatPagination(prev => ({ ...prev, isLoading: true }));
+      try {
+        const res = await fetchConversationMessages(convId, pageToLoad, pageSizeToLoad);
+        setChatPagination({
+          total: res.total,
+          totalPages: res.totalPages,
+          hasMore: res.hasMore,
+          isLoading: false,
+        });
+      } catch {
+        setChatPagination(prev => ({ ...prev, isLoading: false }));
+      }
+    },
+    [currentUser, fetchConversationMessages]
+  );
+
+  // Mark conversation read and fetch only the page of history from server when selected
   useEffect(() => {
     if (selectedConversationId && currentUser) {
       markConversationRead(selectedConversationId);
-      fetchConversationMessages(selectedConversationId);
+      loadConversationPage(selectedConversationId, chatPage, chatPageSize);
     }
-  }, [selectedConversationId, currentUser, markConversationRead, fetchConversationMessages]);
+  }, [selectedConversationId, chatPage, chatPageSize, currentUser, markConversationRead, loadConversationPage]);
 
   // Messages in active conversation (with fallback synthesis so chat pane always opens)
   const activeConversation = useMemo<DirectConversation | null>(() => {
@@ -158,10 +204,18 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     return null;
   }, [conversations, selectedConversationId, currentUser, workspaceUsers, getConversationMessages]);
 
-  const conversationMessages = useMemo(() => {
+  const allConversationMessages = useMemo(() => {
     if (!selectedConversationId) return [];
     return getConversationMessages(selectedConversationId);
   }, [selectedConversationId, getConversationMessages, conversations]);
+
+  const conversationMessages = useMemo(() => {
+    if (!selectedConversationId) return [];
+    const all = allConversationMessages;
+    if (all.length <= chatPageSize && chatPagination.total <= chatPageSize) return all;
+    const startIndex = (chatPage - 1) * chatPageSize;
+    return all.slice(startIndex, startIndex + chatPageSize);
+  }, [selectedConversationId, allConversationMessages, chatPage, chatPageSize, chatPagination.total]);
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -200,6 +254,12 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     return list;
   }, [notifications, activeTab, searchQuery]);
 
+  // Paginated notifications slice
+  const paginatedNotifications = useMemo(() => {
+    const startIndex = (notifPage - 1) * notifPageSize;
+    return filteredNotifications.slice(startIndex, startIndex + notifPageSize);
+  }, [filteredNotifications, notifPage, notifPageSize]);
+
   // Filtered Sent DMs
   const filteredSentMessages = useMemo(() => {
     if (!searchQuery.trim()) return sentMessages;
@@ -211,6 +271,12 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
         m.body.toLowerCase().includes(q)
     );
   }, [sentMessages, searchQuery]);
+
+  // Paginated Sent DMs slice
+  const paginatedSentMessages = useMemo(() => {
+    const startIndex = (sentPage - 1) * sentPageSize;
+    return filteredSentMessages.slice(startIndex, startIndex + sentPageSize);
+  }, [filteredSentMessages, sentPage, sentPageSize]);
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -814,6 +880,68 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 </span>
               </div>
 
+              {/* Server-Paginated Message History Banner */}
+              {(chatPagination.total > chatPageSize || chatPagination.totalPages > 1) && (
+                <div
+                  style={{
+                    padding: '8px 20px',
+                    background: '#f1f5f9',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '12px',
+                    color: '#475569',
+                  }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Radio size={12} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+                    <span>
+                      Server History: Set {chatPage} of {chatPagination.totalPages} ({chatPagination.total} total messages)
+                    </span>
+                  </span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <select
+                      className="pagination-size-select"
+                      style={{ padding: '2px 6px', fontSize: '11px' }}
+                      value={chatPageSize}
+                      onChange={e => {
+                        setChatPageSize(Number(e.target.value));
+                        setChatPage(1);
+                      }}
+                      title="Messages per set from backend"
+                    >
+                      <option value={10}>10 / set</option>
+                      <option value={20}>20 / set</option>
+                      <option value={50}>50 / set</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={() => setChatPage(p => Math.max(1, p - 1))}
+                      disabled={chatPage <= 1 || chatPagination.isLoading}
+                      style={{ padding: '3px 8px', fontSize: '11px', borderRadius: '4px' }}
+                      title="Fetch earlier message set from backend"
+                    >
+                      ← Earlier
+                    </button>
+                    <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#1e293b' }}>
+                      {chatPage} / {chatPagination.totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={() => setChatPage(p => Math.min(chatPagination.totalPages, p + 1))}
+                      disabled={chatPage >= chatPagination.totalPages || chatPagination.isLoading}
+                      style={{ padding: '3px 8px', fontSize: '11px', borderRadius: '4px' }}
+                      title="Fetch newer message set from backend"
+                    >
+                      Newer →
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Message List */}
               <div
                 style={{
@@ -960,7 +1088,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
       ) : activeTab === 'sent' ? (
         /* Sent Messages List */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {filteredSentMessages.map(msg => (
+          {paginatedSentMessages.map(msg => (
             <div
               key={msg.id}
               onClick={() => {
@@ -1037,11 +1165,26 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               No sent messages found.
             </div>
           )}
+
+          {filteredSentMessages.length > 0 && (
+            <Pagination
+              currentPage={sentPage}
+              totalItems={filteredSentMessages.length}
+              pageSize={sentPageSize}
+              onPageChange={setSentPage}
+              pageSizeOptions={[10, 20, 50]}
+              onPageSizeChange={size => {
+                setSentPageSize(size);
+                setSentPage(1);
+              }}
+              itemLabel="sent messages"
+            />
+          )}
         </div>
       ) : (
         /* Notifications & Inbox Items List */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {filteredNotifications.map(notif => {
+          {paginatedNotifications.map(notif => {
             const icon = getNotificationIcon(notif.type);
             const isUnread = !notif.isRead;
             const isDirectMessage = notif.type === 'DIRECT_MESSAGE_RECEIVED';
@@ -1480,6 +1623,21 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 {searchQuery ? 'Try clearing your search query.' : 'You have no notifications in this view.'}
               </p>
             </div>
+          )}
+
+          {filteredNotifications.length > 0 && (
+            <Pagination
+              currentPage={notifPage}
+              totalItems={filteredNotifications.length}
+              pageSize={notifPageSize}
+              onPageChange={setNotifPage}
+              pageSizeOptions={[10, 25, 50]}
+              onPageSizeChange={size => {
+                setNotifPageSize(size);
+                setNotifPage(1);
+              }}
+              itemLabel="notifications"
+            />
           )}
         </div>
       )}

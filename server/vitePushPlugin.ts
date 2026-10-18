@@ -568,11 +568,13 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
       return;
     }
 
-    // 7. GET /api/messages — Retrieve conversation history with participant authorization
+    // 7. GET /api/messages — Retrieve conversation history with participant authorization & pagination
     if (req.method === 'GET' && url.startsWith('/api/messages')) {
       const parsedUrl = new URL(url, 'http://localhost');
       const conversationId = parsedUrl.searchParams.get('conversationId');
       const userId = parsedUrl.searchParams.get('userId');
+      const pageParam = parsedUrl.searchParams.get('page');
+      const pageSizeParam = parsedUrl.searchParams.get('pageSize') || parsedUrl.searchParams.get('limit');
 
       let list = [...sharedSyncData.directMessages];
       if (conversationId) {
@@ -585,7 +587,39 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
 
       // Sort chronologically ascending (oldest first, newest last)
       list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      sendJson(res, 200, { success: true, count: list.length, messages: list });
+
+      const total = list.length;
+
+      if (pageParam !== null || pageSizeParam !== null) {
+        const pageSize = Math.max(1, Math.min(100, parseInt(pageSizeParam || '20', 10) || 20));
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        const page = Math.max(1, Math.min(parseInt(pageParam || '1', 10) || 1, totalPages));
+        const startIndex = (page - 1) * pageSize;
+        const pagedMessages = list.slice(startIndex, startIndex + pageSize);
+
+        sendJson(res, 200, {
+          success: true,
+          count: pagedMessages.length,
+          total,
+          page,
+          pageSize,
+          totalPages,
+          hasMore: page < totalPages,
+          messages: pagedMessages,
+        });
+        return;
+      }
+
+      sendJson(res, 200, {
+        success: true,
+        count: list.length,
+        total,
+        page: 1,
+        pageSize: total,
+        totalPages: 1,
+        hasMore: false,
+        messages: list,
+      });
       return;
     }
 

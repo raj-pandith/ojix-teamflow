@@ -94,11 +94,24 @@ export function useMessages() {
   );
 
   const fetchConversationMessages = useCallback(
-    async (convId: string): Promise<DirectMessage[]> => {
-      if (!currentUser) return [];
-      const msgs = await directMessageService.fetchConversationMessages(currentUser, convId);
+    async (
+      convId: string,
+      page: number = 1,
+      pageSize: number = 20
+    ): Promise<{
+      messages: DirectMessage[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+      hasMore: boolean;
+    }> => {
+      if (!currentUser) {
+        return { messages: [], total: 0, page: 1, pageSize, totalPages: 1, hasMore: false };
+      }
+      const res = await directMessageService.fetchConversationMessages(currentUser, convId, page, pageSize);
       refresh();
-      return msgs;
+      return res;
     },
     [currentUser, refresh]
   );
