@@ -83,11 +83,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     };
   }, [currentTask?.id, currentUser]);
 
-  const activeTask = currentTask || task;
-  if (!activeTask) return null;
-
-  const assignee = users.find(u => u.uid === activeTask.assigneeId);
-  const isAssigneeIneligible = Boolean(assignee && project && !isUserEligibleForAssignment(assignee, project));
+  const activeTask = (currentTask && task && currentTask.id === task.id) ? currentTask : task;
 
   const suggestions = React.useMemo(() => {
     if (!showMentionSuggestions || mentionQuery === null || !currentUser) return [];
@@ -99,6 +95,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       highlightedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [highlightCommentId, logs]);
+
+  if (!isOpen || !activeTask) return null;
+
+  const assignee = users.find(u => u.uid === activeTask.assigneeId);
+  const isAssigneeIneligible = Boolean(assignee && project && !isUserEligibleForAssignment(assignee, project));
 
   const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
