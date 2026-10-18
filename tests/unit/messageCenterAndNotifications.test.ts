@@ -468,5 +468,43 @@ describe('OJIX TeamFlow Message Center, Notifications & Direct Messaging', () =>
       const matches = allNotifs.filter(n => n.deduplicationKey === 'dup-test-key-123');
       expect(matches.length).toBe(1);
     });
+
+    it('populates task and comment metadata so clicking anywhere on the row redirects to where the task comment message is', () => {
+      notificationService.notifyTaskCommentMention(
+        testTask,
+        testProject,
+        '@rajpandith Please review the frontend auth flow',
+        'comment-auth-999',
+        memberA,
+        leadUser
+      );
+
+      const notifs = storageEngine.getNotifications(memberA);
+      const commentNotif = notifs.find(n => n.type === 'TASK_COMMENT_MENTION');
+      expect(commentNotif).toBeDefined();
+      expect(commentNotif?.projectId).toBe(testProject.id);
+      expect(commentNotif?.taskId).toBe(testTask.id);
+      expect(commentNotif?.commentId).toBe('comment-auth-999');
+      expect(commentNotif?.title).toContain('You were mentioned');
+    });
+
+    it('populates task reassignment metadata so clicking anywhere on the row redirects to the task', () => {
+      notificationService.notifyTaskAssigned(
+        testTask,
+        testProject,
+        memberA,
+        leadUser,
+        true // isReassignment
+      );
+
+      const notifs = storageEngine.getNotifications(memberA);
+      const reassignNotif = notifs.find(n => n.type === 'TASK_REASSIGNED');
+      expect(reassignNotif).toBeDefined();
+      expect(reassignNotif?.title).toBe('Task reassigned to you');
+      expect(reassignNotif?.projectId).toBe(testProject.id);
+      expect(reassignNotif?.taskId).toBe(testTask.id);
+      expect(reassignNotif?.body).toContain('reassigned task');
+    });
   });
 });
+

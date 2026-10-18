@@ -3367,4 +3367,27 @@
   }
 }
 
+/* Interactive Notification Card & Accessibility */
+.notification-card.is-interactive {
+  cursor: pointer;
+  outline: none;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.notification-card.is-interactive:hover {
+  border-color: #a5b4fc !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12) !important;
+}
+
+.notification-card.is-interactive:focus-visible {
+  outline: 2px solid var(--accent-primary, #6366f1) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.18) !important;
+}
+
+.notification-card.is-interactive:active {
+  transform: translateY(1px);
+}
+
 

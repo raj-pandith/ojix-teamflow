@@ -248,4 +248,24 @@ describe('OJIX TeamFlow — Chat Message Lifecycle, Persistence & Real-Time Sync
     const userConversations = directMessageService.getConversations(userAlice);
     expect(userConversations).toEqual([]);
   });
+
+  // 11. Direct message notification contains conversationId to enable direct title-click navigation.
+  it('11. Direct message notification contains conversationId enabling direct title-click chat redirection', async () => {
+    await storageEngine.sendDirectMessage(
+      { recipientId: userBob.uid, body: 'Checking roadmap deliverables' },
+      userAlice
+    );
+
+    const bobNotifs = storageEngine.getNotifications(userBob);
+    const dmNotif = bobNotifs.find(n => n.type === 'DIRECT_MESSAGE_RECEIVED');
+    expect(dmNotif).toBeDefined();
+    expect(dmNotif?.conversationId).toBe(convAliceBob);
+    expect(dmNotif?.actorUserId).toBe(userAlice.uid);
+    expect(dmNotif?.title).toContain('Message from Alice Chat');
+
+    // Verify conversation resolution fallback matches convAliceBob
+    const candidateId = dmNotif?.conversationId || (dmNotif?.entityType === 'conversation' ? dmNotif.entityId : null);
+    expect(candidateId).toBe(convAliceBob);
+  });
 });
+

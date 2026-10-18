@@ -37,15 +37,26 @@ export const PushNotificationBanner: React.FC<PushNotificationBannerProps> = ({
 
       if (notif.type === 'PROJECT_DELETED') {
         onOpenDeletionSummary?.(notif);
-      } else if (notif.type === 'TASK_COMMENT_MENTION' && notif.projectId && notif.taskId) {
+      } else if (
+        (notif.type === 'TASK_COMMENT_MENTION' ||
+         notif.type === 'TASK_ASSIGNED' ||
+         notif.type === 'TASK_REASSIGNED' ||
+         Boolean(notif.taskId)) &&
+        notif.projectId &&
+        notif.taskId
+      ) {
         onNavigateToTask?.(notif.projectId, notif.taskId, notif.commentId);
       } else if (
-        (notif.type === 'PROJECT_ASSIGNED' || notif.type === 'PROJECT_MEMBER_ADDED') &&
+        (notif.type === 'PROJECT_ASSIGNED' ||
+         notif.type === 'PROJECT_MEMBER_ADDED' ||
+         notif.type === 'PROJECT_LEAD_CHANGED' ||
+         notif.type === 'PROJECT_ROLE_CHANGED') &&
         notif.projectId
       ) {
         onNavigateToProject?.(notif.projectId);
       } else if (notif.type === 'DIRECT_MESSAGE_RECEIVED') {
-        onOpenMessages?.(notif.conversationId);
+        const convId = notif.conversationId || (notif.entityType === 'conversation' ? notif.entityId : undefined);
+        onOpenMessages?.(convId);
       } else {
         onOpenMessages?.();
       }

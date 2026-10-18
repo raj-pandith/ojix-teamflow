@@ -209,6 +209,65 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     }
   };
 
+  const handleNotificationTitleClick = (notif: AppNotification) => {
+    const isTaskEvent =
+      notif.type === 'TASK_COMMENT_MENTION' ||
+      notif.type === 'TASK_ASSIGNED' ||
+      notif.type === 'TASK_REASSIGNED' ||
+      Boolean(notif.taskId) ||
+      notif.entityType === 'task' ||
+      notif.entityType === 'comment';
+
+    if (notif.type === 'DIRECT_MESSAGE_RECEIVED') {
+      markNotificationRead(notif.id);
+      setActiveTab('direct_messages');
+      const convId = notif.conversationId || (notif.entityType === 'conversation' ? notif.entityId : null);
+      if (convId) {
+        setSelectedConversationId(convId);
+      } else if (currentUser && notif.actorUserId) {
+        const actorId = notif.actorUserId;
+        const found = conversations.find(c =>
+          c.participantIds.includes(actorId) && c.participantIds.includes(currentUser.uid)
+        );
+        if (found) {
+          setSelectedConversationId(found.id);
+        } else {
+          const derived = `conv-${[currentUser.uid, actorId].sort().join('-')}`;
+          setSelectedConversationId(derived);
+        }
+      }
+    } else if (isTaskEvent) {
+      markNotificationRead(notif.id);
+      const taskId = notif.taskId || (notif.entityType === 'task' ? notif.entityId : null);
+      let projectId = notif.projectId;
+      if (!projectId && taskId && currentUser) {
+        const allTasks = storageEngine.getAllAccessibleTasks(currentUser);
+        const match = allTasks.find(t => t.id === taskId);
+        if (match) {
+          projectId = match.projectId;
+        }
+      }
+      if (projectId && taskId) {
+        onNavigateToTask?.(projectId, taskId, notif.commentId);
+      } else if (projectId) {
+        onNavigateToProject?.(projectId);
+      }
+    } else if (
+      (notif.type === 'PROJECT_ASSIGNED' ||
+       notif.type === 'PROJECT_MEMBER_ADDED' ||
+       notif.type === 'PROJECT_LEAD_CHANGED' ||
+       notif.type === 'PROJECT_ROLE_CHANGED') &&
+      notif.projectId
+    ) {
+      markNotificationRead(notif.id);
+      onNavigateToProject?.(notif.projectId);
+    } else if (notif.type === 'PROJECT_DELETED') {
+      setDeletionNoticeModalItem(notif);
+    } else if (notif.type === 'USER_BLOCKED') {
+      setActiveBlockedNotice(notif);
+    }
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'PROJECT_DELETED':
@@ -221,6 +280,9 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
         return '🚪';
       case 'TASK_COMMENT_MENTION':
         return '💬';
+      case 'TASK_ASSIGNED':
+      case 'TASK_REASSIGNED':
+        return '📋';
       case 'USER_BLOCKED':
         return '🚫';
       case 'DIRECT_MESSAGE_RECEIVED':
@@ -867,16 +929,39 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
           {filteredSentMessages.map(msg => (
             <div
               key={msg.id}
+              onClick={() => {
+                setActiveTab('direct_messages');
+                setSelectedConversationId(msg.conversationId);
+              }}
               style={{
                 background: '#ffffff',
                 border: '1px solid #e2e8f0',
                 borderRadius: '10px',
                 padding: '14px 18px',
                 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                cursor: 'pointer',
+                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+              }}
+              title="Click anywhere to open chat conversation"
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = '#c7d2fe';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(99, 102, 241, 0.1)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a' }}>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    color: '#4338ca',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                  }}
+                >
                   To: 👤 {msg.recipientDisplayName}
                 </span>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>
@@ -915,11 +1000,76 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
           {filteredNotifications.map(notif => {
             const icon = getNotificationIcon(notif.type);
             const isUnread = !notif.isRead;
+            const isDirectMessage = notif.type === 'DIRECT_MESSAGE_RECEIVED';
+            const isCommentMention = notif.type === 'TASK_COMMENT_MENTION';
+            const isTaskAssignment = notif.type === 'TASK_ASSIGNED' || notif.type === 'TASK_REASSIGNED';
+            const isTaskEvent =
+              isCommentMention ||
+              isTaskAssignment ||
+              Boolean(notif.taskId) ||
+              notif.entityType === 'task' ||
+              notif.entityType === 'comment';
+            const isProjectEvent =
+              (notif.type === 'PROJECT_ASSIGNED' ||
+                notif.type === 'PROJECT_MEMBER_ADDED' ||
+                notif.type === 'PROJECT_LEAD_CHANGED' ||
+                notif.type === 'PROJECT_ROLE_CHANGED') &&
+              Boolean(notif.projectId);
+            const isDeletionEvent = notif.type === 'PROJECT_DELETED';
+            const isBlockedEvent = notif.type === 'USER_BLOCKED';
+            const isInteractiveRow =
+              isDirectMessage || isTaskEvent || isProjectEvent || isDeletionEvent || isBlockedEvent;
+
+            const rowTooltip = isDirectMessage
+              ? 'Click anywhere on row to open chat conversation'
+              : isCommentMention
+              ? 'Click anywhere on row to view comment in task'
+              : isTaskEvent
+              ? 'Click anywhere on row to view task'
+              : isProjectEvent
+              ? 'Click anywhere on row to open project'
+              : isDeletionEvent
+              ? 'Click anywhere on row to view deletion summary'
+              : isBlockedEvent
+              ? 'Click anywhere on row to view account status'
+              : undefined;
 
             return (
               <div
                 key={notif.id}
-                className="notification-card"
+                className={`notification-card ${isInteractiveRow ? 'is-interactive' : ''}`}
+                role={isInteractiveRow ? 'button' : undefined}
+                tabIndex={isInteractiveRow ? 0 : undefined}
+                aria-label={
+                  isDirectMessage
+                    ? `Open conversation with ${notif.actorDisplayName || 'sender'}: ${notif.title}`
+                    : isCommentMention
+                    ? `View comment on task ${notif.taskTitle || ''}: ${notif.title}`
+                    : isTaskEvent
+                    ? `View task ${notif.taskTitle || ''}: ${notif.title}`
+                    : isProjectEvent
+                    ? `Open project ${notif.projectName || ''}: ${notif.title}`
+                    : isDeletionEvent
+                    ? `View deletion summary: ${notif.title}`
+                    : isBlockedEvent
+                    ? `View account status: ${notif.title}`
+                    : undefined
+                }
+                onClick={() => {
+                  if (isInteractiveRow) {
+                    handleNotificationTitleClick(notif);
+                  }
+                }}
+                onKeyDown={e => {
+                  if (isInteractiveRow && (e.key === 'Enter' || e.key === ' ')) {
+                    if (e.key === ' ') {
+                      e.preventDefault();
+                    }
+                    if (e.target === e.currentTarget) {
+                      handleNotificationTitleClick(notif);
+                    }
+                  }
+                }}
                 style={{
                   background: isUnread ? '#f8faff' : '#ffffff',
                   border: isUnread ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
@@ -930,8 +1080,26 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                   alignItems: 'flex-start',
                   gap: '14px',
                   boxShadow: isUnread ? '0 2px 8px rgba(79, 70, 229, 0.08)' : '0 1px 3px rgba(0, 0, 0, 0.04)',
-                  transition: 'background 0.2s ease',
+                  transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+                  cursor: isInteractiveRow ? 'pointer' : 'default',
                 }}
+                onMouseEnter={e => {
+                  if (isInteractiveRow) {
+                    e.currentTarget.style.borderColor = '#a5b4fc';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.12)';
+                    e.currentTarget.style.background = isUnread ? '#f0f4ff' : '#f8fafc';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (isInteractiveRow) {
+                    e.currentTarget.style.borderColor = isUnread ? '#c7d2fe' : '#e2e8f0';
+                    e.currentTarget.style.boxShadow = isUnread
+                      ? '0 2px 8px rgba(79, 70, 229, 0.08)'
+                      : '0 1px 3px rgba(0, 0, 0, 0.04)';
+                    e.currentTarget.style.background = isUnread ? '#f8faff' : '#ffffff';
+                  }
+                }}
+                title={rowTooltip}
               >
                 {/* Event Type Icon */}
                 <div
@@ -941,6 +1109,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     borderRadius: '8px',
                     background: isUnread ? '#e0e7ff' : '#f1f5f9',
                     lineHeight: 1,
+                    userSelect: 'none',
                   }}
                 >
                   {icon}
@@ -948,8 +1117,36 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
 
                 {/* Main Body */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    <h4
+                      style={{
+                        margin: 0,
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: isDirectMessage ? '#4338ca' : '#0f172a',
+                        cursor: isInteractiveRow ? 'pointer' : 'default',
+                        transition: 'color 0.15s ease, text-decoration 0.15s ease',
+                      }}
+                      onMouseEnter={e => {
+                        if (isInteractiveRow) {
+                          e.currentTarget.style.color = '#4f46e5';
+                          e.currentTarget.style.textDecoration = 'underline';
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (isInteractiveRow) {
+                          e.currentTarget.style.color = isDirectMessage ? '#4338ca' : '#0f172a';
+                          e.currentTarget.style.textDecoration = 'none';
+                        }
+                      }}
+                    >
                       {notif.title}
                     </h4>
                     {isUnread && (
@@ -1033,7 +1230,10 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
                   {isUnread && (
                     <button
-                      onClick={() => markNotificationRead(notif.id)}
+                      onClick={e => {
+                        e.stopPropagation();
+                        markNotificationRead(notif.id);
+                      }}
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -1049,63 +1249,78 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     </button>
                   )}
 
-                  {notif.type === 'PROJECT_DELETED' && (
+                  {isDeletionEvent && (
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => setDeletionNoticeModalItem(notif)}
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleNotificationTitleClick(notif);
+                      }}
                     >
                       View Summary
                     </Button>
                   )}
 
-                  {notif.type === 'TASK_COMMENT_MENTION' && notif.projectId && notif.taskId && (
+                  {isCommentMention && (
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => {
-                        markNotificationRead(notif.id);
-                        onNavigateToTask?.(notif.projectId!, notif.taskId!, notif.commentId);
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleNotificationTitleClick(notif);
                       }}
                     >
                       View Comment
                     </Button>
                   )}
 
-                  {(notif.type === 'PROJECT_ASSIGNED' || notif.type === 'PROJECT_MEMBER_ADDED') &&
-                    notif.projectId && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          markNotificationRead(notif.id);
-                          onNavigateToProject?.(notif.projectId!);
-                        }}
-                      >
-                        Open Project
-                      </Button>
-                    )}
+                  {(isTaskAssignment || (isTaskEvent && !isCommentMention)) && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleNotificationTitleClick(notif);
+                      }}
+                    >
+                      View Task
+                    </Button>
+                  )}
 
-                  {notif.type === 'USER_BLOCKED' && (
+                  {isProjectEvent && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleNotificationTitleClick(notif);
+                      }}
+                    >
+                      Open Project
+                    </Button>
+                  )}
+
+                  {isBlockedEvent && (
                     <Button
                       variant="danger"
                       size="sm"
-                      onClick={() => setActiveBlockedNotice(notif)}
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleNotificationTitleClick(notif);
+                      }}
                     >
                       Account Status
                     </Button>
                   )}
 
-                  {notif.type === 'DIRECT_MESSAGE_RECEIVED' && (
+                  {isDirectMessage && (
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => {
-                        markNotificationRead(notif.id);
-                        setActiveTab('direct_messages');
-                        if (notif.conversationId) {
-                          setSelectedConversationId(notif.conversationId);
-                        }
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleNotificationTitleClick(notif);
                       }}
                     >
                       Open Chat

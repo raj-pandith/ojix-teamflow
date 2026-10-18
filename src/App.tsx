@@ -91,11 +91,13 @@ const MainApp: React.FC = () => {
 
   const handleNavigateToTask = (projectId: string, taskId: string, commentId?: string | null) => {
     setActiveProjectId(projectId);
+    setCurrentTab('kanban');
     if (!currentUser) return;
     try {
       const target = storageEngine.getTaskById(taskId, currentUser);
       if (target) {
         setInspectedTask({ task: target, commentId });
+        setHighlightedTaskId(taskId);
       }
     } catch (e) {
       console.warn('Failed to inspect task from notification:', e);
