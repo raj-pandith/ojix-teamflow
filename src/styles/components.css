@@ -2817,8 +2817,9 @@ button svg,
 
 .dashboard-sections-grid {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.75fr);
   gap: var(--space-6);
+  align-items: start;
 }
 
 @media (max-width: 1024px) {
@@ -2835,6 +2836,8 @@ button svg,
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+  width: 100%;
 }
 
 .panel-header {
@@ -2910,6 +2913,22 @@ button svg,
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-width: 0;
+  width: 100%;
+}
+
+.empty-panel-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 36px 20px;
+  background: var(--surface-sunken, #FAF7F4);
+  border: 1px dashed var(--border-subtle, #E2D9D0);
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Header & Summary Badges */
