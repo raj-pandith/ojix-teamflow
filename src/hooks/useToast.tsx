@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -34,12 +35,29 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 4000);
   }, [dismissToast]);
 
+  const renderIcon = (type: ToastType) => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle2 size={16} className="toast-icon-svg" />;
+      case 'error':
+        return <AlertCircle size={16} className="toast-icon-svg" />;
+      case 'warning':
+        return <AlertTriangle size={16} className="toast-icon-svg" />;
+      case 'info':
+      default:
+        return <Info size={16} className="toast-icon-svg" />;
+    }
+  };
+
   return (
     <ToastContext.Provider value={{ toasts, showToast, dismissToast }}>
       {children}
       <div className="toast-container" aria-live="polite">
         {toasts.map(t => (
           <div key={t.id} className={`toast toast-${t.type} animate-fade-in`}>
+            <div className="toast-icon-wrapper" aria-hidden="true">
+              {renderIcon(t.type)}
+            </div>
             <div className="toast-content">
               <strong className="toast-title">{t.title}</strong>
               {t.message && <p className="toast-message">{t.message}</p>}
@@ -49,7 +67,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               onClick={() => dismissToast(t.id)}
               aria-label="Close notification"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
         ))}

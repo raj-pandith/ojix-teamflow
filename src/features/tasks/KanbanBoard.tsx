@@ -7,6 +7,20 @@ import { BlockerModal } from '../../components/tasks/BlockerModal';
 import { TaskDetailModal } from '../../components/tasks/TaskDetailModal';
 import { storageEngine } from '../../services/storageEngine';
 import { canUserMoveTask } from '../../domain/taskStateMachine';
+import {
+  LucideIcon,
+  FolderKanban,
+  Search,
+  X,
+  PanelsTopLeft,
+  List,
+  Plus,
+  CircleDot,
+  Clock,
+  AlertTriangle,
+  Eye,
+  CheckCircle2,
+} from 'lucide-react';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -26,12 +40,16 @@ interface KanbanBoardProps {
 }
 
 // 5 Columns in exact requested order
-const COLUMNS: Array<{ status: TaskStatus; label: string; icon: string }> = [
-  { status: 'todo', label: 'To Do', icon: '📝' },
-  { status: 'in_progress', label: 'In Progress', icon: '⚙️' },
-  { status: 'blocked', label: 'Blocked', icon: '⚠️' },
-  { status: 'in_review', label: 'In Review', icon: '👀' },
-  { status: 'done', label: 'Done', icon: '✅' },
+const COLUMNS: Array<{
+  status: TaskStatus;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { status: 'todo', label: 'To Do', icon: CircleDot },
+  { status: 'in_progress', label: 'In Progress', icon: Clock },
+  { status: 'blocked', label: 'Blocked', icon: AlertTriangle },
+  { status: 'in_review', label: 'In Review', icon: Eye },
+  { status: 'done', label: 'Done', icon: CheckCircle2 },
 ];
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -213,8 +231,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <div className="kanban-title-row">
             <h1 className="kanban-page-title">Kanban Board</h1>
             {project && (
-              <span className="kanban-project-tag">
-                📁 {project.name}
+              <span className="kanban-project-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FolderKanban size={14} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+                <span>{project.name}</span>
               </span>
             )}
           </div>
@@ -248,7 +267,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       <div className="kanban-toolbar">
         <div className="kanban-toolbar-filters">
           <div className="kanban-search-box">
-            <span className="toolbar-search-icon">🔍</span>
+            <Search size={14} className="toolbar-search-icon" />
             <input
               type="text"
               placeholder="Filter tasks..."
@@ -263,7 +282,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 onClick={() => setSearchQuery('')}
                 title="Clear search"
               >
-                ✕
+                <X size={14} />
               </button>
             )}
           </div>
@@ -291,10 +310,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             title="Filter by Priority"
           >
             <option value="all">All Priorities</option>
-            <option value="urgent">🔴 Urgent</option>
-            <option value="high">🟠 High</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="low">🟢 Low</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
           </select>
 
           <select
@@ -331,7 +350,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               className="btn-toggle-view active"
               title="Board View"
             >
-              📋 Board
+              <PanelsTopLeft size={14} style={{ marginRight: '6px' }} />
+              <span>Board</span>
             </button>
             {onSwitchToListView && (
               <button
@@ -341,7 +361,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 title="Switch to List View"
                 id="toggle-to-list-view-btn"
               >
-                📑 List
+                <List size={14} style={{ marginRight: '6px' }} />
+                <span>List</span>
               </button>
             )}
           </div>
@@ -354,7 +375,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onClick={onOpenNewTask}
               id="kanban-toolbar-create-task-btn"
             >
-              + New Task
+              <Plus size={14} style={{ marginRight: '6px' }} />
+              <span>New Task</span>
             </button>
           )}
         </div>
@@ -367,18 +389,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           style={{
             margin: '20px 24px',
             padding: '40px 24px',
-            background: 'var(--surface-primary, #161b22)',
-            border: '1px dashed var(--border-default, #30363d)',
+            background: 'var(--bg-surface, #FFFFFF)',
+            border: '1px dashed var(--border-subtle, #E8DED5)',
             borderRadius: '12px',
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: '36px', marginBottom: '12px' }}>📁</div>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary, #f0f6fc)', marginBottom: '8px' }}>
+          <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>
+            <FolderKanban size={36} color="var(--accent-primary, #C9662F)" />
+          </div>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary, #1E293B)', marginBottom: '8px' }}>
             No Projects Yet
           </h2>
-          <p style={{ color: 'var(--text-secondary, #8b949e)', maxWidth: '440px', margin: '0 auto 20px', fontSize: '14px', lineHeight: 1.5 }}>
-            All seed data has been removed. Create your first project to begin adding tasks, assigning team members, and organizing your sprint board.
+          <p style={{ color: 'var(--text-secondary, #64748B)', maxWidth: '440px', margin: '0 auto 20px', fontSize: '14px', lineHeight: 1.5 }}>
+            Create your first project to begin adding tasks, assigning team members, and organizing your sprint board.
           </p>
           {canCreateProject && onOpenNewTask && (
             <button
@@ -388,11 +412,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               id="kanban-create-first-project-btn"
               style={{ padding: '8px 20px', fontWeight: 600 }}
             >
-              + Create Project
+              <Plus size={14} style={{ marginRight: '6px' }} />
+              <span>Create Project</span>
             </button>
           )}
           {!canCreateProject && (
-            <p style={{ color: 'var(--text-muted, #8b949e)', fontSize: '13px', margin: '0 auto' }}>
+            <p style={{ color: 'var(--text-muted, #8E9EA5)', fontSize: '13px', margin: '0 auto' }}>
               Members and Viewers cannot create projects. Contact a Workspace Admin or Project Lead to set up a project.
             </p>
           )}
@@ -415,6 +440,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             const count = sortedTasks.filter(t =>
               c.status === 'todo' ? (t.status === 'todo' || t.status === 'backlog') : t.status === c.status
             ).length;
+            const ColumnIcon = c.icon;
             return (
               <button
                 key={c.status}
@@ -424,7 +450,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 className={`mobile-tab-btn ${mobileActiveColumn === c.status ? 'active' : ''}`}
                 onClick={() => setMobileActiveColumn(c.status)}
               >
-                {c.icon} {c.label} ({count})
+                <ColumnIcon size={13} style={{ marginRight: '4px' }} />
+                <span>{c.label} ({count})</span>
               </button>
             );
           })}
@@ -441,6 +468,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             });
             const isDragOver = activeDragOverCol === col.status;
             const isMobileHidden = mobileActiveColumn !== 'all' && mobileActiveColumn !== col.status;
+            const ColumnIcon = col.icon;
 
             return (
               <div
@@ -453,7 +481,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 {/* Column Header */}
                 <div className="kanban-column-header">
                   <div className="column-title-group">
-                    <span className="column-icon">{col.icon}</span>
+                    <span className="column-icon"><ColumnIcon size={15} /></span>
                     <h3 className="column-name">{col.label}</h3>
                     <span className="column-count-badge">{colTasks.length}</span>
                   </div>
@@ -464,7 +492,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       onClick={onOpenNewTask}
                       title={`Add task to ${col.label}`}
                     >
-                      +
+                      <Plus size={13} />
                     </button>
                   )}
                 </div>

@@ -8,6 +8,7 @@ import { BlockerModal } from '../../components/tasks/BlockerModal';
 import { storageEngine } from '../../services/storageEngine';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
 import { ALLOWED_TRANSITIONS, canUserMoveTask } from '../../domain/taskStateMachine';
+import { Search, X, AlertTriangle, ArrowRight, FolderOpen, User } from 'lucide-react';
 
 interface GroupedListViewProps {
   tasks: Task[];
@@ -67,7 +68,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
       {/* Universal Multi-Filter & Search Bar */}
       <div className="filter-bar">
         <div className="search-input-wrapper">
-          <span className="search-icon">🔍</span>
+          <Search size={14} className="search-icon" />
           <input
             type="text"
             className="search-input"
@@ -81,7 +82,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
               className="search-clear-btn"
               onClick={() => onFilterChange({ ...filters, searchQuery: '' })}
             >
-              ✕
+              <X size={14} />
             </button>
           )}
         </div>
@@ -209,8 +210,9 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
                   <td className="td-title">
                     <span className="row-task-title">{task.title}</span>
                     {task.status === 'blocked' && task.blockerReason && (
-                      <span className="row-blocker-tag" title={task.blockerReason}>
-                        ⚠️ {task.blockerReason}
+                      <span className="row-blocker-tag" title={task.blockerReason} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={12} />
+                        <span>{task.blockerReason}</span>
                       </span>
                     )}
                   </td>
@@ -228,8 +230,9 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
 
                   <td className="td-assignee">
                     {assignee ? (
-                      <span className="assignee-pill">
-                        👤 {assignee.displayName}
+                      <span className="assignee-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <User size={12} />
+                        <span>{assignee.displayName}</span>
                       </span>
                     ) : (
                       <span className="unassigned-text">Unassigned</span>
@@ -243,8 +246,10 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
                         setSelectedTask(task);
                         setIsDetailOpen(true);
                       }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                     >
-                      Inspect ➔
+                      <span>Inspect</span>
+                      <ArrowRight size={13} />
                     </button>
                   </td>
                 </tr>
@@ -255,7 +260,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
               <tr>
                 <td colSpan={6} className="td-empty-table">
                   <div className="empty-table-state">
-                    <span className="empty-icon">📂</span>
+                    <FolderOpen size={36} color="var(--accent-primary, #C9662F)" style={{ marginBottom: '8px' }} />
                     <p className="empty-title">No tasks matching current filter</p>
                     <p className="empty-subtitle">Try adjusting your search criteria or resetting filters.</p>
                   </div>

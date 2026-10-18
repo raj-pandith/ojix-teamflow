@@ -2,6 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
+import {
+  Bell,
+  BellRing,
+  UserPlus,
+  Plus,
+  Zap,
+  ChevronDown,
+  ShieldCheck,
+  LogOut,
+  RotateCcw,
+  Settings,
+} from 'lucide-react';
 
 interface TopbarProps {
   onOpenTriage: () => void;
@@ -111,12 +123,13 @@ export const Topbar: React.FC<TopbarProps> = ({
             onClick={handleEnableAlerts}
             id="enable-alerts-btn"
             style={{
-              borderColor: 'var(--accent-primary, #6366f1)',
-              color: 'var(--accent-primary-light, #818cf8)',
+              borderColor: 'var(--accent-primary, #C9662F)',
+              color: 'var(--accent-primary, #C9662F)',
             }}
             title="Enable native desktop browser notifications"
           >
-            🔔 Enable Alerts
+            <BellRing size={14} style={{ marginRight: '6px' }} />
+            <span>Enable Alerts</span>
           </Button>
         )}
 
@@ -129,7 +142,8 @@ export const Topbar: React.FC<TopbarProps> = ({
             id="add-user-topbar-btn"
             title="Invite a new member to the workspace"
           >
-            + Invite Member
+            <UserPlus size={14} style={{ marginRight: '6px' }} />
+            <span>Invite Member</span>
           </Button>
         )}
 
@@ -142,18 +156,20 @@ export const Topbar: React.FC<TopbarProps> = ({
             title="Open Message Center & Notifications"
             style={{
               position: 'relative',
-              background: 'var(--surface-elevated, #21262d)',
-              border: '1px solid var(--border-default, #30363d)',
-              borderRadius: '6px',
-              padding: '6px 10px',
+              background: 'var(--bg-surface, #FFFFFF)',
+              border: '1px solid var(--border-subtle, #E8DED5)',
+              borderRadius: '8px',
+              padding: '7px 9px',
               cursor: 'pointer',
-              fontSize: '15px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              color: 'var(--text-primary, #1E293B)',
+              boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+              transition: 'background-color 0.15s ease, border-color 0.15s ease',
             }}
           >
-            <span>🔔</span>
+            <Bell size={16} />
             {typeof unreadMessagesCount === 'number' && unreadMessagesCount > 0 && (
               <span
                 id="topbar-unread-badge"
@@ -161,7 +177,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                   position: 'absolute',
                   top: '-4px',
                   right: '-4px',
-                  background: 'var(--accent-primary, #6366f1)',
+                  background: 'var(--accent-primary, #C9662F)',
                   color: '#fff',
                   fontSize: '10px',
                   fontWeight: 700,
@@ -169,7 +185,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                   borderRadius: '10px',
                   minWidth: '16px',
                   textAlign: 'center',
-                  boxShadow: '0 0 4px rgba(0,0,0,0.5)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                 }}
               >
                 {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
@@ -186,7 +202,8 @@ export const Topbar: React.FC<TopbarProps> = ({
           className="triage-trigger-btn"
           title="Open Work Triage to resolve blockers and parse notes"
         >
-          ⚡ Work Triage
+          <Zap size={14} style={{ marginRight: '6px', color: 'var(--accent-primary)' }} />
+          <span>Work Triage</span>
         </Button>
 
         {/* Create Task Button (Workspace Admin and Project Lead only) */}
@@ -197,7 +214,8 @@ export const Topbar: React.FC<TopbarProps> = ({
             onClick={onOpenNewTask}
             id="create-task-topbar-btn"
           >
-            + New Task
+            <Plus size={14} style={{ marginRight: '6px' }} />
+            <span>New Task</span>
           </Button>
         )}
 
@@ -222,17 +240,15 @@ export const Topbar: React.FC<TopbarProps> = ({
                 <span className="user-display-name">{currentUser.displayName}</span>
                 <span className="user-role-label">{currentUser.role.replace('_', ' ')}</span>
               </div>
-              <svg
+              <ChevronDown
+                size={14}
                 className={`menu-caret-icon ${isUserMenuOpen ? 'open' : ''}`}
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+                style={{
+                  transition: 'transform 0.2s ease',
+                  transform: isUserMenuOpen ? 'rotate(180deg)' : 'none',
+                  color: 'var(--text-muted, #64748B)',
+                }}
+              />
             </button>
 
             {/* Profile Dropdown Popover */}
@@ -264,7 +280,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                     }}
                     id="dropdown-inspect-access-btn"
                   >
-                    <span className="item-icon">🛡️</span>
+                    <ShieldCheck size={16} className="item-icon" />
                     <span>View Role &amp; Permitted Projects</span>
                   </button>
                 )}
@@ -277,7 +293,8 @@ export const Topbar: React.FC<TopbarProps> = ({
                       className="dev-switcher-toggle"
                       onClick={() => setShowDevSwitcher(!showDevSwitcher)}
                     >
-                      <span>🛠️ Dev Impersonation ({showDevSwitcher ? 'Hide' : 'Show'})</span>
+                      <Settings size={14} style={{ marginRight: '6px' }} />
+                      <span>Dev Impersonation ({showDevSwitcher ? 'Hide' : 'Show'})</span>
                     </button>
                     {showDevSwitcher && (
                       <div className="dev-personas-list">
@@ -303,7 +320,8 @@ export const Topbar: React.FC<TopbarProps> = ({
                             setIsUserMenuOpen(false);
                           }}
                         >
-                          ↻ Reset Test Data
+                          <RotateCcw size={14} style={{ marginRight: '6px' }} />
+                          <span>Reset Test Data</span>
                         </button>
                       </div>
                     )}
@@ -321,7 +339,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                   }}
                   id="dropdown-logout-btn"
                 >
-                  <span className="item-icon">🚪</span>
+                  <LogOut size={16} className="item-icon" />
                   <span>Sign Out</span>
                 </button>
               </div>

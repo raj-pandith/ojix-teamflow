@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 interface ActivateAccountPageProps {
@@ -204,15 +205,15 @@ export const ActivateAccountPage: React.FC<ActivateAccountPageProps> = ({ onNavi
               {/* Password Requirements Checklist */}
               <div className="password-checklist">
                 <div className={`checklist-item ${hasMinLength ? 'met' : ''}`}>
-                  <span className="check-icon">{hasMinLength ? '✓' : '•'}</span>
+                  <span className="check-icon">{hasMinLength ? <Check size={12} /> : '•'}</span>
                   <span>Minimum 8 characters</span>
                 </div>
                 <div className={`checklist-item ${hasSpecialOrNumber ? 'met' : ''}`}>
-                  <span className="check-icon">{hasSpecialOrNumber ? '✓' : '•'}</span>
+                  <span className="check-icon">{hasSpecialOrNumber ? <Check size={12} /> : '•'}</span>
                   <span>At least one number or special symbol</span>
                 </div>
                 <div className={`checklist-item ${passwordsMatch ? 'met' : ''}`}>
-                  <span className="check-icon">{passwordsMatch ? '✓' : '•'}</span>
+                  <span className="check-icon">{passwordsMatch ? <Check size={12} /> : '•'}</span>
                   <span>Passwords match</span>
                 </div>
               </div>

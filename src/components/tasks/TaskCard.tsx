@@ -2,6 +2,7 @@ import React from 'react';
 import { Task, TaskStatus } from '../../types/task';
 import { Badge } from '../common/Badge';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
+import { Calendar, AlertCircle, AlertTriangle } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -84,7 +85,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       {/* 6. Optional Blocker Information */}
       {task.status === 'blocked' && task.blockerReason && (
         <div className="task-blocker-banner">
-          <span className="blocker-icon">⚠️</span>
+          <AlertTriangle size={12} className="blocker-icon" style={{ flexShrink: 0 }} />
           <span className="blocker-text">{task.blockerReason}</span>
         </div>
       )}
@@ -94,8 +95,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         <div
           className={`task-due-date ${isOverdue ? 'due-date-overdue' : ''}`}
           title={`Due Date: ${task.dueDate}${isOverdue ? ' (Overdue)' : ''}`}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
         >
-          <span className="due-date-icon">{isOverdue ? '⚠️' : '📅'}</span>
+          {isOverdue ? <AlertCircle size={12} /> : <Calendar size={12} />}
           <span>{formatDisplayDate(task.dueDate)}</span>
         </div>
 

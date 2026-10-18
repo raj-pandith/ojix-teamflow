@@ -1,4 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import {
+  UserPlus,
+  Search,
+  X,
+  Phone,
+  User,
+  Mail,
+  Pencil,
+  Lock,
+  Unlock,
+  UserX,
+  ShieldCheck,
+  MoreVertical,
+} from 'lucide-react';
 import { UserProfile, UserRole, UserStatus } from '../../types/auth';
 import { ActivityLogEntry } from '../../types/audit';
 import { Button } from '../common/Button';
@@ -23,6 +37,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
+
+  // Context Menu state
+  const [contextMenu, setContextMenu] = useState<{
+    user: UserProfile;
+    x: number;
+    y: number;
+  } | null>(null);
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -57,7 +78,16 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       }).catch(() => {});
     }
     const unsubscribe = storageEngine.subscribe(refreshData);
-    return () => unsubscribe();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [currentUser]);
 
   // Filtered users
@@ -190,46 +220,63 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   return (
     <div className="user-management-view animate-fade-in" style={{ padding: 'var(--space-4)' }}>
       {/* View Header */}
-      <div className="view-header" style={{ marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
         <div>
-          <h1 className="view-title">Member Directory</h1>
-          <p className="view-subtitle">
+          <h1 style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--color-text-primary, #1E293B)', margin: '0 0 4px 0' }}>
+            Member Directory
+          </h1>
+          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary, #64748B)', margin: 0 }}>
             Manage member profiles, roles, and workspace access permissions.
           </p>
         </div>
         <Button variant="primary" onClick={handleOpenCreate} id="admin-create-user-btn">
-          + Add Member
+          <UserPlus size={15} style={{ marginRight: 6 }} /> Add Member
         </Button>
       </div>
 
       {/* Metrics Row */}
-      <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-        <div className="metric-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>Total Registered</span>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>{totalUsers}</div>
+      <div className="members-metrics-grid">
+        <div className="member-metric-card">
+          <div className="member-metric-label">
+            <User size={13} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+            <span>Total Members</span>
+          </div>
+          <div className="member-metric-value">{totalUsers}</div>
         </div>
-        <div className="metric-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-done)', textTransform: 'uppercase', fontWeight: 600 }}>Active Accounts</span>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--status-done)', marginTop: '4px' }}>{activeCount}</div>
+        <div className="member-metric-card">
+          <div className="member-metric-label">
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--status-done, #176E3C)' }} />
+            <span style={{ color: 'var(--status-done, #176E3C)' }}>Active</span>
+          </div>
+          <div className="member-metric-value" style={{ color: 'var(--status-done, #176E3C)' }}>{activeCount}</div>
         </div>
-        <div className="metric-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-in_progress, #38bdf8)', textTransform: 'uppercase', fontWeight: 600 }}>Pending Activation</span>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--status-in_progress, #38bdf8)', marginTop: '4px' }}>{pendingCount}</div>
+        <div className="member-metric-card">
+          <div className="member-metric-label">
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#0284C7' }} />
+            <span style={{ color: '#0284C7' }}>Pending Activation</span>
+          </div>
+          <div className="member-metric-value" style={{ color: '#0284C7' }}>{pendingCount}</div>
         </div>
-        <div className="metric-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-blocked)', textTransform: 'uppercase', fontWeight: 600 }}>Suspended / Blocked</span>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--status-blocked)', marginTop: '4px' }}>{blockedCount}</div>
+        <div className="member-metric-card">
+          <div className="member-metric-label">
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--status-blocked, #D97706)' }} />
+            <span style={{ color: 'var(--status-blocked, #D97706)' }}>Suspended / Blocked</span>
+          </div>
+          <div className="member-metric-value" style={{ color: 'var(--status-blocked, #D97706)' }}>{blockedCount}</div>
         </div>
-        <div className="metric-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-overdue)', textTransform: 'uppercase', fontWeight: 600 }}>Terminated</span>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--status-overdue)', marginTop: '4px' }}>{terminatedCount}</div>
+        <div className="member-metric-card">
+          <div className="member-metric-label">
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--status-overdue, #E11D48)' }} />
+            <span style={{ color: 'var(--status-overdue, #E11D48)' }}>Terminated</span>
+          </div>
+          <div className="member-metric-value" style={{ color: 'var(--status-overdue, #E11D48)' }}>{terminatedCount}</div>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
       <div className="filter-bar" style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <div className="search-input-wrapper" style={{ flex: 1, minWidth: '240px' }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><Search size={14} /></span>
           <input
             type="text"
             className="search-input"
@@ -239,7 +286,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             id="user-search-input"
           />
           {searchQuery && (
-            <button className="search-clear-btn" onClick={() => setSearchQuery('')}>✕</button>
+            <button className="search-clear-btn" onClick={() => setSearchQuery('')} aria-label="Clear search">
+              <X size={14} />
+            </button>
           )}
         </div>
 
@@ -268,22 +317,20 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
           <option value="blocked">Blocked Only</option>
           <option value="terminated">Terminated Only</option>
         </select>
-
       </div>
 
       {/* Users Table */}
-      <div className="table-container" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table className="tasks-table" style={{ width: '100%', minWidth: '720px' }}>
+      <div className="members-table-wrapper">
+        <table className="members-table">
           <thead>
             <tr>
-              <th>User</th>
-              <th>Email</th>
-              <th>Contact Phone</th>
-              <th>Category / Role</th>
-              <th>Account Status</th>
-              <th>Permitted Projects</th>
-              <th>Registered Date</th>
-              <th style={{ textAlign: 'right' }}>Actions</th>
+              <th style={{ width: '24%' }}>Member</th>
+              <th style={{ width: '25%' }}>Email</th>
+              <th style={{ width: '17%' }}>Phone</th>
+              <th style={{ width: '13%' }}>Role</th>
+              <th style={{ width: '11%' }}>Status</th>
+              <th style={{ width: '10%' }}>Joined</th>
+              <th style={{ textAlign: 'right', width: '28px' }}></th>
             </tr>
           </thead>
           <tbody>
@@ -291,27 +338,54 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               const isSelf = user.uid === currentUser.uid;
               const isTerminated = user.status === 'terminated';
               const isBlocked = user.status === 'blocked';
+              const isContextActive = contextMenu?.user.uid === user.uid;
+              const avatarClass = user.role === 'workspace_admin'
+                ? 'member-avatar member-avatar-admin'
+                : user.role === 'project_lead'
+                ? 'member-avatar member-avatar-lead'
+                : user.role === 'viewer'
+                ? 'member-avatar member-avatar-viewer'
+                : 'member-avatar member-avatar-member';
 
               return (
-                <tr key={user.uid} className={isBlocked || isTerminated ? 'row-blocked' : ''}>
+                <tr
+                  key={user.uid}
+                  className={`member-row-interactive ${isBlocked || isTerminated ? 'row-blocked' : ''} ${isContextActive ? 'context-active' : ''}`}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    const x = Math.min(e.clientX, window.innerWidth - 210);
+                    const y = Math.min(e.clientY, window.innerHeight - 230);
+                    setContextMenu({ user, x, y });
+                  }}
+                  title="Right-click for member actions"
+                >
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span className="member-avatar" style={{ width: '32px', height: '32px', fontSize: '13px' }}>
-                        {user.displayName.charAt(0)}
-                      </span>
-                      <div>
-                        <strong>{user.displayName}</strong>
-                        {isSelf && (
-                          <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            (YOU)
-                          </span>
-                        )}
+                    <div className="member-identity-cell">
+                      <div className={avatarClass}>
+                        {user.displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="member-info">
+                        <div className="member-name-row">
+                          <span className="member-name">{user.displayName}</span>
+                          {isSelf && <span className="member-you-pill">You</span>}
+                        </div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{user.email}</td>
-                  <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                    {user.phone ? `📞 ${user.phone}` : <span style={{ opacity: 0.5 }}>—</span>}
+                  <td>
+                    <span className="member-email-text" title={user.email}>
+                      {user.email}
+                    </span>
+                  </td>
+                  <td>
+                    {user.phone ? (
+                      <span className="member-phone-text">
+                        <Phone size={12} style={{ color: 'var(--color-text-muted, #94A3B8)' }} />
+                        <span>{user.phone}</span>
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--color-text-muted, #94A3B8)', opacity: 0.5 }}>—</span>
+                    )}
                   </td>
                   <td>
                     <Badge type="role" value={user.role} />
@@ -319,126 +393,25 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                   <td>
                     <Badge type="user-status" value={user.status || 'active'} />
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '240px' }}>
-                      {user.role === 'workspace_admin' ? (
-                        <span
-                          className="badge"
-                          style={{
-                            fontSize: '11px',
-                            padding: '2px 8px',
-                            background: 'rgba(99, 102, 241, 0.15)',
-                            color: 'var(--accent-primary-light, #818cf8)',
-                            border: '1px solid rgba(99, 102, 241, 0.3)',
-                            borderRadius: '4px',
-                            fontWeight: 600,
-                          }}
-                        >
-                          ⚡ All Projects (Global)
-                        </span>
-                      ) : (
-                        (() => {
-                          const permitted = storageEngine.getProjects(user);
-                          if (permitted.length === 0) {
-                            return (
-                              <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                                None assigned
-                              </span>
-                            );
-                          }
-                          return permitted.map(p => (
-                            <span
-                              key={p.id}
-                              className="badge"
-                              style={{
-                                fontSize: '11px',
-                                padding: '2px 7px',
-                                background: 'var(--surface-sunken, #161b22)',
-                                border: '1px solid var(--border-default, #30363d)',
-                                borderRadius: '4px',
-                                color: 'var(--color-text-primary, #f0f6fc)',
-                              }}
-                              title={`Invited to contribute in ${p.name}`}
-                            >
-                              📁 {p.name}
-                            </span>
-                          ));
-                        })()
-                      )}
-                    </div>
-                  </td>
-                  <td style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                  <td style={{ fontSize: '12px', color: 'var(--color-text-secondary, #64748B)', whiteSpace: 'nowrap' }}>
                     {formatDisplayDate(user.createdAt ? user.createdAt.slice(0, 10) : '2026-10-01')}
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '3px 8px', fontSize: '12px' }}
-                        onClick={() => setInspectingPersonaUser(user)}
-                        id={`view-persona-btn-${user.uid}`}
-                        title="View user persona and permitted projects"
-                      >
-                        👤 Persona
-                      </button>
-                      {user.status === 'pending_activation' && (
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '3px 8px', fontSize: '12px', color: 'var(--accent-primary-light, #818cf8)' }}
-                          onClick={() => handleResendInvite(user)}
-                          id={`resend-invite-btn-${user.uid}`}
-                          title="Resend activation invitation link"
-                        >
-                          ✉️ Resend Link
-                        </button>
-                      )}
-                      {!isTerminated && (
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '3px 8px', fontSize: '12px' }}
-                          onClick={() => handleOpenEdit(user)}
-                          id={`edit-user-btn-${user.uid}`}
-                          title="Edit user details"
-                        >
-                          ✏️ Edit
-                        </button>
-                      )}
-
-                      {!isSelf && !isTerminated && (
-                        <button
-                          type="button"
-                          className={`btn btn-sm ${isBlocked ? 'btn-secondary' : 'btn-secondary'}`}
-                          style={{ padding: '3px 8px', fontSize: '12px', color: isBlocked ? 'var(--status-done)' : 'var(--status-blocked)' }}
-                          onClick={() => handleToggleBlock(user)}
-                          id={`toggle-block-user-btn-${user.uid}`}
-                          title={isBlocked ? 'Unblock user account' : 'Block user account'}
-                        >
-                          {isBlocked ? '🔓 Unblock' : '🔒 Block'}
-                        </button>
-                      )}
-
-                      {!isSelf && !isTerminated && (
-                        <button
-                          type="button"
-                          className="btn btn-danger btn-sm"
-                          style={{ padding: '3px 8px', fontSize: '12px' }}
-                          onClick={() => setTerminatingUser(user)}
-                          id={`terminate-user-btn-${user.uid}`}
-                          title="Terminate account and revoke access"
-                        >
-                          🛑 Terminate
-                        </button>
-                      )}
-
-                      {isTerminated && (
-                        <span style={{ fontSize: '11px', color: 'var(--status-overdue)', fontWeight: 600 }}>
-                          Access Revoked
-                        </span>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      className="member-menu-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = Math.min(rect.right - 190, window.innerWidth - 210);
+                        const y = Math.min(rect.bottom + 4, window.innerHeight - 230);
+                        setContextMenu({ user, x, y });
+                      }}
+                      title="Actions (or right-click row)"
+                      aria-label={`Actions for ${user.displayName}`}
+                    >
+                      <MoreVertical size={14} />
+                    </button>
                   </td>
                 </tr>
               );
@@ -446,8 +419,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
             {filteredUsers.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--color-text-secondary)' }}>
-                  No workspace users match your filter criteria.
+                <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--color-text-secondary, #64748B)' }}>
+                  No workspace members match your search or filter criteria.
                 </td>
               </tr>
             )}
@@ -455,10 +428,121 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
         </table>
       </div>
 
+      {/* Right-Click & Action Context Menu Floating Popover */}
+      {contextMenu && (
+        <>
+          <div
+            className="context-menu-backdrop"
+            onClick={() => setContextMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setContextMenu(null);
+            }}
+          />
+          <div
+            className="member-context-menu"
+            style={{
+              top: `${contextMenu.y}px`,
+              left: `${contextMenu.x}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            role="menu"
+          >
+            <div className="context-menu-header">
+              <span className="context-menu-user-name">{contextMenu.user.displayName}</span>
+            </div>
+
+            <button
+              type="button"
+              className="context-menu-item"
+              id={`view-persona-btn-${contextMenu.user.uid}`}
+              onClick={() => {
+                setInspectingPersonaUser(contextMenu.user);
+                setContextMenu(null);
+              }}
+            >
+              <User size={13} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+              <span>Persona &amp; Access</span>
+            </button>
+
+            {contextMenu.user.status !== 'terminated' && (
+              <button
+                type="button"
+                className="context-menu-item"
+                id={`edit-user-btn-${contextMenu.user.uid}`}
+                onClick={() => {
+                  handleOpenEdit(contextMenu.user);
+                  setContextMenu(null);
+                }}
+              >
+                <Pencil size={13} />
+                <span>Edit Member</span>
+              </button>
+            )}
+
+            {contextMenu.user.status === 'pending_activation' && (
+              <button
+                type="button"
+                className="context-menu-item context-menu-highlight"
+                id={`resend-invite-btn-${contextMenu.user.uid}`}
+                onClick={() => {
+                  handleResendInvite(contextMenu.user);
+                  setContextMenu(null);
+                }}
+              >
+                <Mail size={13} />
+                <span>Resend Invitation</span>
+              </button>
+            )}
+
+            {contextMenu.user.uid !== currentUser.uid && contextMenu.user.status !== 'terminated' && (
+              <>
+                <div className="context-menu-divider" />
+                <button
+                  type="button"
+                  className="context-menu-item"
+                  id={`toggle-block-user-btn-${contextMenu.user.uid}`}
+                  onClick={() => {
+                    handleToggleBlock(contextMenu.user);
+                    setContextMenu(null);
+                  }}
+                >
+                  {contextMenu.user.status === 'blocked' ? (
+                    <>
+                      <Unlock size={13} style={{ color: 'var(--status-done, #176E3C)' }} />
+                      <span>Unblock Account</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={13} style={{ color: 'var(--status-blocked, #D97706)' }} />
+                      <span>Block / Suspend</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className="context-menu-item context-menu-danger"
+                  id={`terminate-user-btn-${contextMenu.user.uid}`}
+                  onClick={() => {
+                    setTerminatingUser(contextMenu.user);
+                    setContextMenu(null);
+                  }}
+                >
+                  <UserX size={13} />
+                  <span>Terminate</span>
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
       {/* Sensitive User-Management Audit Log Section */}
       <div style={{ marginTop: 'var(--space-5)' }}>
-        <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-          📜 User Management Audit Trail ({logs.length} Events)
+        <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <ShieldCheck size={18} style={{ color: 'var(--accent-primary)' }} />
+          User Management Audit Trail ({logs.length} Events)
         </h3>
         <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
           Immutable record of account creations, updates, suspensions, and terminations.
@@ -470,7 +554,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               <div className="timeline-marker" />
               <div className="timeline-content">
                 <div className="timeline-header">
-                  <span className="timeline-user">👤 {log.userDisplayName}</span>
+                  <span className="timeline-user" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <User size={12} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+                    {log.userDisplayName}
+                  </span>
                   <span className={`timeline-action-badge action-badge-${log.action}`}>
                     {log.action.replace('_', ' ').toUpperCase()}
                   </span>

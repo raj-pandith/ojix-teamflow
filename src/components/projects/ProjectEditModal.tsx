@@ -104,11 +104,11 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
             value={status}
             onChange={e => setStatus(e.target.value as ProjectStatus)}
             options={[
-              { value: 'planning', label: '📋 Planning' },
-              { value: 'active', label: '⚡ Active' },
-              { value: 'on_hold', label: '⏸️ On Hold' },
-              { value: 'completed', label: '✅ Completed' },
-              { value: 'archived', label: '📦 Archived' },
+              { value: 'planning', label: 'Planning' },
+              { value: 'active', label: 'Active' },
+              { value: 'on_hold', label: 'On Hold' },
+              { value: 'completed', label: 'Completed' },
+              { value: 'archived', label: 'Archived' },
             ]}
             id="edit-project-status-select"
           />

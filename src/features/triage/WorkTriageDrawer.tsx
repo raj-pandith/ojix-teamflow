@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Zap, X, Plus } from 'lucide-react';
 import { Task, TaskPriority } from '../../types/task';
 import { Project } from '../../types/project';
 import { UserProfile } from '../../types/auth';
@@ -85,14 +86,14 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
       <div className="drawer-panel" onClick={e => e.stopPropagation()}>
         <div className="drawer-header">
           <div className="drawer-title-group">
-            <span className="drawer-icon">⚡</span>
+            <span className="drawer-icon"><Zap size={18} /></span>
             <div>
               <h3 className="drawer-title">Work Triage</h3>
               <p className="drawer-subtitle">Unblock bottlenecks, clear overdue tasks, and parse meeting notes into work items.</p>
             </div>
           </div>
           <button className="drawer-close-btn" onClick={onClose} aria-label="Close drawer">
-            ✕
+            <X size={18} />
           </button>
         </div>
 
@@ -232,7 +233,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
                       disabled={!meetingNotes.trim()}
                       className="btn-extract-actions"
                     >
-                      ⚡ Parse Action Items
+                      <Zap size={14} style={{ marginRight: 6 }} /> Parse Action Items
                     </Button>
                   </div>
 
@@ -252,7 +253,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
                               isLoading={addingTaskIndex === i}
                               onClick={() => handleAddExtractedTask(task, i)}
                             >
-                              + Add to Project
+                              <Plus size={13} style={{ marginRight: 4 }} /> Add to Project
                             </Button>
                           </div>
                         ))}

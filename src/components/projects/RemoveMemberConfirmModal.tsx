@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { Project, RemoveMemberResult, TaskReassignmentDecision } from '../../types/project';
 import { UserProfile } from '../../types/auth';
 import { Task } from '../../types/task';
@@ -345,7 +346,9 @@ export const RemoveMemberConfirmModal: React.FC<RemoveMemberConfirmModalProps> =
             </div>
           ) : (
             <div className="removal-empty-tasks-box">
-              <span className="empty-icon">✓</span>
+              <span className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle2 size={20} style={{ color: 'var(--status-done, #10b981)' }} />
+              </span>
               <div className="empty-tasks-text">
                 <strong>No Unfinished Tasks</strong>
                 <p>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CheckCircle2, Copy } from 'lucide-react';
 import { UserProfile, UserRole } from '../../types/auth';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -150,7 +151,9 @@ export const UserInviteModal: React.FC<UserInviteModalProps> = ({
       {activationResult ? (
         <div className="invite-success-container">
           <div className="invite-success-banner">
-            <div className="invite-badge-check">✓</div>
+            <div className="invite-badge-check" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle2 size={24} style={{ color: 'var(--status-done, #10b981)' }} />
+            </div>
             <div>
               <h4 className="invite-success-title">Account Created &amp; Activation Link Ready</h4>
               <p className="invite-success-desc">
@@ -169,8 +172,8 @@ export const UserInviteModal: React.FC<UserInviteModalProps> = ({
                 className="form-input link-input font-mono"
                 value={activationResult.activationUrl}
               />
-              <Button variant="primary" size="sm" onClick={handleCopyLink}>
-                Copy Link
+              <Button variant="primary" size="sm" onClick={handleCopyLink} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Copy size={13} /> Copy Link
               </Button>
             </div>
             <p className="link-note">

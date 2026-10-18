@@ -7,6 +7,24 @@ import { ManageTeamModal } from '../../components/projects/ManageTeamModal';
 import { ProjectEditModal } from '../../components/projects/ProjectEditModal';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
 import { storageEngine } from '../../services/storageEngine';
+import {
+  Calendar,
+  Pencil,
+  Trash2,
+  PanelsTopLeft,
+  Users,
+  User,
+  Eye,
+  Search,
+  ArrowUpDown,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  ListTodo,
+  Mail,
+  ChevronRight,
+  MoreVertical,
+} from 'lucide-react';
 
 interface ProjectDashboardProps {
   project: Project | null;
@@ -118,24 +136,30 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                     aria-label="Change project status"
                     id="project-status-quick-select"
                   >
-                    <option value="planning">📋 Planning</option>
-                    <option value="active">⚡ Active</option>
-                    <option value="on_hold">⏸️ On Hold</option>
-                    <option value="completed">✅ Completed</option>
-                    <option value="archived">📦 Archived</option>
+                    <option value="planning">Planning</option>
+                    <option value="active">Active</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="completed">Completed</option>
+                    <option value="archived">Archived</option>
                   </select>
                 </div>
               )}
-              <span className="project-date-range">
-                🗓️ {formatDisplayDate(project.startDate)} ➔ {formatDisplayDate(project.dueDate)}
+              <span className="project-date-range" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <Calendar size={13} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+                <span>{formatDisplayDate(project.startDate)} – {formatDisplayDate(project.dueDate)}</span>
               </span>
             </div>
             <h2 className="project-hero-title">{project.name}</h2>
             <p className="project-hero-desc">{project.objective}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary btn-sm" onClick={onGoToKanban}>
-              Open Board
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={onGoToKanban}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <PanelsTopLeft size={14} />
+              <span>Open Board</span>
             </button>
             {canManageTeam && onUpdateProject && (
               <button
@@ -143,8 +167,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                 onClick={() => setIsEditProjectOpen(true)}
                 id="edit-project-dashboard-btn"
                 title="Edit project details and status"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                ✏️ Edit Project
+                <Pencil size={13} />
+                <span>Edit Project</span>
               </button>
             )}
             {canDelete && (
@@ -159,8 +185,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                 }}
                 id="delete-project-dashboard-btn"
                 title="Delete this project"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                Delete Project
+                <Trash2 size={13} />
+                <span>Delete</span>
               </button>
             )}
           </div>
@@ -236,7 +264,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                 >
                   <div className="action-item-header">
                     <Badge type="priority" value={task.priority} />
-                    <span className="action-assignee">👤 {assignee?.displayName || 'Unassigned'}</span>
+                    <span className="action-assignee" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <User size={12} />
+                      <span>{assignee?.displayName || 'Unassigned'}</span>
+                    </span>
                     <span className="action-goto-link" style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--accent-primary)', fontWeight: 600 }}>Inspect on Board</span>
                   </div>
                   <h4 className="action-item-title">{task.title}</h4>
@@ -248,7 +279,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
             })}
             {blockedTasks.length === 0 && (
               <div className="empty-panel-state">
-                <span className="empty-panel-icon">🟢</span>
+                <CheckCircle2 size={24} color="var(--status-done, #176E3C)" style={{ marginBottom: '6px' }} />
                 <p>No blockers reported. Everything is moving on schedule.</p>
               </div>
             )}
@@ -261,7 +292,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
           <div className="team-allocation-header">
             <div className="team-allocation-title-group">
               <div className="team-allocation-icon-box" aria-hidden="true">
-                👥
+                <Users size={18} color="var(--accent-primary, #C9662F)" />
               </div>
               <div className="team-allocation-title-text">
                 <h3 className="team-allocation-title" id="team-allocation-heading">
@@ -280,7 +311,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                   className="summary-badge-pill badge-pastel-blue"
                   title="Total tasks across all members in this project"
                 >
-                  <span className="summary-badge-icon">📋</span>
+                  <ListTodo size={14} className="summary-badge-icon" />
                   <div className="summary-badge-content">
                     <span className="summary-badge-count">{totalTasks}</span>
                     <span className="summary-badge-label">Total Tasks</span>
@@ -291,7 +322,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                   className="summary-badge-pill badge-pastel-amber"
                   title="Tasks currently pending completion"
                 >
-                  <span className="summary-badge-icon">🕒</span>
+                  <Clock size={14} className="summary-badge-icon" />
                   <div className="summary-badge-content">
                     <span className="summary-badge-count">
                       {tasks.filter(t => t.status !== 'done' && t.status !== 'blocked').length}
@@ -304,7 +335,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                   className="summary-badge-pill badge-pastel-green"
                   title="Completed tasks in this project"
                 >
-                  <span className="summary-badge-icon">✅</span>
+                  <CheckCircle2 size={14} className="summary-badge-icon" />
                   <div className="summary-badge-content">
                     <span className="summary-badge-count">{doneTasks.length}</span>
                     <span className="summary-badge-label">Done</span>
@@ -315,7 +346,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                   className="summary-badge-pill badge-pastel-red"
                   title="Tasks currently blocked"
                 >
-                  <span className="summary-badge-icon">⛔</span>
+                  <AlertTriangle size={14} className="summary-badge-icon" />
                   <div className="summary-badge-content">
                     <span className="summary-badge-count">{blockedTasks.length}</span>
                     <span className="summary-badge-label">Blocked</span>
@@ -328,10 +359,11 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                   className="btn btn-primary btn-sm"
                   onClick={() => setIsManageTeamOpen(true)}
                   id="dashboard-manage-team-btn"
-                  style={{ fontSize: 'var(--text-xs)', padding: '6px 12px', height: '36px' }}
+                  style={{ fontSize: 'var(--text-xs)', padding: '6px 12px', height: '36px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   title="Add or remove team members for this project"
                 >
-                  👥 Manage Team
+                  <Users size={14} />
+                  <span>Manage Team</span>
                 </button>
               )}
             </div>
@@ -340,7 +372,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
           {/* Search, Filter Tabs & Sorting Toolbar */}
           <div className="team-allocation-toolbar">
             <div className="team-search-wrapper">
-              <span className="team-search-icon" aria-hidden="true">🔍</span>
+              <Search size={14} className="team-search-icon" aria-hidden="true" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -364,30 +396,36 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                   className={`team-filter-pill-btn ${memberRoleFilter === 'all' ? 'active' : ''}`}
                   onClick={() => setMemberRoleFilter('all')}
                   id="filter-all-members-btn"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                 >
-                  👥 All Members
+                  <Users size={13} />
+                  <span>All Members</span>
                 </button>
                 <button
                   type="button"
                   className={`team-filter-pill-btn ${memberRoleFilter === 'member' ? 'active' : ''}`}
                   onClick={() => setMemberRoleFilter('member')}
                   id="filter-members-only-btn"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                 >
-                  👤 Members
+                  <User size={13} />
+                  <span>Members</span>
                 </button>
                 <button
                   type="button"
                   className={`team-filter-pill-btn ${memberRoleFilter === 'viewer' ? 'active' : ''}`}
                   onClick={() => setMemberRoleFilter('viewer')}
                   id="filter-viewers-only-btn"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                 >
-                  👁️ Viewers
+                  <Eye size={13} />
+                  <span>Viewers</span>
                 </button>
               </div>
 
               {/* Sort Dropdown */}
-              <div className="team-sort-select-wrapper">
-                <span className="team-sort-icon">⇅</span>
+              <div className="team-sort-select-wrapper" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <ArrowUpDown size={13} className="team-sort-icon" />
                 <select
                   className="team-sort-select"
                   value={memberSortBy}
@@ -411,7 +449,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
               <div className="team-member-row-card team-unassigned-row" id="unassigned-work-row">
                 <div className="member-col-identity">
                   <span className="member-avatar-circle unassigned-avatar" aria-hidden="true">
-                    ⚠️
+                    <AlertTriangle size={15} color="#B45309" />
                   </span>
                   <div className="member-details-box">
                     <div className="member-name-row">
@@ -441,7 +479,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                     aria-label={`View ${unassignedTasks.length} unassigned tasks`}
                   >
                     <div className="stat-badge-top">
-                      <span className="stat-badge-icon">📋</span>
+                      <span className="stat-badge-icon"><ListTodo size={12} /></span>
                       <span className="stat-badge-count">{unassignedTasks.length}</span>
                     </div>
                     <span className="stat-badge-label">Total</span>
@@ -461,7 +499,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                     aria-label="View pending unassigned tasks"
                   >
                     <div className="stat-badge-top">
-                      <span className="stat-badge-icon">🕒</span>
+                      <span className="stat-badge-icon"><Clock size={12} /></span>
                       <span className="stat-badge-count">
                         {unassignedTasks.filter(t => t.status !== 'done' && t.status !== 'blocked').length}
                       </span>
@@ -483,7 +521,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                     aria-label="View completed unassigned tasks"
                   >
                     <div className="stat-badge-top">
-                      <span className="stat-badge-icon">✅</span>
+                      <span className="stat-badge-icon"><CheckCircle2 size={12} /></span>
                       <span className="stat-badge-count">
                         {unassignedTasks.filter(t => t.status === 'done').length}
                       </span>
@@ -505,7 +543,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                     aria-label="View blocked unassigned tasks"
                   >
                     <div className="stat-badge-top">
-                      <span className="stat-badge-icon">⛔</span>
+                      <span className="stat-badge-icon"><AlertTriangle size={12} /></span>
                       <span className="stat-badge-count">
                         {unassignedTasks.filter(t => t.status === 'blocked').length}
                       </span>
@@ -528,7 +566,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                     title="Open unassigned tasks"
                     aria-label="Open unassigned tasks"
                   >
-                    ❯
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
@@ -679,7 +717,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                           <strong className="member-name-text">{m.displayName}</strong>
                           {m.isCurrentUser && (
                             <span className="member-you-pill" title="Currently logged in user">
-                              👤 You
+                              <User size={10} style={{ marginRight: 3 }} /> You
                             </span>
                           )}
                         </div>
@@ -709,7 +747,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                           title={`Send direct message to ${m.displayName}`}
                           aria-label={`Send message to ${m.displayName}`}
                         >
-                          ✉️
+                          <Mail size={13} />
                         </button>
                       </div>
                     )}
@@ -731,7 +769,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                         aria-label={`View ${m.total} total tasks for ${m.displayName}`}
                       >
                         <div className="stat-badge-top">
-                          <span className="stat-badge-icon">📋</span>
+                          <span className="stat-badge-icon"><ListTodo size={12} /></span>
                           <span className="stat-badge-count">{m.total}</span>
                         </div>
                         <span className="stat-badge-label">Total</span>
@@ -752,7 +790,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                         aria-label={`View ${m.pending} pending tasks for ${m.displayName}`}
                       >
                         <div className="stat-badge-top">
-                          <span className="stat-badge-icon">🕒</span>
+                          <span className="stat-badge-icon"><Clock size={12} /></span>
                           <span className="stat-badge-count">{m.pending}</span>
                         </div>
                         <span className="stat-badge-label">Pending</span>
@@ -773,7 +811,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                         aria-label={`View ${m.done} completed tasks for ${m.displayName}`}
                       >
                         <div className="stat-badge-top">
-                          <span className="stat-badge-icon">✅</span>
+                          <span className="stat-badge-icon"><CheckCircle2 size={12} /></span>
                           <span className="stat-badge-count">{m.done}</span>
                         </div>
                         <span className="stat-badge-label">Done</span>
@@ -794,7 +832,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                         aria-label={`View ${m.blocked} blocked tasks for ${m.displayName}`}
                       >
                         <div className="stat-badge-top">
-                          <span className="stat-badge-icon">⛔</span>
+                          <span className="stat-badge-icon"><AlertTriangle size={12} /></span>
                           <span className="stat-badge-count">{m.blocked}</span>
                         </div>
                         <span className="stat-badge-label">Blocked</span>
@@ -816,7 +854,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                         title={`View tasks for ${m.displayName}`}
                         aria-label={`View tasks for ${m.displayName}`}
                       >
-                        ❯
+                        <ChevronRight size={14} />
                       </button>
 
                       <button
@@ -830,7 +868,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                         aria-label="More options"
                         aria-expanded={isMenuOpen}
                       >
-                        ⋮
+                        <MoreVertical size={14} />
                       </button>
 
                       {isMenuOpen && (
@@ -847,7 +885,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                               }
                             }}
                           >
-                            📋 View All Tasks
+                            <ListTodo size={13} style={{ marginRight: 6 }} /> View All Tasks
                           </button>
                           {!m.isCurrentUser && onOpenDirectMessage && (
                             <button
@@ -858,7 +896,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                                 onOpenDirectMessage(m.uid);
                               }}
                             >
-                              ✉️ Direct Message
+                              <Mail size={13} style={{ marginRight: 6 }} /> Direct Message
                             </button>
                           )}
                           {canManageTeam && (
@@ -870,7 +908,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                                 setIsManageTeamOpen(true);
                               }}
                             >
-                              👥 Manage Team
+                              <Users size={13} style={{ marginRight: 6 }} /> Manage Team
                             </button>
                           )}
                         </div>

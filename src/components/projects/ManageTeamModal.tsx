@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 import { Project, RemoveMemberResult } from '../../types/project';
 import { UserProfile, UserRole } from '../../types/auth';
 import { Modal } from '../common/Modal';
@@ -298,7 +299,7 @@ export const ManageTeamModal: React.FC<ManageTeamModalProps> = ({
                     onClick={() => setSearchQuery('')}
                     aria-label="Clear search"
                   >
-                    ✕
+                    <X size={14} />
                   </button>
                 )}
               </div>

@@ -1,4 +1,24 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import {
+  Bell,
+  MessageSquare,
+  Send,
+  Inbox,
+  Check,
+  CheckCheck,
+  Radio,
+  Zap,
+  User,
+  FolderKanban,
+  ListTodo,
+  Trash2,
+  Users,
+  UserMinus,
+  Ban,
+  AlertTriangle,
+  Crown,
+  Mail,
+} from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useMessages } from '../../hooks/useMessages';
 import { AppNotification, DirectConversation, DirectMessage } from '../../types/message';
@@ -268,27 +288,27 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     }
   };
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string): React.ReactNode => {
     switch (type) {
       case 'PROJECT_DELETED':
-        return '🗑️';
+        return <Trash2 size={16} style={{ color: 'var(--status-overdue, #ef4444)' }} />;
       case 'PROJECT_ASSIGNED':
-        return '👑';
+        return <Crown size={16} style={{ color: 'var(--accent-primary, #C9662F)' }} />;
       case 'PROJECT_MEMBER_ADDED':
-        return '👥';
+        return <Users size={16} style={{ color: 'var(--status-done, #10b981)' }} />;
       case 'PROJECT_MEMBER_REMOVED':
-        return '🚪';
+        return <UserMinus size={16} style={{ color: 'var(--status-blocked, #f59e0b)' }} />;
       case 'TASK_COMMENT_MENTION':
-        return '💬';
+        return <MessageSquare size={16} style={{ color: 'var(--accent-primary, #C9662F)' }} />;
       case 'TASK_ASSIGNED':
       case 'TASK_REASSIGNED':
-        return '📋';
+        return <ListTodo size={16} style={{ color: 'var(--accent-primary, #C9662F)' }} />;
       case 'USER_BLOCKED':
-        return '🚫';
+        return <Ban size={16} style={{ color: 'var(--status-overdue, #ef4444)' }} />;
       case 'DIRECT_MESSAGE_RECEIVED':
-        return '✉️';
+        return <Mail size={16} style={{ color: 'var(--accent-primary, #C9662F)' }} />;
       default:
-        return '🔔';
+        return <Bell size={16} style={{ color: 'var(--accent-primary, #C9662F)' }} />;
     }
   };
 
@@ -359,12 +379,12 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               id="enable-desktop-push-btn"
               title="Enable native alerts outside the browser on your desktop"
               style={{
-                border: '1px solid var(--accent-primary, #6366f1)',
-                color: 'var(--accent-primary-light, #818cf8)',
-                background: 'rgba(99, 102, 241, 0.12)',
+                border: '1px solid var(--accent-primary)',
+                color: 'var(--accent-primary)',
+                background: 'rgba(201, 102, 47, 0.08)',
               }}
             >
-              🔔 Enable Desktop OS Alerts
+              <Bell size={14} style={{ marginRight: 6 }} /> Enable Desktop OS Alerts
             </Button>
           ) : (
             <span
@@ -382,7 +402,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               }}
               title="Desktop push alerts outside the browser are active"
             >
-              ✓ Desktop Push Active
+              <Check size={14} /> Desktop Push Active
             </span>
           )}
 
@@ -418,7 +438,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             id="trigger-sample-push-btn"
             title="Display a live on-screen push notification alert"
           >
-            ⚡ Test Push Alert
+            <Zap size={14} style={{ marginRight: 6 }} /> Test Push Alert
           </Button>
 
           <Button
@@ -428,7 +448,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             id="web-push-settings-btn"
             title="Manage browser Web Push subscriptions, VAPID registration, and devices"
           >
-            📡 Web Push Settings
+            <Radio size={14} style={{ marginRight: 6 }} /> Web Push Settings
           </Button>
 
           {totalUnreadCount > 0 && (
@@ -439,7 +459,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               id="mark-all-read-btn"
               title="Mark all notifications and messages as read"
             >
-              ✓ Mark All Read
+              <CheckCheck size={14} style={{ marginRight: 6 }} /> Mark All Read
             </Button>
           )}
           <Button
@@ -450,7 +470,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             id="new-dm-btn"
             title={isBlocked ? 'Blocked accounts cannot send messages' : 'Send a direct message'}
           >
-            ✉️ New Message
+            <Mail size={14} style={{ marginRight: 6 }} /> New Message
           </Button>
         </div>
       </div>
@@ -546,17 +566,20 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             style={{
               padding: '8px 14px',
               borderRadius: '8px',
-              border: activeTab === 'notifications' ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
-              background: activeTab === 'notifications' ? '#e0e7ff' : '#ffffff',
-              color: activeTab === 'notifications' ? '#4338ca' : '#64748b',
+              border: activeTab === 'notifications' ? '1px solid var(--accent-primary)' : '1px solid #e2e8f0',
+              background: activeTab === 'notifications' ? 'rgba(201, 102, 47, 0.1)' : '#ffffff',
+              color: activeTab === 'notifications' ? 'var(--accent-primary)' : '#64748b',
               fontWeight: 600,
               fontSize: '13px',
               cursor: 'pointer',
-              boxShadow: activeTab === 'notifications' ? '0 1px 3px rgba(67, 56, 202, 0.15)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: activeTab === 'notifications' ? '0 1px 3px rgba(201, 102, 47, 0.15)' : 'none',
               transition: 'all 0.15s ease',
             }}
           >
-            🔔 Notifications
+            <Bell size={14} /> Notifications
           </button>
 
           <button
@@ -565,20 +588,20 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             style={{
               padding: '8px 14px',
               borderRadius: '8px',
-              border: activeTab === 'direct_messages' ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
-              background: activeTab === 'direct_messages' ? '#e0e7ff' : '#ffffff',
-              color: activeTab === 'direct_messages' ? '#4338ca' : '#64748b',
+              border: activeTab === 'direct_messages' ? '1px solid var(--accent-primary)' : '1px solid #e2e8f0',
+              background: activeTab === 'direct_messages' ? 'rgba(201, 102, 47, 0.1)' : '#ffffff',
+              color: activeTab === 'direct_messages' ? 'var(--accent-primary)' : '#64748b',
               fontWeight: 600,
               fontSize: '13px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: activeTab === 'direct_messages' ? '0 1px 3px rgba(67, 56, 202, 0.15)' : 'none',
+              boxShadow: activeTab === 'direct_messages' ? '0 1px 3px rgba(201, 102, 47, 0.15)' : 'none',
               transition: 'all 0.15s ease',
             }}
           >
-            💬 Direct Messages
+            <MessageSquare size={14} /> Direct Messages
             {unreadDMsCount > 0 && (
               <span
                 style={{
@@ -601,17 +624,20 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
             style={{
               padding: '8px 14px',
               borderRadius: '8px',
-              border: activeTab === 'sent' ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
-              background: activeTab === 'sent' ? '#e0e7ff' : '#ffffff',
-              color: activeTab === 'sent' ? '#4338ca' : '#64748b',
+              border: activeTab === 'sent' ? '1px solid var(--accent-primary)' : '1px solid #e2e8f0',
+              background: activeTab === 'sent' ? 'rgba(201, 102, 47, 0.1)' : '#ffffff',
+              color: activeTab === 'sent' ? 'var(--accent-primary)' : '#64748b',
               fontWeight: 600,
               fontSize: '13px',
               cursor: 'pointer',
-              boxShadow: activeTab === 'sent' ? '0 1px 3px rgba(67, 56, 202, 0.15)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: activeTab === 'sent' ? '0 1px 3px rgba(201, 102, 47, 0.15)' : 'none',
               transition: 'all 0.15s ease',
             }}
           >
-            📤 Sent
+            <Send size={14} /> Sent
           </button>
         </div>
 
@@ -855,8 +881,16 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                       </div>
 
                       {isMine && (
-                        <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
-                          {msg.isRead ? '✓✓ Read' : '✓ Delivered'}
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted, #64748b)', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          {msg.isRead ? (
+                            <>
+                              <CheckCheck size={12} style={{ color: 'var(--status-done, #10b981)' }} /> Read
+                            </>
+                          ) : (
+                            <>
+                              <Check size={12} /> Delivered
+                            </>
+                          )}
                         </span>
                       )}
                     </div>
@@ -957,15 +991,25 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                   style={{
                     fontWeight: 600,
                     fontSize: '14px',
-                    color: '#4338ca',
-                    textDecoration: 'underline',
-                    cursor: 'pointer',
+                    color: 'var(--accent-primary, #C9662F)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
                   }}
                 >
-                  To: 👤 {msg.recipientDisplayName}
+                  To: <User size={13} /> {msg.recipientDisplayName}
                 </span>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>
-                  {new Date(msg.createdAt).toLocaleString()} • {msg.isRead ? '✓✓ Read' : '✓ Delivered'}
+                <span style={{ fontSize: '12px', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  {new Date(msg.createdAt).toLocaleString()} •{' '}
+                  {msg.isRead ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: 'var(--status-done, #10b981)' }}>
+                      <CheckCheck size={12} /> Read
+                    </span>
+                  ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                      <Check size={12} /> Delivered
+                    </span>
+                  )}
                 </span>
               </div>
               {msg.subject && (
@@ -1124,19 +1168,20 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 {/* Event Type Icon */}
                 <div
                   style={{
-                    fontSize: '20px',
                     padding: '8px',
                     borderRadius: '8px',
                     background: isDeletionEvent
                       ? '#fee2e2'
-                      : isUnread ? '#e0e7ff' : '#f1f5f9',
+                      : isUnread ? 'rgba(201, 102, 47, 0.1)' : 'var(--surface-elevated, #FAF5F0)',
                     color: isDeletionEvent ? '#dc2626' : undefined,
-                    border: isDeletionEvent ? '1px solid #fca5a5' : undefined,
-                    lineHeight: 1,
+                    border: isDeletionEvent ? '1px solid #fca5a5' : '1px solid var(--border-default, #E8DED5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     userSelect: 'none',
                   }}
                 >
-                  {isDeletionEvent ? '⚠️' : icon}
+                  {isDeletionEvent ? <AlertTriangle size={18} style={{ color: '#dc2626' }} /> : icon}
                 </div>
 
                 {/* Main Body */}
@@ -1156,13 +1201,13 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                         fontWeight: 600,
                         color: isDeletionEvent
                           ? '#991b1b'
-                          : isDirectMessage ? '#4338ca' : '#0f172a',
+                          : isDirectMessage ? 'var(--accent-primary)' : 'var(--color-text-primary, #1e293b)',
                         cursor: isInteractiveRow ? 'pointer' : 'default',
                         transition: 'color 0.15s ease, text-decoration 0.15s ease',
                       }}
                       onMouseEnter={e => {
                         if (isInteractiveRow) {
-                          e.currentTarget.style.color = isDeletionEvent ? '#dc2626' : '#4f46e5';
+                          e.currentTarget.style.color = isDeletionEvent ? '#dc2626' : 'var(--accent-primary)';
                           e.currentTarget.style.textDecoration = 'underline';
                         }
                       }}
@@ -1170,7 +1215,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                         if (isInteractiveRow) {
                           e.currentTarget.style.color = isDeletionEvent
                             ? '#991b1b'
-                            : isDirectMessage ? '#4338ca' : '#0f172a';
+                            : isDirectMessage ? 'var(--accent-primary)' : 'var(--color-text-primary, #1e293b)';
                           e.currentTarget.style.textDecoration = 'none';
                         }
                       }}
@@ -1194,7 +1239,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           gap: '3px',
                         }}
                       >
-                        ⚠️ Project Deleted
+                        <AlertTriangle size={11} /> Project Deleted
                       </span>
                     )}
                     {isUnread && (
@@ -1203,7 +1248,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           width: '8px',
                           height: '8px',
                           borderRadius: '50%',
-                          background: isDeletionEvent ? '#dc2626' : '#4f46e5',
+                          background: isDeletionEvent ? '#dc2626' : 'var(--accent-primary)',
                           display: 'inline-block',
                         }}
                         title="Unread"
@@ -1254,12 +1299,16 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           fontSize: '11px',
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          background: isDeletionEvent ? '#fee2e2' : '#e0f2fe',
-                          color: isDeletionEvent ? '#991b1b' : '#0369a1',
+                          background: isDeletionEvent ? '#fee2e2' : 'var(--surface-sunken, #F5EFEB)',
+                          color: isDeletionEvent ? '#991b1b' : 'var(--color-text-primary, #1E293B)',
+                          border: '1px solid var(--border-default, #E8DED5)',
                           fontWeight: 500,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
                         }}
                       >
-                        📁 {notif.projectName}
+                        <FolderKanban size={11} style={{ color: 'var(--color-text-secondary)' }} /> {notif.projectName}
                       </span>
                     )}
 
@@ -1269,12 +1318,16 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           fontSize: '11px',
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          background: '#f3e8ff',
-                          color: '#7e22ce',
+                          background: 'var(--surface-sunken, #F5EFEB)',
+                          color: 'var(--color-text-primary, #1E293B)',
+                          border: '1px solid var(--border-default, #E8DED5)',
                           fontWeight: 500,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
                         }}
                       >
-                        📋 {notif.taskTitle}
+                        <ListTodo size={11} style={{ color: 'var(--accent-primary)' }} /> {notif.taskTitle}
                       </span>
                     )}
 
@@ -1284,11 +1337,15 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           fontSize: '11px',
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          background: '#f1f5f9',
-                          color: '#475569',
+                          background: 'var(--surface-sunken, #F5EFEB)',
+                          color: 'var(--color-text-secondary, #64748B)',
+                          border: '1px solid var(--border-default, #E8DED5)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
                         }}
                       >
-                        👤 {notif.actorDisplayName}
+                        <User size={11} /> {notif.actorDisplayName}
                       </span>
                     )}
                   </div>
@@ -1305,15 +1362,18 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: isDeletionEvent ? '#dc2626' : '#4f46e5',
+                        color: isDeletionEvent ? '#dc2626' : 'var(--accent-primary)',
                         fontSize: '12px',
                         fontWeight: 600,
                         cursor: 'pointer',
                         padding: '4px 6px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
                       }}
                       title="Mark as read"
                     >
-                      ✓ Mark read
+                      <Check size={13} /> Mark read
                     </button>
                   )}
 
@@ -1410,7 +1470,9 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                 color: '#64748b',
               }}
             >
-              <div style={{ fontSize: '32px', marginBottom: '8px' }}>📭</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                <Inbox size={40} style={{ color: 'var(--color-text-muted, #94a3b8)', opacity: 0.7 }} />
+              </div>
               <h4 style={{ margin: '0 0 4px', color: '#0f172a' }}>
                 No messages found
               </h4>

@@ -2,6 +2,18 @@ import React from 'react';
 import { Project } from '../../types/project';
 import { UserProfile } from '../../types/auth';
 import { authService } from '../../services/authService';
+import {
+  LayoutDashboard,
+  ListTodo,
+  PanelsTopLeft,
+  List,
+  MessagesSquare,
+  Users,
+  ShieldCheck,
+  Plus,
+  LogOut,
+  X,
+} from 'lucide-react';
 
 export type ActiveNavTab = 'kanban' | 'list' | 'dashboard' | 'my-tasks' | 'messages' | 'security' | 'projects' | 'users';
 
@@ -76,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onCloseMobile}
               aria-label="Close sidebar navigation"
             >
-              ✕
+              <X size={18} />
             </button>
           )}
         </div>
@@ -88,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleSelectTab('dashboard')}
           id="nav-project-dashboard"
         >
-          <span className="nav-icon">📊</span>
+          <LayoutDashboard size={18} className="nav-icon" />
           <span className="nav-label">Dashboard</span>
         </button>
 
@@ -97,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleSelectTab('my-tasks')}
           id="nav-my-tasks"
         >
-          <span className="nav-icon">👤</span>
+          <ListTodo size={18} className="nav-icon" />
           <span className="nav-label">My Queue</span>
         </button>
 
@@ -106,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleSelectTab('kanban')}
           id="nav-kanban-board"
         >
-          <span className="nav-icon">📋</span>
+          <PanelsTopLeft size={18} className="nav-icon" />
           <span className="nav-label">Board</span>
         </button>
 
@@ -115,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleSelectTab('list')}
           id="nav-list-view"
         >
-          <span className="nav-icon">📑</span>
+          <List size={18} className="nav-icon" />
           <span className="nav-label">Task List</span>
         </button>
 
@@ -124,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleSelectTab('messages')}
           id="nav-message-center"
         >
-          <span className="nav-icon">💬</span>
+          <MessagesSquare size={18} className="nav-icon" />
           <span className="nav-label">Messages</span>
           {typeof unreadMessagesCount === 'number' && unreadMessagesCount > 0 && (
             <span
@@ -132,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               id="sidebar-unread-badge"
               style={{
                 marginLeft: 'auto',
-                background: 'var(--accent-primary, #6366f1)',
+                background: 'var(--accent-primary, #C9662F)',
                 color: '#fff',
                 fontSize: '11px',
                 fontWeight: 700,
@@ -151,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => handleSelectTab('users')}
             id="nav-manage-users"
           >
-            <span className="nav-icon">👥</span>
+            <Users size={18} className="nav-icon" />
             <span className="nav-label">Members</span>
           </button>
         )}
@@ -162,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => handleSelectTab('security')}
             id="nav-security-assurance"
           >
-            <span className="nav-icon">🛡️</span>
+            <ShieldCheck size={18} className="nav-icon" />
             <span className="nav-label">Security & Access</span>
           </button>
         )}
@@ -178,7 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title="Add new project"
               id="create-project-sidebar-btn"
             >
-              +
+              <Plus size={14} />
             </button>
           )}
         </div>
@@ -242,18 +254,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             style={{
               background: 'none',
               border: 'none',
-              color: 'var(--text-muted, #6e7681)',
+              color: 'var(--text-muted, #64748B)',
               cursor: 'pointer',
               padding: '6px',
-              borderRadius: '4px',
+              borderRadius: '6px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '15px',
-              transition: 'color 0.15s ease',
+              transition: 'color 0.15s ease, background-color 0.15s ease',
             }}
           >
-            🚪
+            <LogOut size={16} />
           </button>
         </div>
       </div>

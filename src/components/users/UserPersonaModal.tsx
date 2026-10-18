@@ -5,6 +5,16 @@ import { Modal } from '../common/Modal';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { storageEngine } from '../../services/storageEngine';
+import {
+  FolderKanban,
+  ShieldCheck,
+  Shield,
+  Phone,
+  Mail,
+  ArrowRight,
+  RotateCcw,
+  Inbox,
+} from 'lucide-react';
 
 interface UserPersonaModalProps {
   isOpen: boolean;
@@ -61,36 +71,8 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
     >
       <div className="persona-profile-modal-content">
         {/* Profile Card Header */}
-        <div
-          className="persona-modal-header"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            padding: '16px',
-            background: 'var(--bg-surface-elevated, #FAF5F0)',
-            border: '1px solid var(--border-subtle, #E8DED5)',
-            borderRadius: 'var(--radius-md, 8px)',
-            marginBottom: '18px',
-          }}
-        >
-          <div
-            className="persona-modal-avatar"
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--accent-primary, #CC642D), #B55322)',
-              color: '#fff',
-              fontSize: '22px',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-            }}
-          >
+        <div className="persona-modal-header">
+          <div className="persona-modal-avatar">
             {user.displayName.charAt(0).toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -98,7 +80,8 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
               <h2
                 style={{
                   fontSize: '18px',
-                  fontWeight: 700,
+                  fontWeight: 600,
+                  letterSpacing: '-0.015em',
                   margin: 0,
                   color: 'var(--color-text-primary, #1E293B)',
                 }}
@@ -110,10 +93,11 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                   style={{
                     fontSize: '11px',
                     fontWeight: 600,
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    background: 'var(--accent-primary-subtle, rgba(99,102,241,0.15))',
-                    color: 'var(--accent-primary-light, #818cf8)',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    background: 'var(--accent-primary-subtle, #FDF4EF)',
+                    color: 'var(--accent-primary, #C9662F)',
+                    border: '1px solid var(--accent-primary-border, #F3D3C1)',
                   }}
                 >
                   Current User
@@ -123,13 +107,27 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
             <div
               style={{
                 fontSize: '13px',
-                color: 'var(--color-text-secondary, #8b949e)',
-                marginTop: '2px',
+                color: 'var(--color-text-secondary, #64748B)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap',
               }}
             >
-              {user.email} {user.phone && `• 📞 ${user.phone}`}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <Mail size={13} style={{ color: 'var(--text-muted, #8E9EA5)' }} />
+                <span>{user.email}</span>
+              </span>
+              {user.phone && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ opacity: 0.4 }}>•</span>
+                  <Phone size={13} style={{ color: 'var(--text-muted, #8E9EA5)' }} />
+                  <span>{user.phone}</span>
+                </span>
+              )}
             </div>
-            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
               <Badge type="role" value={user.role} />
               <Badge type="user-status" value={user.status || 'active'} />
             </div>
@@ -137,34 +135,29 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
         </div>
 
         {/* Operating Description */}
-        <div
-          className="persona-description-card"
-          style={{
-            padding: '12px 14px',
-            background: 'var(--surface-sunken, #0d1117)',
-            border: '1px solid var(--border-subtle, #21262d)',
-            borderRadius: '6px',
-            marginBottom: '18px',
-          }}
-        >
+        <div className="persona-description-card">
           <div
             style={{
               fontSize: '11px',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               fontWeight: 700,
-              color: 'var(--color-text-secondary, #8b949e)',
-              marginBottom: '4px',
+              color: 'var(--accent-primary, #C9662F)',
+              marginBottom: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
-            Role Overview & Operating Responsibilities
+            <Shield size={13} />
+            <span>Role Overview &amp; Operating Responsibilities</span>
           </div>
           <p
             style={{
               fontSize: '13px',
-              lineHeight: 1.5,
+              lineHeight: 1.55,
               margin: 0,
-              color: 'var(--color-text-primary, #c9d1d9)',
+              color: 'var(--color-text-secondary, #475569)',
             }}
           >
             {persona.description || 'Executes assigned tasks and oversees project commitments.'}
@@ -172,21 +165,21 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
         </div>
 
         {/* Permitted Projects Section */}
-        <div className="permitted-projects-section" style={{ marginBottom: '16px' }}>
+        <div className="permitted-projects-section">
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '8px',
+              marginBottom: '10px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '15px' }}>📁</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FolderKanban size={16} style={{ color: 'var(--accent-primary, #C9662F)' }} />
               <h3
                 style={{
                   fontSize: '14px',
-                  fontWeight: 700,
+                  fontWeight: 600,
                   margin: 0,
                   color: 'var(--color-text-primary, #1E293B)',
                 }}
@@ -196,12 +189,12 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
               <span
                 style={{
                   fontSize: '11px',
-                  fontWeight: 700,
-                  background: 'var(--bg-surface-elevated, #FAF5F0)',
-                  color: 'var(--color-text-primary, #1E293B)',
+                  fontWeight: 600,
+                  background: 'var(--bg-canvas-subtle, #F3EAE3)',
+                  color: 'var(--color-text-secondary, #64748B)',
                   border: '1px solid var(--border-subtle, #E8DED5)',
-                  borderRadius: '10px',
-                  padding: '1px 7px',
+                  borderRadius: '12px',
+                  padding: '1px 8px',
                 }}
               >
                 {isAdmin ? `All (${allProjects.length})` : allProjects.length}
@@ -211,11 +204,15 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
               <span
                 style={{
                   fontSize: '11px',
-                  color: 'var(--accent-primary, #CC642D)',
+                  color: 'var(--accent-primary, #C9662F)',
                   fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
               >
-                ⚡ Global Admin Access
+                <ShieldCheck size={13} />
+                <span>Global Admin Access</span>
               </span>
             )}
           </div>
@@ -224,7 +221,8 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
             style={{
               fontSize: '12px',
               color: 'var(--color-text-secondary, #64748B)',
-              margin: '0 0 10px 0',
+              margin: '0 0 12px 0',
+              lineHeight: 1.5,
             }}
           >
             {isAdmin
@@ -232,28 +230,20 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
               : 'Projects this user has been permitted and invited to contribute in by a Project Lead or Workspace Admin.'}
           </p>
 
-          <div
-            className="permitted-projects-list"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              maxHeight: '220px',
-              overflowY: 'auto',
-              paddingRight: '4px',
-            }}
-          >
+          <div className="permitted-projects-list">
             {allProjects.length === 0 ? (
               <div
                 style={{
                   textAlign: 'center',
-                  padding: '24px 16px',
+                  padding: '28px 16px',
                   background: 'var(--bg-surface-elevated, #FAF5F0)',
-                  borderRadius: '6px',
+                  borderRadius: '10px',
                   border: '1px dashed var(--border-subtle, #E8DED5)',
                 }}
               >
-                <div style={{ fontSize: '24px', marginBottom: '6px' }}>📭</div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                  <Inbox size={26} color="var(--accent-primary, #C9662F)" />
+                </div>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary, #1E293B)' }}>
                   No Permitted Projects Yet
                 </div>
@@ -278,16 +268,6 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                   <div
                     key={project.id}
                     className="permitted-project-card"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 12px',
-                      background: 'var(--bg-surface, #FFFFFF)',
-                      border: '1px solid var(--border-subtle, #E8DED5)',
-                      borderRadius: '6px',
-                      gap: '10px',
-                    }}
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -306,9 +286,9 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                             fontWeight: 600,
                             padding: '1px 6px',
                             borderRadius: '4px',
-                            background: isOwner ? 'rgba(99,102,241,0.2)' : 'rgba(46,160,67,0.2)',
-                            color: isOwner ? 'var(--accent-primary-light, #818cf8)' : 'var(--status-done, #3fb950)',
-                            border: `1px solid ${isOwner ? 'rgba(99,102,241,0.4)' : 'rgba(46,160,67,0.4)'}`,
+                            background: isOwner ? 'var(--accent-primary-subtle, #FDF4EF)' : 'rgba(23, 110, 60, 0.08)',
+                            color: isOwner ? 'var(--accent-primary, #C9662F)' : 'var(--status-done, #176E3C)',
+                            border: `1px solid ${isOwner ? 'var(--accent-primary-border, #F3D3C1)' : 'rgba(23, 110, 60, 0.2)'}`,
                           }}
                         >
                           {roleBadgeText}
@@ -316,10 +296,11 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                         <span
                           style={{
                             fontSize: '10px',
-                            padding: '1px 5px',
+                            padding: '1px 6px',
                             borderRadius: '4px',
-                            background: 'var(--surface-sunken, #0d1117)',
-                            color: 'var(--color-text-secondary, #8b949e)',
+                            background: 'var(--bg-canvas-subtle, #F3EAE3)',
+                            color: 'var(--color-text-secondary, #64748B)',
+                            fontWeight: 600,
                           }}
                         >
                           {project.status.toUpperCase()}
@@ -329,8 +310,8 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                         <div
                           style={{
                             fontSize: '11px',
-                            color: 'var(--color-text-secondary, #8b949e)',
-                            marginTop: '2px',
+                            color: 'var(--color-text-secondary, #64748B)',
+                            marginTop: '3px',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -344,11 +325,12 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        style={{ padding: '3px 8px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                        style={{ padding: '4px 10px', fontSize: '11px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => handleOpenProject(project.id)}
                         id={`open-permitted-project-${project.id}`}
                       >
-                        Open ➔
+                        <span>Open</span>
+                        <ArrowRight size={12} />
                       </button>
                     )}
                   </div>
@@ -359,17 +341,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
         </div>
 
         {/* Modal Action Footer */}
-        <div
-          className="persona-modal-actions"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '10px',
-            paddingTop: '12px',
-            borderTop: '1px solid var(--border-default, #30363d)',
-          }}
-        >
+        <div className="persona-modal-actions">
           <div>
             {!isSelf && onSwitchPersona && user.status !== 'blocked' && user.status !== 'terminated' && (
               <Button
@@ -378,7 +350,8 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                 onClick={handleSwitchToThisPersona}
                 id="switch-to-this-persona-btn"
               >
-                🔄 Switch to this Persona
+                <RotateCcw size={13} style={{ marginRight: '6px' }} />
+                <span>Switch to this Persona</span>
               </Button>
             )}
           </div>

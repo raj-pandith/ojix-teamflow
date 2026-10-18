@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle, X } from 'lucide-react';
 import { ProjectDeletionNotice } from '../../types/project';
 import { formatDisplayDateTime } from '../../domain/timezone';
 
@@ -18,8 +19,8 @@ export const StickyDeletionBanner: React.FC<StickyDeletionBannerProps> = ({
       {notices.map(notice => (
         <div key={notice.id} className="sticky-deletion-banner animate-fade-in">
           <div className="banner-left">
-            <span className="banner-icon" role="img" aria-label="Project deleted warning">
-              ⚠️
+            <span className="banner-icon" aria-hidden="true" style={{ display: 'flex', alignItems: 'center' }}>
+              <AlertTriangle size={18} style={{ color: 'var(--status-overdue, #ef4444)' }} />
             </span>
             <div className="banner-content">
               <span className="banner-headline">Project Deleted</span>
@@ -39,8 +40,9 @@ export const StickyDeletionBanner: React.FC<StickyDeletionBannerProps> = ({
             title="Dismiss notification"
             aria-label="Dismiss notification"
             id={`dismiss-deletion-notice-${notice.id}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
       ))}

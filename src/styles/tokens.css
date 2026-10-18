@@ -73,11 +73,20 @@
   --text-muted: #8E9EA5;
   --text-inverse: #FFFFFF;
 
-  /* Primary Brand Action (Burnt Orange #CC642D) */
-  --accent-primary: #CC642D;
-  --accent-primary-hover: #B55322;
-  --accent-primary-subtle: #FDF2EC;
-  --accent-primary-border: #F3D2C1;
+  /* Primary Brand Action (Refined Brand Orange #C9662F) */
+  --accent-primary: #C9662F;
+  --accent-primary-hover: #B55420;
+  --accent-primary-subtle: #FDF4EF;
+  --accent-primary-border: #F3D3C1;
+  --sidebar-brand-accent: #C9662F;
+  --border-focus: #C9662F;
+
+  /* Surfaces & Structural Layers (Ensures light warm fallbacks) */
+  --surface-primary: #FFFFFF;
+  --surface-elevated: #FAF5F0;
+  --surface-sunken: #F5EFEB;
+  --surface-subtle: #F7EFE9;
+  --border-default: #E8DED5;
 
   /* Status Accents (Editorial Warm Harmony) */
   --status-todo: #505E70;

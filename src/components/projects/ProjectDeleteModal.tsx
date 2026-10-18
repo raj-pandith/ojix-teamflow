@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AlertTriangle, X } from 'lucide-react';
 
 interface ProjectDeleteModalProps {
   isOpen: boolean;
@@ -55,13 +56,13 @@ export const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
       >
         <div className="modal-header" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '20px' }}>⚠️</span>
+            <AlertTriangle size={20} style={{ color: 'var(--color-danger, #ef4444)' }} />
             <h3 id="delete-project-modal-title" style={{ color: 'var(--color-danger, #ef4444)', margin: 0 }}>
               Delete Project
             </h3>
           </div>
-          <button className="btn-close-modal" onClick={handleClose} aria-label="Close dialog">
-            ✕
+          <button className="btn-close-modal" onClick={handleClose} aria-label="Close dialog" style={{ display: 'flex', alignItems: 'center' }}>
+            <X size={18} />
           </button>
         </div>
 

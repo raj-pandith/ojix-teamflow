@@ -456,13 +456,35 @@
 /* Buttons - Rounded Pill Buttons with Warm Editorial Saas Aesthetic */
 .btn {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: 6px;
   font-weight: 600;
   border-radius: var(--radius-pill);
   transition: all var(--transition-fast);
   white-space: nowrap;
+  line-height: 1.2;
+}
+
+.btn-text,
+.btn-content {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
+button svg,
+.btn svg,
+.btn-text svg,
+.btn-content svg {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  flex-shrink: 0;
 }
 
 .btn-sm {
@@ -602,59 +624,592 @@
   margin-bottom: var(--space-4);
 }
 
-/* Modals */
+/* ==========================================================================
+   Modals & Dialogs System — Enterprise Editorial Polish
+   ========================================================================== */
+
+@keyframes modalBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalScaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: var(--bg-overlay);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--z-modal);
-  padding: var(--space-4);
+  z-index: var(--z-modal, 1000);
+  padding: var(--space-4, 16px);
+  animation: modalBackdropFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .modal-container {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-modal);
+  background: var(--bg-surface, #FFFFFF);
+  border: 1px solid var(--border-default, #E8DED5);
+  border-radius: 18px;
+  box-shadow: 
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 4px 6px -1px rgba(15, 23, 42, 0.03),
+    0 16px 32px -4px rgba(15, 23, 42, 0.10),
+    0 32px 64px -12px rgba(15, 23, 42, 0.16);
   width: 100%;
-  max-height: 90vh;
-  max-height: 90dvh;
+  max-height: min(90vh, 840px);
+  max-height: min(90dvh, 840px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+  animation: modalScaleIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-surface-elevated);
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-subtle, #EFE7E0);
+  background: var(--bg-surface, #FFFFFF);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
 }
 
 .modal-title {
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  font-weight: 800;
-  letter-spacing: -0.035em;
-  color: var(--text-primary);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--color-text-primary, #1E293B);
+  line-height: 1.35;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .modal-close-btn {
-  color: var(--text-muted);
-  font-size: var(--text-lg);
-  padding: 4px;
-  line-height: 1;
-  border-radius: var(--radius-pill);
+  color: var(--color-text-muted, #94A3B8);
+  background: transparent;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .modal-close-btn:hover {
-  color: var(--text-primary);
+  color: var(--color-text-primary, #1E293B);
+  background: var(--surface-sunken, #F5EFEB);
+}
+
+.modal-close-btn:focus-visible {
+  outline: 2px solid var(--accent-primary, #C9662F);
+  outline-offset: 2px;
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #E2D9D0 transparent;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #E2D9D0;
+  border-radius: 9999px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #CDBFB3;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle, #EFE7E0);
+  margin-top: 20px;
+}
+
+/* User Persona & Access Profile Modal Components */
+.persona-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  background: linear-gradient(180deg, #FDFBF9 0%, #F9F4EE 100%);
+  border: 1px solid #EBE1D7;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.persona-modal-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-primary, #C9662F) 0%, #A84D1B 100%);
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(201, 102, 47, 0.28);
+  border: 2px solid #FFFFFF;
+}
+
+.persona-description-card {
+  padding: 14px 18px;
+  background: #FAF6F2;
+  border: 1px solid #EDE4DB;
+  border-left: 3px solid var(--accent-primary, #C9662F);
+  border-radius: 10px;
+  margin-bottom: 18px;
+}
+
+.permitted-projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.permitted-project-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border: 1px solid #EBE1D7;
+  border-radius: 10px;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.permitted-project-card:hover {
+  border-color: #D6C2B2;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.persona-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  margin-top: 20px;
+  border-top: 1px solid #EFE7E0;
+  position: sticky;
+  bottom: 0;
+  background: #FFFFFF;
+  z-index: 5;
+}
+
+/* ==========================================================================
+   Members Directory & Team Governance Table — Premium Editorial Design
+   ========================================================================== */
+
+.members-directory-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.members-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.member-metric-card {
+  background: #FFFFFF;
+  border: 1px solid #EBE1D7;
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.member-metric-card:hover {
+  transform: translateY(-1px);
+  border-color: #DCC8B8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.member-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.member-metric-value {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #1E293B;
+  margin-top: 4px;
+  line-height: 1.15;
+}
+
+.members-table-wrapper {
+  background: #FFFFFF;
+  border: 1px solid #EAE0D5;
+  border-radius: 14px;
+  overflow-x: auto;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02), 0 6px 20px rgba(0, 0, 0, 0.03);
+}
+
+.members-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.members-table th {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748B;
+  background: #FAF7F4;
+  border-bottom: 1px solid #EAE0D5;
+  white-space: nowrap;
+}
+
+.members-table th:last-child {
+  text-align: right;
+  padding-right: 14px;
+}
+
+.members-table td {
+  padding: 7px 12px;
+  font-size: 13px;
+  color: #1E293B;
+  border-bottom: 1px solid #F3EAE1;
+  vertical-align: middle;
+}
+
+.members-table tr:last-child td {
+  border-bottom: none;
+}
+
+.members-table tbody tr {
+  transition: background-color 0.1s ease;
+}
+
+.members-table tbody tr:hover {
+  background-color: #FAF6F1;
+}
+
+.members-table tbody tr.row-blocked {
+  background-color: #FFF9F7;
+  opacity: 0.88;
+}
+
+.member-row-interactive {
+  cursor: pointer;
+  user-select: none;
+}
+
+.member-row-interactive.context-active {
+  background-color: #F6EEE5 !important;
+}
+
+/* User Identity Cell */
+.member-identity-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.member-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: #FFFFFF !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  border: 1.5px solid #FFFFFF;
+}
+
+.member-avatar.member-avatar-admin {
+  background: linear-gradient(135deg, #C9662F 0%, #A84D1B 100%) !important;
+  box-shadow: 0 2px 6px rgba(201, 102, 47, 0.28);
+}
+
+.member-avatar.member-avatar-lead {
+  background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%) !important;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.28);
+}
+
+.member-avatar.member-avatar-member {
+  background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%) !important;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.28);
+}
+
+.member-avatar.member-avatar-viewer {
+  background: linear-gradient(135deg, #64748B 0%, #475569 100%) !important;
+}
+
+.member-name-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.member-name {
+  font-weight: 600;
+  color: #1E293B;
+  white-space: nowrap;
+}
+
+.member-you-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #FDF4EF;
+  color: #C9662F;
+  border: 1px solid #F3D3C1;
+}
+
+.member-email-text {
+  font-size: 13px;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  display: block;
+}
+
+.member-phone-text {
+  font-size: 12px;
+  color: #64748B;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Action Toolbar & Menu Trigger */
+.member-menu-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.member-menu-btn:hover {
+  background: #F5EFEB;
+  border-color: #E2D7CC;
+  color: #1E293B;
+}
+
+/* Right-Click Context Menu Floating Card */
+.context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: transparent;
+}
+
+.member-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #FFFFFF;
+  border: 1px solid #E6DDD4;
+  border-radius: 10px;
+  box-shadow: 
+    0 4px 6px -1px rgba(15, 23, 42, 0.06),
+    0 16px 32px -4px rgba(15, 23, 42, 0.14),
+    0 0 0 1px rgba(0, 0, 0, 0.03);
+  min-width: 190px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: contextMenuFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.context-menu-header {
+  padding: 6px 8px 4px 8px;
+  border-bottom: 1px solid #F3EAE1;
+  margin-bottom: 3px;
+}
+
+.context-menu-user-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1E293B;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.1s ease;
+}
+
+.context-menu-item:hover {
+  background: #F7F1EB;
+  color: #C9662F;
+}
+
+.context-menu-item.context-menu-highlight {
+  color: #C9662F;
+}
+
+.context-menu-item.context-menu-highlight:hover {
+  background: #FDF4EF;
+}
+
+.context-menu-item.context-menu-danger {
+  color: #BE123C;
+}
+
+.context-menu-item.context-menu-danger:hover {
+  background: #FFF1F2;
+  color: #9F1239;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: #F3EAE1;
+  margin: 3px 0;
+}
+
+.member-action-btn:hover {
+  background: #F7F1EB;
+  border-color: #CDBEB0;
+  color: #1E293B;
+}
+
+.member-action-btn:focus-visible {
+  outline: 2px solid #C9662F;
+  outline-offset: 1px;
+}
+
+.member-action-btn.btn-highlight {
+  color: #C9662F;
+  border-color: #F3D3C1;
+  background: #FDF4EF;
+}
+
+.member-action-btn.btn-highlight:hover {
+  background: #FCEAE0;
+  border-color: #E8BFA8;
+}
+
+.member-action-btn.btn-danger {
+  color: #BE123C;
+}
+
+.member-action-btn.btn-danger:hover {
+  background: #FFF1F2;
+  border-color: #FECDD3;
+  color: #9F1239;
+}
+
+.member-action-btn.btn-success {
+  color: #15803D;
+}
+
+.member-action-btn.btn-success:hover {
+  background: #F0FDF4;
+  border-color: #BBF7D0;
+  color: #166534;
 }
 
 .member-checkbox-list {
@@ -4731,18 +5286,9 @@
 /* ==========================================================================
    Global Member Avatar Base Style
    ========================================================================== */
-.member-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  font-weight: 700;
-  text-transform: uppercase;
+.member-avatar:not([class*="member-avatar-"]) {
   background: var(--bg-surface-elevated, #FAF5F0);
   color: var(--text-primary, #1E293B);
-  border: 1px solid var(--border-subtle, #E8DED5);
-  flex-shrink: 0;
-  line-height: 1;
 }
 
 /* ==========================================================================
