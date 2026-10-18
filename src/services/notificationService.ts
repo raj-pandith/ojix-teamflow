@@ -198,8 +198,12 @@ class NotificationService {
 
     const now = new Date().toISOString();
     const type: NotificationType = isReassignment ? 'TASK_REASSIGNED' : 'TASK_ASSIGNED';
-    const title = isReassignment ? 'Task reassigned to you' : 'New task assigned to you';
-    const body = `${actor.displayName} ${isReassignment ? 'reassigned' : 'assigned'} task "${task.title}" to you in "${project.name}".`;
+    const title = isReassignment
+      ? `Task reassigned: ${task.title}`
+      : `New task assigned: ${task.title}`;
+    const body = isReassignment
+      ? `${actor.displayName} reassigned task "${task.title}" to you in ${project.name}.`
+      : `${actor.displayName} assigned you a task in ${project.name}.`;
 
     const dedupKey = isReassignment
       ? `tskasg-${task.id}-${assignee.uid}-re-${task.updatedAt || now}`

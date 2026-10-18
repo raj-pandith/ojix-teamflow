@@ -519,10 +519,10 @@ describe('OJIX TeamFlow Message Center, Notifications & Direct Messaging', () =>
       const notifs = storageEngine.getNotifications(memberA);
       const reassignNotif = notifs.find(n => n.type === 'TASK_REASSIGNED');
       expect(reassignNotif).toBeDefined();
-      expect(reassignNotif?.title).toBe('Task reassigned to you');
+      expect(reassignNotif?.title).toBe(`Task reassigned: ${testTask.title}`);
       expect(reassignNotif?.projectId).toBe(testProject.id);
       expect(reassignNotif?.taskId).toBe(testTask.id);
-      expect(reassignNotif?.body).toContain('reassigned task');
+      expect(reassignNotif?.body).toMatch(/reassigned task/i);
     });
   });
 });

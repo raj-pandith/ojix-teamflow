@@ -72,7 +72,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   React.useEffect(() => {
     if (!highlightedTaskId) return;
 
-    const scrollTimer = setTimeout(() => {
+    const targetTask = tasks.find(t => t.id === highlightedTaskId);
+    if (targetTask && mobileActiveColumn !== 'all' && mobileActiveColumn !== targetTask.status) {
+      setMobileActiveColumn(targetTask.status);
+    }
+
+    const scrollCard = () => {
       const cardElement = document.getElementById(`task-card-${highlightedTaskId}`);
       if (cardElement) {
         cardElement.scrollIntoView({
@@ -81,19 +86,23 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           inline: 'center',
         });
       }
-    }, 120);
+    };
+
+    const timer1 = setTimeout(scrollCard, 100);
+    const timer2 = setTimeout(scrollCard, 350);
 
     const clearTimer = setTimeout(() => {
       if (onClearHighlight) {
         onClearHighlight();
       }
-    }, 3400);
+    }, 4000);
 
     return () => {
-      clearTimeout(scrollTimer);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       clearTimeout(clearTimer);
     };
-  }, [highlightedTaskId, onClearHighlight]);
+  }, [highlightedTaskId, onClearHighlight, tasks, mobileActiveColumn]);
 
   const users = storageEngine.getUsers();
 

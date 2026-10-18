@@ -60,10 +60,10 @@ class TaskService {
       throw new Error(firstError);
     }
 
-    const idempotencyKey = `create-task-${projectId}-${data.title}-${user.uid}`;
+    const idempotencyKey = `create-task-${projectId}-${data.title}-${data.description || ''}-${data.status}-${data.priority}-${data.dueDate}-${user.uid}`;
     return storageEngine.executeIdempotent(idempotencyKey, async () => {
       const newTask: Task = {
-        id: `task-${Date.now().toString(36)}`,
+        id: `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         workspaceId: 'ws-ojix-main',
         projectId,
         title: data.title.trim(),
@@ -83,7 +83,7 @@ class TaskService {
 
       // Audit log
       auditService.logActivity({
-        id: `log-${Date.now().toString(36)}`,
+        id: `log-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         workspaceId: 'ws-ojix-main',
         projectId,
         taskId: newTask.id,
@@ -264,7 +264,8 @@ class TaskService {
       if (merged.assigneeId) {
         const assigneeUser = storageEngine.getUser(merged.assigneeId);
         if (assigneeUser) {
-          notificationService.notifyTaskAssigned(updatedTask, project, assigneeUser, user, true);
+          const isReassignment = Boolean(existing.assigneeId && existing.assigneeId !== merged.assigneeId);
+          notificationService.notifyTaskAssigned(updatedTask, project, assigneeUser, user, isReassignment);
         }
       }
     }

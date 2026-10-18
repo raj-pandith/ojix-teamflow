@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ToastProvider } from './hooks/useToast';
+import { ToastProvider, useToast } from './hooks/useToast';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useProjects } from './hooks/useProjects';
 import { useTasks } from './hooks/useTasks';
@@ -28,6 +28,7 @@ import './styles/global.css';
 
 const MainApp: React.FC = () => {
   const { currentUser } = useAuth();
+  const { showToast } = useToast();
   const {
     projects,
     activeProject,
@@ -40,7 +41,7 @@ const MainApp: React.FC = () => {
   const {
     tasks,
     filteredTasks,
-    myTasks,
+    allMyTasks,
     filters,
     setFilters,
     createTask,
@@ -95,11 +96,16 @@ const MainApp: React.FC = () => {
     try {
       const target = storageEngine.getTaskById(taskId, currentUser);
       if (target) {
-        setInspectedTask({ task: target, commentId });
+        if (commentId) {
+          setInspectedTask({ task: target, commentId });
+        }
         setHighlightedTaskId(taskId);
+      } else {
+        showToast('error', 'Task Not Found', 'This task could not be found or you do not have permission to view it.');
       }
     } catch (e) {
       console.warn('Failed to inspect task from notification:', e);
+      showToast('error', 'Access Denied', 'You do not have permission to access this project or task.');
     }
   };
 
@@ -222,7 +228,7 @@ const MainApp: React.FC = () => {
 
           {currentTab === 'my-tasks' && currentUser && (
             <PersonalDashboard
-              myTasks={myTasks}
+              myTasks={allMyTasks}
               currentUser={currentUser}
               onSelectTask={handleSelectTaskFromDashboard}
               onGoToBoard={() => setCurrentTab('kanban')}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Task, TaskFormData, TaskStatus, TaskFilterOptions } from '../types/task';
 import { taskService } from '../services/taskService';
+import { storageEngine } from '../services/storageEngine';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { isTaskOverdue, getDueDateCategory } from '../domain/timezone';
@@ -141,6 +142,21 @@ export function useTasks(projectId?: string) {
     return true;
   });
 
+  const [allMyTasks, setAllMyTasks] = useState<Task[]>(() =>
+    currentUser ? taskService.getMyTasks(currentUser) : []
+  );
+
+  useEffect(() => {
+    if (!currentUser) {
+      setAllMyTasks([]);
+      return;
+    }
+    setAllMyTasks(taskService.getMyTasks(currentUser));
+    return storageEngine.subscribe(() => {
+      setAllMyTasks(taskService.getMyTasks(currentUser));
+    });
+  }, [currentUser]);
+
   const myTasks = tasks.filter(t => t.assigneeId === currentUser?.uid);
   const overdueTasks = tasks.filter(t => isTaskOverdue(t.dueDate, t.status));
   const blockedTasks = tasks.filter(t => t.status === 'blocked');
@@ -149,6 +165,7 @@ export function useTasks(projectId?: string) {
     tasks,
     filteredTasks,
     myTasks,
+    allMyTasks,
     overdueTasks,
     blockedTasks,
     filters,

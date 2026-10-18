@@ -1279,29 +1279,33 @@
 /* Card Focus & Highlight Animation (DEC-013) */
 @keyframes taskCardFocusHighlight {
   0% {
-    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.8), 0 0 20px rgba(217, 119, 6, 0.4);
-    border-color: var(--status-blocked);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.9), 0 0 25px rgba(99, 102, 241, 0.6);
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.12);
     transform: translateY(-3px) scale(1.02);
   }
   25% {
-    box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.35), 0 0 25px rgba(217, 119, 6, 0.5);
-    border-color: var(--status-blocked);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.5), 0 0 30px rgba(99, 102, 241, 0.7);
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.15);
     transform: translateY(-3px) scale(1.02);
   }
   65% {
-    box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2), 0 0 15px rgba(217, 119, 6, 0.3);
-    border-color: var(--status-blocked);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3), 0 0 15px rgba(99, 102, 241, 0.4);
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.08);
     transform: translateY(-1px) scale(1.01);
   }
   100% {
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
     border-color: var(--card-border);
+    background: transparent;
     transform: translateY(0) scale(1);
   }
 }
 
 .task-card.task-card-highlighted {
-  animation: taskCardFocusHighlight 3.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: taskCardFocusHighlight 3.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   z-index: 10;
   position: relative;
 }
@@ -1309,8 +1313,9 @@
 @media (prefers-reduced-motion: reduce) {
   .task-card.task-card-highlighted {
     animation: none;
-    outline: 3px solid var(--status-blocked);
+    outline: 3px solid #6366f1;
     outline-offset: 2px;
+    background: rgba(99, 102, 241, 0.1);
   }
 }
 
