@@ -5,6 +5,7 @@ import { UserProfile } from '../../types/auth';
 import { Badge } from '../../components/common/Badge';
 import { ManageTeamModal } from '../../components/projects/ManageTeamModal';
 import { ProjectEditModal } from '../../components/projects/ProjectEditModal';
+import { Pagination } from '../../components/common/Pagination';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
 import { storageEngine } from '../../services/storageEngine';
 import {
@@ -64,6 +65,26 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   const [memberSortBy, setMemberSortBy] = useState<'name' | 'tasks' | 'pending' | 'blocked'>('name');
   const [activeMenuMemberId, setActiveMenuMemberId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Pagination for Team Allocation
+  const [memberCurrentPage, setMemberCurrentPage] = useState(1);
+  const [memberPageSize, setMemberPageSize] = useState(5);
+
+  // Right-click context menu state for team members
+  const [memberContextMenu, setMemberContextMenu] = useState<{
+    member: {
+      uid: string;
+      displayName: string;
+      isCurrentUser: boolean;
+    };
+    x: number;
+    y: number;
+  } | null>(null);
+
+  // Reset pagination to page 1 whenever search, filter, or sorting changes
+  useEffect(() => {
+    setMemberCurrentPage(1);
+  }, [searchMemberQuery, memberRoleFilter, memberSortBy]);
 
   // Keyboard shortcut Ctrl+K to focus search
   useEffect(() => {
@@ -693,14 +714,37 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                 );
               }
 
-              return sortedMembers.map(m => {
-                const isMenuOpen = activeMenuMemberId === m.uid;
+              const totalMatchingMembers = sortedMembers.length;
+              const totalMemberPages = Math.max(1, Math.ceil(totalMatchingMembers / memberPageSize));
+              const safeMemberPage = Math.min(memberCurrentPage, totalMemberPages);
+              const startIndex = (safeMemberPage - 1) * memberPageSize;
+              const paginatedMembers = sortedMembers.slice(startIndex, startIndex + memberPageSize);
+
+              return (
+                <>
+                  {paginatedMembers.map(m => {
+                    const isMenuOpen = activeMenuMemberId === m.uid;
 
                 return (
                   <div
                     key={m.uid}
-                    className={`team-member-row-card ${m.isCurrentUser ? 'is-current-user' : ''}`}
+                    className={`team-member-row-card ${m.isCurrentUser ? 'is-current-user' : ''} ${memberContextMenu?.member.uid === m.uid ? 'context-active' : ''}`}
                     id={`team-member-row-${m.uid}`}
+                    onContextMenu={e => {
+                      e.preventDefault();
+                      const x = Math.min(e.clientX, window.innerWidth - 210);
+                      const y = Math.min(e.clientY, window.innerHeight - 200);
+                      setMemberContextMenu({
+                        member: {
+                          uid: m.uid,
+                          displayName: m.displayName,
+                          isCurrentUser: m.isCurrentUser,
+                        },
+                        x,
+                        y,
+                      });
+                    }}
+                    title="Right-click for member options (Message, View Tasks, Manage Team)"
                   >
                     {/* Member Identity: Avatar, Name, Role Badge, Presence */}
                     <div className="member-col-identity">
@@ -736,21 +780,6 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                         </div>
                       </div>
                     </div>
-
-                    {/* Direct Message Action Button (Omitted for logged-in user, as in reference image) */}
-                    {!m.isCurrentUser && (
-                      <div className="member-col-message">
-                        <button
-                          type="button"
-                          className="member-msg-btn"
-                          onClick={() => onOpenDirectMessage && onOpenDirectMessage(m.uid)}
-                          title={`Send direct message to ${m.displayName}`}
-                          aria-label={`Send message to ${m.displayName}`}
-                        >
-                          <Mail size={13} />
-                        </button>
-                      </div>
-                    )}
 
                     {/* 4 Interactive Task Statistic Badges */}
                     <div className="member-col-stats">
@@ -916,7 +945,25 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
                     </div>
                   </div>
                 );
-              });
+              })}
+
+                  <div className="team-allocation-pagination-wrapper">
+                    <Pagination
+                      currentPage={safeMemberPage}
+                      totalItems={totalMatchingMembers}
+                      pageSize={memberPageSize}
+                      onPageChange={setMemberCurrentPage}
+                      pageSizeOptions={[5, 10, 20]}
+                      onPageSizeChange={newSize => {
+                        setMemberPageSize(newSize);
+                        setMemberCurrentPage(1);
+                      }}
+                      itemLabel="members"
+                      compact={true}
+                    />
+                  </div>
+                </>
+              );
             })()}
           </div>
         </div>
@@ -936,6 +983,86 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
           project={project}
           onUpdateProject={onUpdateProject}
         />
+      )}
+
+      {/* Right-Click Context Menu for Team Members */}
+      {memberContextMenu && (
+        <>
+          <div
+            className="context-menu-backdrop"
+            onClick={() => setMemberContextMenu(null)}
+            onContextMenu={e => {
+              e.preventDefault();
+              setMemberContextMenu(null);
+            }}
+          />
+          <div
+            className="member-context-menu"
+            style={{
+              top: `${memberContextMenu.y}px`,
+              left: `${memberContextMenu.x}px`,
+            }}
+            onClick={e => e.stopPropagation()}
+            role="menu"
+            id={`team-member-context-menu-${memberContextMenu.member.uid}`}
+          >
+            <div className="context-menu-header">
+              <span className="context-menu-user-name">{memberContextMenu.member.displayName}</span>
+            </div>
+
+            {/* 1. Direct Message */}
+            {!memberContextMenu.member.isCurrentUser && onOpenDirectMessage && (
+              <button
+                type="button"
+                className="context-menu-item"
+                id={`member-context-msg-btn-${memberContextMenu.member.uid}`}
+                onClick={() => {
+                  const uid = memberContextMenu.member.uid;
+                  setMemberContextMenu(null);
+                  onOpenDirectMessage(uid);
+                }}
+              >
+                <Mail size={13} style={{ color: 'var(--accent-primary, #C9662F)' }} />
+                <span>Send Message</span>
+              </button>
+            )}
+
+            {/* 2. View All Tasks */}
+            <button
+              type="button"
+              className="context-menu-item"
+              id={`member-context-tasks-btn-${memberContextMenu.member.uid}`}
+              onClick={() => {
+                const uid = memberContextMenu.member.uid;
+                setMemberContextMenu(null);
+                if (onNavigateToTasks) {
+                  onNavigateToTasks({ assigneeId: uid, status: 'all', view: 'list' });
+                } else {
+                  onGoToKanban();
+                }
+              }}
+            >
+              <ListTodo size={13} />
+              <span>View All Tasks</span>
+            </button>
+
+            {/* 3. Manage Team */}
+            {canManageTeam && (
+              <button
+                type="button"
+                className="context-menu-item"
+                id={`member-context-manage-team-btn-${memberContextMenu.member.uid}`}
+                onClick={() => {
+                  setMemberContextMenu(null);
+                  setIsManageTeamOpen(true);
+                }}
+              >
+                <Users size={13} />
+                <span>Manage Team</span>
+              </button>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

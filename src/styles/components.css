@@ -2931,6 +2931,18 @@ button svg,
   box-sizing: border-box;
 }
 
+.team-allocation-pagination-wrapper {
+  margin-top: 12px;
+  width: 100%;
+}
+
+.team-allocation-pagination-wrapper .pagination-container {
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle, #EFE7E0);
+  background: var(--surface-sunken, #FAF7F4);
+  padding: 8px 14px;
+}
+
 /* Header & Summary Badges */
 .team-allocation-header {
   display: flex;

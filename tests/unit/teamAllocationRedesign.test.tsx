@@ -150,12 +150,12 @@ describe('Team Allocation Redesign — Modern SaaS Layout & Interactive Badges',
     // Contains "You" badge
     expect(screen.getByText(/You/)).toBeDefined();
 
-    // Current user row does not render a message button to themselves
+    // Current user row does not render a standalone message button
     const rajMsgBtn = rajRow?.querySelector('.member-msg-btn');
     expect(rajMsgBtn).toBeNull();
   });
 
-  it('renders direct message button for other team members and triggers direct messaging callback', () => {
+  it('provides direct messaging via right-click context menu for other team members', () => {
     const handleOpenDirectMessage = vi.fn();
 
     renderComponent(
@@ -173,7 +173,13 @@ describe('Team Allocation Redesign — Modern SaaS Layout & Interactive Badges',
     expect(marcusRow).toBeDefined();
     expect(marcusRow?.classList.contains('is-current-user')).toBe(false);
 
-    const msgBtn = marcusRow?.querySelector('.member-msg-btn') as HTMLButtonElement;
+    // Standalone inline icon is removed from row
+    expect(marcusRow?.querySelector('.member-msg-btn')).toBeNull();
+
+    // Right-click on Marcus row to open context menu
+    fireEvent.contextMenu(marcusRow!);
+
+    const msgBtn = screen.getByText('Send Message');
     expect(msgBtn).toBeDefined();
 
     fireEvent.click(msgBtn);
@@ -297,5 +303,65 @@ describe('Team Allocation Redesign — Modern SaaS Layout & Interactive Badges',
 
     expect(document.getElementById('team-member-row-u-viewer-elena')).toBeNull();
     expect(document.getElementById('team-member-row-u-member-marcus')).not.toBeNull();
+  });
+
+  it('renders pagination controls and correctly slices members in Team Allocation', () => {
+    // Create a project with 8 members
+    const eightMembers = Array.from({ length: 8 }, (_, i) => `u-member-extra-${i + 1}`);
+    const largeProject: Project = {
+      ...testProject,
+      id: 'proj-large-team',
+      memberIds: eightMembers,
+    };
+
+    // Add extra mock users
+    const extraUsers: UserProfile[] = eightMembers.map((uid, i) => ({
+      uid,
+      displayName: `Developer ${i + 1}`,
+      email: `dev${i + 1}@ojix.local`,
+      role: 'member',
+      status: 'active',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    }));
+    storageEngine.syncAccountsWithServer(extraUsers);
+
+    renderComponent(
+      <ProjectDashboard
+        project={largeProject}
+        tasks={sampleTasks}
+        currentUser={currentUserRaj}
+        onSelectTask={vi.fn()}
+        onGoToKanban={vi.fn()}
+      />
+    );
+
+    // Initial page shows 1–5 of 8 members (default pageSize is 5)
+    expect(screen.getByText(/Showing/)).toBeDefined();
+    expect(screen.getByText('1–5')).toBeDefined();
+    expect(screen.getByText('8')).toBeDefined();
+
+    // Verify first 5 members are in the DOM, 6-8 are not
+    expect(document.getElementById('team-member-row-u-member-extra-1')).not.toBeNull();
+    expect(document.getElementById('team-member-row-u-member-extra-5')).not.toBeNull();
+    expect(document.getElementById('team-member-row-u-member-extra-6')).toBeNull();
+
+    // Click Next page
+    const nextBtn = screen.getByTitle('Next page');
+    fireEvent.click(nextBtn);
+
+    // Now page 2 shows 6–8 of 8
+    expect(screen.getByText('6–8')).toBeDefined();
+    expect(document.getElementById('team-member-row-u-member-extra-6')).not.toBeNull();
+    expect(document.getElementById('team-member-row-u-member-extra-1')).toBeNull();
+
+    // Switch per page size to 10
+    const sizeSelect = screen.getByLabelText('Number of members per page');
+    fireEvent.change(sizeSelect, { target: { value: '10' } });
+
+    // Now all 8 members are on page 1: 1–8 of 8
+    expect(screen.getByText('1–8')).toBeDefined();
+    expect(document.getElementById('team-member-row-u-member-extra-1')).not.toBeNull();
+    expect(document.getElementById('team-member-row-u-member-extra-8')).not.toBeNull();
   });
 });
