@@ -91,8 +91,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
       {/* 4. Due Date & 5. Assignee Avatar and Name */}
       <div className="task-card-footer">
-        <div className="task-due-date" title={`Due Date: ${task.dueDate}`}>
-          <span className="due-date-icon">📅</span>
+        <div
+          className={`task-due-date ${isOverdue ? 'due-date-overdue' : ''}`}
+          title={`Due Date: ${task.dueDate}${isOverdue ? ' (Overdue)' : ''}`}
+        >
+          <span className="due-date-icon">{isOverdue ? '⚠️' : '📅'}</span>
           <span>{formatDisplayDate(task.dueDate)}</span>
         </div>
 
