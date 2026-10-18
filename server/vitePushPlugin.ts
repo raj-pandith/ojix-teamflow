@@ -266,6 +266,7 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
         }
 
         // Store notification in shared sync store for multi-browser & multi-device sync
+        const dedupKey = body.payload.deduplicationKey || null;
         const notif = {
           id: body.payload.id || `notif-${Date.now()}`,
           recipientUserId: body.recipientUserId,
@@ -282,19 +283,22 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
           conversationId: body.payload.conversationId || null,
           isRead: false,
           createdAt: new Date().toISOString(),
+          deduplicationKey: dedupKey,
         };
 
-        const exists = sharedSyncData.notifications.some(n => n.id === notif.id);
+        const exists = sharedSyncData.notifications.some(
+          n => (n.id && n.id === notif.id) || (dedupKey && n.deduplicationKey && n.deduplicationKey === dedupKey)
+        );
         if (!exists) {
           sharedSyncData.notifications.unshift(notif);
           saveSyncData(sharedSyncData);
+
+          // Broadcast to all active browsers in real time (< 10ms)
+          broadcastRealtimeEvent('notification', notif);
         }
 
-        // Broadcast to all active browsers in real time (< 10ms)
-        broadcastRealtimeEvent('notification', notif);
-
         const results = await pushBackend.sendPushToUser(body.recipientUserId, body.payload);
-        sendJson(res, 200, { success: true, count: results.length, results });
+        sendJson(res, 200, { success: true, count: results.length, duplicate: exists, results });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Send push failed';
         sendJson(res, 500, { error: message });
@@ -324,7 +328,10 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
         if (Array.isArray(body.notifications)) {
           for (const n of body.notifications) {
             if (!n || !n.id) continue;
-            const idx = sharedSyncData.notifications.findIndex(item => item.id === n.id);
+            const dedupKey = n.deduplicationKey || null;
+            const idx = sharedSyncData.notifications.findIndex(
+              item => item.id === n.id || (dedupKey && item.deduplicationKey && item.deduplicationKey === dedupKey)
+            );
             if (idx === -1) {
               sharedSyncData.notifications.unshift(n);
               changed = true;

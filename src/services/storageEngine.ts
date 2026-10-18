@@ -44,6 +44,9 @@ class ReactiveStorageEngine {
   private inFlightMutations: Map<string, Promise<unknown>> = new Map();
   private broadcastChannel: BroadcastChannel | null = null;
   private lastKnownSyncClock = 0;
+  private inFlightNotificationKeys: Set<string> = new Set();
+  private isCrossTabSyncSetup = false;
+  private eventSource: EventSource | null = null;
 
   constructor() {
     this.initialize();
@@ -51,7 +54,8 @@ class ReactiveStorageEngine {
   }
 
   private setupCrossTabSync(): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || this.isCrossTabSyncSetup) return;
+    this.isCrossTabSyncSetup = true;
 
     // 1. Zero-latency BroadcastChannel for instantaneous cross-tab updates
     if (typeof BroadcastChannel !== 'undefined') {
@@ -148,9 +152,12 @@ class ReactiveStorageEngine {
     // 5. Zero-latency Server-Sent Events (SSE) stream for instantaneous real-time push delivery
     if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
       try {
-        const eventSource = new EventSource('/api/sync/events');
+        if (this.eventSource) {
+          this.eventSource.close();
+        }
+        this.eventSource = new EventSource('/api/sync/events');
 
-        eventSource.addEventListener('connected', (event: MessageEvent) => {
+        this.eventSource.addEventListener('connected', (event: MessageEvent) => {
           try {
             const data = JSON.parse(event.data);
             const lastBootId = localStorage.getItem('ojix_server_boot_id');
@@ -160,13 +167,17 @@ class ReactiveStorageEngine {
           } catch {}
         });
 
-        eventSource.addEventListener('notification', (event: MessageEvent) => {
+        this.eventSource.addEventListener('notification', (event: MessageEvent) => {
           try {
             const notif = JSON.parse(event.data);
-            if (notif && notif.id) {
-              const idx = this.notifications.findIndex(n => n.id === notif.id);
-              if (idx === -1) {
-                this.notifications.unshift(notif);
+            if (notif && (notif.id || notif.deduplicationKey)) {
+              const canonicalKey = notif.deduplicationKey || this.computeCanonicalNotificationKey(notif);
+              const exists = this.notifications.some(
+                n => n.id === notif.id || (n.deduplicationKey && n.deduplicationKey === canonicalKey)
+              );
+              if (!exists) {
+                // Inward SSE update updates local cache without re-triggering outward push dispatches
+                this.notifications.unshift({ ...notif, deduplicationKey: canonicalKey });
                 this.persist();
                 this.notify();
               }
@@ -174,16 +185,19 @@ class ReactiveStorageEngine {
           } catch {}
         });
 
-        eventSource.addEventListener('sync', (event: MessageEvent) => {
+        this.eventSource.addEventListener('sync', (event: MessageEvent) => {
           try {
             const data = JSON.parse(event.data);
             let updated = false;
 
             if (Array.isArray(data.notifications)) {
               for (const n of data.notifications) {
-                const idx = this.notifications.findIndex(localN => localN.id === n.id);
-                if (idx === -1) {
-                  this.notifications.unshift(n);
+                const canonicalKey = n.deduplicationKey || this.computeCanonicalNotificationKey(n);
+                const exists = this.notifications.some(
+                  localN => localN.id === n.id || (localN.deduplicationKey && localN.deduplicationKey === canonicalKey)
+                );
+                if (!exists) {
+                  this.notifications.unshift({ ...n, deduplicationKey: canonicalKey });
                   updated = true;
                 }
               }
@@ -248,6 +262,7 @@ class ReactiveStorageEngine {
   public initialize(forceReset = false): void {
     if (forceReset) {
       this.inFlightMutations.clear();
+      this.inFlightNotificationKeys.clear();
     }
     if (forceReset || !localStorage.getItem(STORAGE_KEYS.INITIALIZED)) {
       this.users = [...INITIAL_USERS];
@@ -621,8 +636,9 @@ class ReactiveStorageEngine {
 
     if (targetUser.uid !== caller.uid) {
       const isViewer = targetUser.role === 'viewer';
-      this.notifications.unshift({
-        id: `notif-pmem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      const dedupKey = `pmem-${project.id}-${targetUser.uid}-added_member`;
+      this.addNotification({
+        id: `notif-pmem-${project.id}-${targetUser.uid}-added_member`,
         recipientUserId: targetUser.uid,
         actorUserId: caller.uid,
         actorDisplayName: caller.displayName,
@@ -637,6 +653,7 @@ class ReactiveStorageEngine {
         projectName: project.name,
         isRead: false,
         createdAt: new Date().toISOString(),
+        deduplicationKey: dedupKey,
       });
     }
 
@@ -1129,38 +1146,110 @@ class ReactiveStorageEngine {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  public addNotification(notification: AppNotification): void {
+  // ---- Notification Canonical Deduplication & Observability ----
+  public computeCanonicalNotificationKey(notification: AppNotification): string {
     if (notification.deduplicationKey) {
-      const exists = this.notifications.some(n => n.deduplicationKey === notification.deduplicationKey);
-      if (exists) return;
+      return notification.deduplicationKey;
     }
-    this.notifications.unshift(notification);
-    this.persist();
-    this.notify();
-    this.dispatchPushNotification(notification);
-    this.pushSyncToServer({ notifications: [notification] });
+    const type = notification.type;
+    const recipient = notification.recipientUserId;
+    const projId = notification.projectId || notification.entityId || 'general';
+    const taskId = notification.taskId || notification.entityId || 'none';
+
+    switch (type) {
+      case 'PROJECT_ASSIGNED':
+      case 'PROJECT_MEMBER_ADDED':
+      case 'PROJECT_MEMBER_REMOVED':
+        return `pmem-${projId}-${recipient}-${type}`;
+      case 'TASK_ASSIGNED':
+      case 'TASK_REASSIGNED':
+        return `tskasg-${taskId}-${recipient}-${type}`;
+      case 'TASK_COMMENT_MENTION':
+        return `mnt-${notification.commentId || taskId}-${recipient}`;
+      case 'PROJECT_DELETED':
+        return `pdel-${projId}-${recipient}`;
+      case 'USER_BLOCKED':
+        return `blk-${notification.entityId || recipient}`;
+      default:
+        return `notif-${type}-${recipient}-${projId}-${taskId}`;
+    }
   }
 
-  public addNotifications(notifications: AppNotification[]): void {
-    let added = false;
-    const newlyAdded: AppNotification[] = [];
-    for (const notif of notifications) {
-      if (notif.deduplicationKey) {
-        const exists = this.notifications.some(n => n.deduplicationKey === notif.deduplicationKey);
-        if (exists) continue;
-      }
-      this.notifications.unshift(notif);
-      newlyAdded.push(notif);
-      added = true;
+  private logNotificationEvent(
+    action: 'NOTIFICATION_CREATED' | 'DUPLICATE_IDEMPOTENT_SKIPPED' | 'DUPLICATE_CONCURRENT_REJECTED' | 'PUSH_DISPATCHED' | 'PUSH_FAILED',
+    notif: AppNotification,
+    details?: string
+  ): void {
+    if (process.env.NODE_ENV === 'test' && !process.env.DEBUG_NOTIFS) return;
+    const logPayload = {
+      event: action,
+      type: notif.type,
+      recipientId: notif.recipientUserId,
+      projectId: notif.projectId || notif.entityId,
+      taskId: notif.taskId,
+      deduplicationKey: notif.deduplicationKey,
+      notificationId: notif.id,
+      timestamp: new Date().toISOString(),
+      ...(details ? { details } : {}),
+    };
+    console.info(`[NotificationService] ${action}:`, JSON.stringify(logPayload));
+  }
+
+  public addNotification(notification: AppNotification): boolean {
+    if (!notification || !notification.recipientUserId) {
+      return false;
     }
-    if (added) {
+
+    const canonicalKey = this.computeCanonicalNotificationKey(notification);
+    const enrichedNotif: AppNotification = {
+      ...notification,
+      deduplicationKey: canonicalKey,
+    };
+
+    // 1. Concurrency guard: reject concurrent in-flight duplicates
+    if (this.inFlightNotificationKeys.has(canonicalKey)) {
+      this.logNotificationEvent('DUPLICATE_CONCURRENT_REJECTED', enrichedNotif);
+      return false;
+    }
+
+    // 2. Database-level uniqueness check (both by ID and by canonical business deduplicationKey)
+    const alreadyExists = this.notifications.some(
+      n => n.id === enrichedNotif.id || (n.deduplicationKey && n.deduplicationKey === canonicalKey)
+    );
+
+    if (alreadyExists) {
+      this.logNotificationEvent('DUPLICATE_IDEMPOTENT_SKIPPED', enrichedNotif);
+      return false;
+    }
+
+    // 3. Lock key during processing
+    this.inFlightNotificationKeys.add(canonicalKey);
+
+    try {
+      this.notifications.unshift(enrichedNotif);
       this.persist();
       this.notify();
-      for (const notif of newlyAdded) {
-        this.dispatchPushNotification(notif);
-      }
-      this.pushSyncToServer({ notifications: newlyAdded });
+      this.logNotificationEvent('NOTIFICATION_CREATED', enrichedNotif);
+
+      // 4. Asynchronously deliver push (isolated from persistence)
+      this.dispatchPushNotification(enrichedNotif);
+      this.pushSyncToServer({ notifications: [enrichedNotif] });
+      return true;
+    } finally {
+      // Release in-flight lock after execution completes
+      this.inFlightNotificationKeys.delete(canonicalKey);
     }
+  }
+
+  public addNotifications(notifications: AppNotification[]): AppNotification[] {
+    const newlyAdded: AppNotification[] = [];
+    for (const notif of notifications) {
+      const added = this.addNotification(notif);
+      if (added) {
+        newlyAdded.push(notif);
+      }
+    }
+    return newlyAdded;
   }
 
   private dispatchPushNotification(notification: AppNotification): void {

@@ -90,8 +90,12 @@ class NotificationService {
       body = `You have been added as a Viewer to "${project.name}". You have read-only access to this project.`;
     }
 
+    const dedupKey = action === 'removed_member'
+      ? `pmem-${project.id}-${recipient.uid}-removed-${project.updatedAt || now.slice(0, 10)}`
+      : `pmem-${project.id}-${recipient.uid}-${action}`;
+
     storageEngine.addNotification({
-      id: `notif-pmem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `notif-pmem-${project.id}-${recipient.uid}-${action}`,
       recipientUserId: recipient.uid,
       actorUserId: actor.uid,
       actorDisplayName: actor.displayName,
@@ -104,7 +108,7 @@ class NotificationService {
       projectName: project.name,
       isRead: false,
       createdAt: now,
-      deduplicationKey: `pmem-${project.id}-${recipient.uid}-${action}-${Date.now()}`,
+      deduplicationKey: dedupKey,
     });
   }
 
@@ -120,9 +124,10 @@ class NotificationService {
 
     const now = new Date().toISOString();
     const preview = commentText.length > 120 ? `${commentText.slice(0, 120)}...` : commentText;
+    const dedupKey = `mnt-${commentId || task.id}-${mentionedUser.uid}`;
 
     storageEngine.addNotification({
-      id: `notif-mnt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `notif-mnt-${commentId || task.id}-${mentionedUser.uid}`,
       recipientUserId: mentionedUser.uid,
       actorUserId: commenter.uid,
       actorDisplayName: commenter.displayName,
@@ -139,15 +144,17 @@ class NotificationService {
       commentPreview: preview,
       isRead: false,
       createdAt: now,
-      deduplicationKey: `mnt-${commentId}-${mentionedUser.uid}`,
+      deduplicationKey: dedupKey,
     });
   }
 
   public notifyUserBlocked(blockedUser: UserProfile, actor: UserProfile): void {
     const now = new Date().toISOString();
+    const dedupKey = `blk-${blockedUser.uid}`;
+
     // Notification to affected user
     storageEngine.addNotification({
-      id: `notif-blk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `notif-blk-${blockedUser.uid}`,
       recipientUserId: blockedUser.uid,
       actorUserId: actor.uid,
       actorDisplayName: actor.displayName,
@@ -158,13 +165,13 @@ class NotificationService {
       entityId: blockedUser.uid,
       isRead: false,
       createdAt: now,
-      deduplicationKey: `blk-${blockedUser.uid}-${now.slice(0, 10)}`,
+      deduplicationKey: dedupKey,
     });
 
     // Notification to admin
     if (actor.uid !== blockedUser.uid) {
       storageEngine.addNotification({
-        id: `notif-blk-adm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `notif-blk-adm-${blockedUser.uid}-${actor.uid}`,
         recipientUserId: actor.uid,
         actorUserId: actor.uid,
         actorDisplayName: actor.displayName,
@@ -175,6 +182,7 @@ class NotificationService {
         entityId: blockedUser.uid,
         isRead: false,
         createdAt: now,
+        deduplicationKey: `blk-adm-${blockedUser.uid}-${actor.uid}`,
       });
     }
   }
@@ -193,8 +201,12 @@ class NotificationService {
     const title = isReassignment ? 'Task reassigned to you' : 'New task assigned to you';
     const body = `${actor.displayName} ${isReassignment ? 'reassigned' : 'assigned'} task "${task.title}" to you in "${project.name}".`;
 
+    const dedupKey = isReassignment
+      ? `tskasg-${task.id}-${assignee.uid}-re-${task.updatedAt || now}`
+      : `tskasg-${task.id}-${assignee.uid}-new`;
+
     storageEngine.addNotification({
-      id: `notif-tsk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `notif-tsk-${task.id}-${assignee.uid}-${isReassignment ? 're' : 'new'}`,
       recipientUserId: assignee.uid,
       actorUserId: actor.uid,
       actorDisplayName: actor.displayName,
@@ -209,7 +221,7 @@ class NotificationService {
       taskTitle: task.title,
       isRead: false,
       createdAt: now,
-      deduplicationKey: `tskasg-${task.id}-${assignee.uid}-${isReassignment ? 're' : 'new'}-${Date.now()}`,
+      deduplicationKey: dedupKey,
     });
   }
 }

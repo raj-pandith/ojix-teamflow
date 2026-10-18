@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { UserProfile } from '../../types/auth';
-import { AppNotification, EntityType } from '../../types/message';
+import { AppNotification } from '../../types/message';
 import { notificationService } from '../../services/notificationService';
 import { nativePushService } from '../../services/nativePushService';
 import { webPushClient } from '../../services/webPushClient';
@@ -96,35 +96,10 @@ export const PushNotificationBanner: React.FC<PushNotificationBannerProps> = ({
         }
 
         // Live Web Push delivery event from Service Worker
+        // The notification is already persisted in the backend and displayed natively by sw.js showNotification.
+        // Do NOT re-add to storageEngine or re-trigger browser notification to prevent recursive loops.
         if (event.data?.type === 'PUSH_NOTIFICATION_RECEIVED' && event.data?.payload) {
-          const p = event.data.payload;
-          if (!currentUser || !p.recipientUserId || p.recipientUserId === currentUser.uid) {
-            const notif: AppNotification = {
-              id: p.id || `notif-sw-${Date.now()}`,
-              recipientUserId: currentUser?.uid || p.recipientUserId || '',
-              actorUserId: p.actorUserId || '',
-              actorDisplayName: p.actorDisplayName || 'Team Member',
-              type: p.type || 'TASK_COMMENT_MENTION',
-              title: p.title || 'OJIX TeamFlow Alert',
-              body: p.body || 'New operational activity in TeamFlow.',
-              entityType: (p.type === 'DIRECT_MESSAGE_RECEIVED'
-                ? 'conversation'
-                : p.projectId && p.taskId
-                ? 'comment'
-                : 'project') as EntityType,
-              entityId: p.commentId || p.taskId || p.projectId || p.conversationId || p.id,
-              projectId: p.projectId || undefined,
-              projectName: p.projectName || undefined,
-              taskId: p.taskId || undefined,
-              taskTitle: p.taskTitle || undefined,
-              commentId: p.commentId || undefined,
-              conversationId: p.conversationId || undefined,
-              isRead: false,
-              createdAt: new Date().toISOString(),
-            };
-            storageEngine.addNotification(notif);
-            triggerBrowserNotification(notif);
-          }
+          // Purely monitoring / state sync without duplicate creation
         }
       };
 
