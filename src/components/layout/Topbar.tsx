@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
@@ -26,11 +26,16 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleMobileNav,
   onOpenPersonaModal,
 }) => {
-  const { currentUser, personas, switchPersona, resetDemoData } = useAuth();
+  const { currentUser, personas, switchPersona, logout, resetDemoData } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [showDevSwitcher, setShowDevSwitcher] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const canCreate = canCreateTask !== undefined
     ? canCreateTask
     : (currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead');
-  const [permission, setPermission] = React.useState<NotificationPermission>(() => {
+
+  const [permission, setPermission] = useState<NotificationPermission>(() => {
     return typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'granted';
   });
 
@@ -42,6 +47,38 @@ export const Topbar: React.FC<TopbarProps> = ({
       } catch {}
     }
   };
+
+  // Close dropdown on outside click or escape
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsUserMenuOpen(false);
+    };
+
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isUserMenuOpen]);
+
+  const initials = currentUser?.displayName
+    ? currentUser.displayName
+        .split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+    : 'U';
+
+  const isDevMode = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
 
   return (
     <header className="topbar">
@@ -164,62 +201,133 @@ export const Topbar: React.FC<TopbarProps> = ({
           </Button>
         )}
 
-        {/* Demo Persona Quick-Switcher */}
-        <div className="persona-switcher-container">
-          <label htmlFor="persona-select" className="persona-label">
-            Persona:
-          </label>
-          <select
-            id="persona-select"
-            className="persona-select"
-            value={currentUser?.uid || ''}
-            onChange={e => switchPersona(e.target.value)}
-          >
-            {personas.map(p => (
-              <option key={p.uid} value={p.uid}>
-                {p.displayName} ({p.roleLabel}{p.status === 'blocked' ? ' — Blocked' : p.status === 'terminated' ? ' — Terminated' : ''})
-              </option>
-            ))}
-          </select>
-          {onOpenPersonaModal && (
+        {/* =========================================================================
+            AUTHENTICATED USER PROFILE WIDGET & MENU (Replaces old persona dropdown)
+            ========================================================================= */}
+        {currentUser && (
+          <div className="user-profile-menu-container" ref={menuRef}>
             <button
               type="button"
-              className="persona-info-btn"
-              onClick={onOpenPersonaModal}
-              id="topbar-inspect-persona-btn"
-              title="Inspect active persona profile & permitted projects"
-              style={{
-                background: 'var(--surface-elevated, #21262d)',
-                border: '1px solid var(--border-default, #30363d)',
-                borderRadius: '6px',
-                padding: '4px 7px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--color-text-secondary, #8b949e)',
-                transition: 'all 0.15s ease',
-              }}
+              className="user-profile-btn"
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              id="user-profile-menu-btn"
+              aria-expanded={isUserMenuOpen}
+              aria-haspopup="true"
+              title={`${currentUser.displayName} (${currentUser.role.replace('_', ' ').toUpperCase()})`}
             >
-              ℹ️
+              <div className="user-avatar-badge" aria-hidden="true">
+                {initials}
+              </div>
+              <div className="user-info-text">
+                <span className="user-display-name">{currentUser.displayName}</span>
+                <span className="user-role-label">{currentUser.role.replace('_', ' ')}</span>
+              </div>
+              <svg
+                className={`menu-caret-icon ${isUserMenuOpen ? 'open' : ''}`}
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
             </button>
-          )}
-        </div>
 
-        {/* Active Role Pill */}
-        {currentUser && (
-          <Badge type="role" value={currentUser.role} className="role-pill" />
+            {/* Profile Dropdown Popover */}
+            {isUserMenuOpen && (
+              <div className="user-profile-dropdown" role="menu">
+                <div className="dropdown-user-header">
+                  <div className="dropdown-avatar">{initials}</div>
+                  <div className="dropdown-details">
+                    <div className="dropdown-name">{currentUser.displayName}</div>
+                    <div className="dropdown-email">{currentUser.email}</div>
+                    <div className="dropdown-badge-row">
+                      <Badge type="role" value={currentUser.role} />
+                      <span className={`status-tag ${currentUser.status}`}>
+                        {currentUser.status.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="dropdown-divider" />
+
+                {onOpenPersonaModal && (
+                  <button
+                    type="button"
+                    className="dropdown-menu-item"
+                    onClick={() => {
+                      onOpenPersonaModal();
+                      setIsUserMenuOpen(false);
+                    }}
+                    id="dropdown-inspect-access-btn"
+                  >
+                    <span className="item-icon">🛡️</span>
+                    <span>View Role &amp; Permitted Projects</span>
+                  </button>
+                )}
+
+                {/* Developer Persona Switcher (Only visible in Development mode) */}
+                {isDevMode && (
+                  <div className="dev-switcher-section">
+                    <button
+                      type="button"
+                      className="dev-switcher-toggle"
+                      onClick={() => setShowDevSwitcher(!showDevSwitcher)}
+                    >
+                      <span>🛠️ Dev Impersonation ({showDevSwitcher ? 'Hide' : 'Show'})</span>
+                    </button>
+                    {showDevSwitcher && (
+                      <div className="dev-personas-list">
+                        {personas.map(p => (
+                          <button
+                            key={p.uid}
+                            type="button"
+                            className={`dev-persona-btn ${p.uid === currentUser.uid ? 'active' : ''}`}
+                            onClick={() => {
+                              switchPersona(p.uid);
+                              setIsUserMenuOpen(false);
+                            }}
+                          >
+                            <span>{p.displayName}</span>
+                            <span className="dev-persona-role">{p.roleLabel}</span>
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn-reset-demo"
+                          onClick={() => {
+                            resetDemoData();
+                            setIsUserMenuOpen(false);
+                          }}
+                        >
+                          ↻ Reset Test Data
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="dropdown-divider" />
+
+                <button
+                  type="button"
+                  className="dropdown-menu-item logout-item"
+                  onClick={async () => {
+                    setIsUserMenuOpen(false);
+                    await logout();
+                  }}
+                  id="dropdown-logout-btn"
+                >
+                  <span className="item-icon">🚪</span>
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
         )}
-
-        {/* Reset Demo Data */}
-        <button
-          className="btn-reset-demo"
-          onClick={resetDemoData}
-          title="Reset to clean baseline dataset"
-        >
-          ↻ Reset Data
-        </button>
       </div>
     </header>
   );

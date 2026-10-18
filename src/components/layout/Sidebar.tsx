@@ -1,6 +1,7 @@
 import React from 'react';
 import { Project } from '../../types/project';
 import { UserProfile } from '../../types/auth';
+import { authService } from '../../services/authService';
 
 export type ActiveNavTab = 'kanban' | 'list' | 'dashboard' | 'my-tasks' | 'messages' | 'security' | 'projects' | 'users';
 
@@ -31,6 +32,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   onOpenProfile,
 }) => {
+  const handleLogout = () => {
+    authService.logout();
+  };
+
   const canCreateProject =
     currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
@@ -208,20 +213,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-footer">
         <div
           className="user-profile-widget"
-          onClick={onOpenProfile}
-          style={{ cursor: onOpenProfile ? 'pointer' : 'default' }}
-          title={onOpenProfile ? 'Click to inspect your persona & permitted projects' : undefined}
-          id="sidebar-user-persona-widget"
+          style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}
         >
-          <div className="user-avatar-initials">
-            {currentUser?.displayName.charAt(0) || 'U'}
+          <div
+            onClick={onOpenProfile}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: onOpenProfile ? 'pointer' : 'default', flex: 1, minWidth: 0 }}
+            title={onOpenProfile ? 'Click to inspect your role & permitted projects' : undefined}
+            id="sidebar-user-persona-widget"
+          >
+            <div className="user-avatar-initials">
+              {currentUser?.displayName.charAt(0) || 'U'}
+            </div>
+            <div className="user-profile-info" style={{ overflow: 'hidden' }}>
+              <span className="user-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+                {currentUser?.displayName}
+              </span>
+              <span className="user-role-label">
+                {currentUser?.role.replace('_', ' ').toUpperCase()}
+              </span>
+            </div>
           </div>
-          <div className="user-profile-info">
-            <span className="user-name">{currentUser?.displayName}</span>
-            <span className="user-role-label">
-              {currentUser?.role.replace('_', ' ').toUpperCase()}
-            </span>
-          </div>
+          <button
+            type="button"
+            className="sidebar-logout-btn"
+            onClick={handleLogout}
+            title="Sign out of OJIX TeamFlow"
+            id="sidebar-logout-btn"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted, #6e7681)',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '15px',
+              transition: 'color 0.15s ease',
+            }}
+          >
+            🚪
+          </button>
         </div>
       </div>
     </aside>

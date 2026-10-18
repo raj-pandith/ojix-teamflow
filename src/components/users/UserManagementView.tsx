@@ -10,6 +10,8 @@ import { storageEngine } from '../../services/storageEngine';
 import { formatDisplayDate } from '../../domain/timezone';
 import { useToast } from '../../hooks/useToast';
 import { UserPersonaModal } from './UserPersonaModal';
+import { UserInviteModal } from './UserInviteModal';
+import { authService } from '../../services/authService';
 
 interface UserManagementViewProps {
   currentUser: UserProfile;
@@ -28,6 +30,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [terminatingUser, setTerminatingUser] = useState<UserProfile | null>(null);
   const [pendingBlockUser, setPendingBlockUser] = useState<UserProfile | null>(null);
   const [inspectingPersonaUser, setInspectingPersonaUser] = useState<UserProfile | null>(null);
+  const [resendResult, setResendResult] = useState<{ activationUrl: string; email: string } | null>(null);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -46,9 +49,16 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
   useEffect(() => {
     refreshData();
+    if (currentUser.role === 'workspace_admin') {
+      authService.getAdminUsers().then(synced => {
+        if (synced && synced.length > 0) {
+          setUsers(synced);
+        }
+      }).catch(() => {});
+    }
     const unsubscribe = storageEngine.subscribe(refreshData);
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   // Filtered users
   const filteredUsers = users.filter(u => {
@@ -66,8 +76,20 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
   const totalUsers = users.length;
   const activeCount = users.filter(u => (u.status || 'active') === 'active').length;
+  const pendingCount = users.filter(u => u.status === 'pending_activation').length;
   const blockedCount = users.filter(u => u.status === 'blocked').length;
   const terminatedCount = users.filter(u => u.status === 'terminated').length;
+
+  const handleResendInvite = async (user: UserProfile) => {
+    try {
+      const res = await authService.resendInvitation(user.email);
+      setResendResult({ activationUrl: res.activationUrl, email: user.email });
+      showToast('success', 'Invitation Link Regenerated', `New activation link created for ${user.email}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to resend invitation';
+      showToast('error', 'Resend Error', msg);
+    }
+  };
 
   const handleOpenCreate = () => {
     setFormName('');
@@ -85,41 +107,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     setFormPhone(user.phone || '');
     setFormRole(user.role);
     setFormError('');
-  };
-
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formName.trim() || formName.trim().length < 2) {
-      setFormError('Full name must be at least 2 characters.');
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formEmail.trim() || !emailRegex.test(formEmail.trim())) {
-      setFormError('A valid email address is required.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setFormError('');
-    try {
-      const newUser: UserProfile = {
-        uid: `user-${Date.now().toString(36)}`,
-        displayName: formName.trim(),
-        email: formEmail.trim().toLowerCase(),
-        phone: formPhone.trim() || undefined,
-        role: formRole,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      storageEngine.addUser(newUser, currentUser);
-      showToast('success', 'User Created', `Workspace account for "${newUser.displayName}" created.`);
-      setIsCreateModalOpen(false);
-    } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : 'Failed to create user');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -226,6 +213,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--status-done)', marginTop: '4px' }}>{activeCount}</div>
         </div>
         <div className="metric-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-in_progress, #38bdf8)', textTransform: 'uppercase', fontWeight: 600 }}>Pending Activation</span>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--status-in_progress, #38bdf8)', marginTop: '4px' }}>{pendingCount}</div>
+        </div>
+        <div className="metric-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-blocked)', textTransform: 'uppercase', fontWeight: 600 }}>Suspended / Blocked</span>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--status-blocked)', marginTop: '4px' }}>{blockedCount}</div>
         </div>
@@ -273,9 +264,11 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
         >
           <option value="all">All Statuses</option>
           <option value="active">Active Only</option>
+          <option value="pending_activation">Pending Activation Only</option>
           <option value="blocked">Blocked Only</option>
           <option value="terminated">Terminated Only</option>
         </select>
+
       </div>
 
       {/* Users Table */}
@@ -389,6 +382,18 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                       >
                         👤 Persona
                       </button>
+                      {user.status === 'pending_activation' && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '3px 8px', fontSize: '12px', color: 'var(--accent-primary-light, #818cf8)' }}
+                          onClick={() => handleResendInvite(user)}
+                          id={`resend-invite-btn-${user.uid}`}
+                          title="Resend activation invitation link"
+                        >
+                          ✉️ Resend Link
+                        </button>
+                      )}
                       {!isTerminated && (
                         <button
                           type="button"
@@ -485,67 +490,51 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
         </div>
       </div>
 
-      {/* Create User Modal */}
-      <Modal
+      {/* Invite / Create User Modal */}
+      <UserInviteModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        title="Create Workspace User Account"
+        currentUser={currentUser}
+      />
+
+      {/* Resend Link Result Modal */}
+      <Modal
+        isOpen={!!resendResult}
+        onClose={() => setResendResult(null)}
+        title="Regenerated Activation Link"
         maxWidth="500px"
       >
-        <form onSubmit={handleCreateSubmit}>
-          {formError && <div className="form-alert-error" style={{ marginBottom: '12px' }}>{formError}</div>}
-
-          <Input
-            label="Full Name *"
-            value={formName}
-            onChange={e => setFormName(e.target.value)}
-            placeholder="e.g. Jordan Miller"
-            required
-            autoFocus
-            id="create-user-fullname-input"
-          />
-
-          <Input
-            label="Email Address *"
-            type="email"
-            value={formEmail}
-            onChange={e => setFormEmail(e.target.value)}
-            placeholder="e.g. jordan@ojix.local"
-            required
-            id="create-user-email-input"
-          />
-
-          <Input
-            label="Contact Phone"
-            type="tel"
-            value={formPhone}
-            onChange={e => setFormPhone(e.target.value)}
-            placeholder="e.g. +1 (555) 789-0123"
-            id="create-user-phone-input"
-          />
-
-          <Select
-            label="User Category / Role *"
-            value={formRole}
-            onChange={e => setFormRole(e.target.value as UserRole)}
-            options={[
-              { value: 'member', label: 'Member (Active Contributor)' },
-              { value: 'project_lead', label: 'Project Lead (Creates & Manages Project Teams)' },
-              { value: 'viewer', label: 'Viewer (Read-Only Observer)' },
-              { value: 'workspace_admin', label: 'Workspace Admin (Full Governance)' },
-            ]}
-            id="create-user-role-select"
-          />
-
-          <div className="modal-actions" style={{ marginTop: '16px' }}>
-            <Button variant="secondary" type="button" onClick={() => setIsCreateModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" isLoading={isSubmitting} id="submit-create-user-btn">
-              Create User Account
+        <div style={{ padding: '10px 0' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary, #8b949e)', marginBottom: '14px' }}>
+            A fresh 48-hour activation link has been generated for <strong>{resendResult?.email}</strong>.
+          </p>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <input
+              type="text"
+              readOnly
+              className="form-input font-mono"
+              style={{ flex: 1, fontSize: '12px' }}
+              value={resendResult?.activationUrl || ''}
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={async () => {
+                if (resendResult?.activationUrl) {
+                  await navigator.clipboard.writeText(resendResult.activationUrl);
+                  showToast('success', 'Copied!', 'Link copied to clipboard.');
+                }
+              }}
+            >
+              Copy
             </Button>
           </div>
-        </form>
+          <div className="modal-actions">
+            <Button variant="secondary" onClick={() => setResendResult(null)}>
+              Done
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Edit User Modal */}

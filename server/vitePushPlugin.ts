@@ -3,11 +3,45 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import fs from 'fs';
 import path from 'path';
 import { pushBackend } from './pushBackend';
+import { authBackend } from './authBackend';
+
+function extractAuthToken(req: IncomingMessage): string {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7).trim();
+  }
+  const xAuthToken = req.headers['x-auth-token'];
+  if (typeof xAuthToken === 'string' && xAuthToken.trim()) {
+    return xAuthToken.trim();
+  }
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const match = cookieHeader.match(/ojix_session=([^;]+)/);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+  return '';
+}
+
+function sendAuthJson(res: ServerResponse, statusCode: number, data: unknown, cookieHeader?: string) {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Auth-Token');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  if (cookieHeader) {
+    res.setHeader('Set-Cookie', cookieHeader);
+  }
+  res.end(JSON.stringify(data));
+}
 
 interface SharedSyncData {
   notifications: any[];
   logs: any[];
   directMessages: any[];
+  projects: any[];
+  tasks: any[];
 }
 
 const syncFilePath = path.resolve(process.cwd(), '.server-sync.json');
@@ -26,17 +60,21 @@ function loadSyncData(): SharedSyncData {
         notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
         logs: Array.isArray(parsed.logs) ? parsed.logs : [],
         directMessages: Array.isArray(parsed.directMessages) ? parsed.directMessages : [],
+        projects: Array.isArray(parsed.projects) ? parsed.projects : [],
+        tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
       };
     }
     const initialData: SharedSyncData = {
       notifications: [],
       logs: [],
       directMessages: [],
+      projects: [],
+      tasks: [],
     };
     fs.writeFileSync(syncFilePath, JSON.stringify(initialData, null, 2), 'utf8');
     return initialData;
   } catch {
-    return { notifications: [], logs: [], directMessages: [] };
+    return { notifications: [], logs: [], directMessages: [], projects: [], tasks: [] };
   }
 }
 
@@ -117,14 +155,228 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
     const url = req.url || '';
 
     // Handle CORS preflight
-    if (req.method === 'OPTIONS' && (url.startsWith('/api/push') || url.startsWith('/api/sync') || url.startsWith('/api/messages'))) {
+    if (req.method === 'OPTIONS' && (url.startsWith('/api/push') || url.startsWith('/api/sync') || url.startsWith('/api/messages') || url.startsWith('/api/auth'))) {
       res.statusCode = 204;
       res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Auth-Token');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.end();
       return;
     }
+
+    // =========================================================================
+    // AUTHENTICATION & RBAC ENDPOINTS (/api/auth)
+    // =========================================================================
+
+    // POST /api/auth/login — Authenticate user credentials & issue session
+    if (req.method === 'POST' && url === '/api/auth/login') {
+      try {
+        const body = await parseJsonBody<{ email: string; password: string }>(req);
+        const clientIp =
+          (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+          req.socket.remoteAddress ||
+          '127.0.0.1';
+
+        const { session, cookieHeader } = await authBackend.login(body.email, body.password, clientIp);
+        sendAuthJson(res, 200, { success: true, session }, cookieHeader);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Authentication failed';
+        sendAuthJson(res, 401, { error: message });
+      }
+      return;
+    }
+
+    // POST /api/auth/logout — Invalidate session and clear cookie
+    if (req.method === 'POST' && url === '/api/auth/logout') {
+      try {
+        const token = extractAuthToken(req);
+        const cookieHeader = authBackend.logout(token);
+        sendAuthJson(res, 200, { success: true }, cookieHeader);
+      } catch (err: unknown) {
+        sendAuthJson(res, 200, { success: true });
+      }
+      return;
+    }
+
+    // GET /api/auth/me — Validate session and return current user profile
+    if (req.method === 'GET' && url.startsWith('/api/auth/me')) {
+      const token = extractAuthToken(req);
+      const user = authBackend.getSessionUser(token);
+      if (!user) {
+        sendAuthJson(res, 401, { error: 'Unauthorized: No active or valid session', user: null });
+        return;
+      }
+      sendAuthJson(res, 200, { success: true, user });
+      return;
+    }
+
+    // POST /api/auth/activate — Activate user account with one-time token and set password
+    if (req.method === 'POST' && url === '/api/auth/activate') {
+      try {
+        const body = await parseJsonBody<{
+          token: string;
+          email?: string;
+          password: string;
+          confirmPassword: string;
+        }>(req);
+        const result = await authBackend.activateAccount(body);
+        broadcastRealtimeEvent('sync', { accounts: authBackend.getAccounts() });
+        broadcastRealtimeEvent('user_updated', result.user);
+        sendAuthJson(res, 200, result);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Activation failed';
+        sendAuthJson(res, 400, { error: message });
+      }
+      return;
+    }
+
+    // GET /api/auth/admin/users — Get all user accounts (Workspace Admin only)
+    if (req.method === 'GET' && url.startsWith('/api/auth/admin/users')) {
+      const token = extractAuthToken(req);
+      const caller = authBackend.getSessionUser(token);
+      if (!caller || caller.role !== 'workspace_admin') {
+        sendAuthJson(res, 403, { error: 'Forbidden: Only Workspace Admins can view all accounts' });
+        return;
+      }
+      sendAuthJson(res, 200, { success: true, users: authBackend.getAccounts() });
+      return;
+    }
+
+    // GET /api/auth/admin/invitations — Get invitations (Workspace Admin only)
+    if (req.method === 'GET' && url.startsWith('/api/auth/admin/invitations')) {
+      const token = extractAuthToken(req);
+      const caller = authBackend.getSessionUser(token);
+      if (!caller || caller.role !== 'workspace_admin') {
+        sendAuthJson(res, 403, { error: 'Forbidden: Only Workspace Admins can view invitations' });
+        return;
+      }
+      sendAuthJson(res, 200, { success: true, invitations: authBackend.getInvitations() });
+      return;
+    }
+
+    // POST /api/auth/admin/invite-user — Admin invites new member with secure activation link
+    if (req.method === 'POST' && url === '/api/auth/admin/invite-user') {
+      try {
+        const token = extractAuthToken(req);
+        const caller = authBackend.getSessionUser(token);
+        if (!caller || caller.role !== 'workspace_admin') {
+          sendAuthJson(res, 403, { error: 'Forbidden: Only Workspace Admins can invite new users' });
+          return;
+        }
+
+        const body = await parseJsonBody<{
+          displayName: string;
+          email: string;
+          role: any;
+          phone?: string;
+        }>(req);
+
+        const origin = (req.headers.origin as string) || 'http://localhost:5173';
+        const result = await authBackend.inviteUser(body, caller, origin);
+        broadcastRealtimeEvent('sync', { accounts: authBackend.getAccounts() });
+        broadcastRealtimeEvent('user_updated', result.user);
+        sendAuthJson(res, 201, result);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Invite failed';
+        sendAuthJson(res, 400, { error: message });
+      }
+      return;
+    }
+
+    // POST /api/auth/admin/create-user — Admin directly provisions account with initial password
+    if (req.method === 'POST' && url === '/api/auth/admin/create-user') {
+      try {
+        const token = extractAuthToken(req);
+        const caller = authBackend.getSessionUser(token);
+        if (!caller || caller.role !== 'workspace_admin') {
+          sendAuthJson(res, 403, { error: 'Forbidden: Only Workspace Admins can create user accounts' });
+          return;
+        }
+
+        const body = await parseJsonBody<{
+          displayName: string;
+          email: string;
+          role: any;
+          password: string;
+          phone?: string;
+        }>(req);
+
+        const newUser = await authBackend.createUserWithPassword(body, caller);
+        broadcastRealtimeEvent('sync', { accounts: authBackend.getAccounts() });
+        broadcastRealtimeEvent('user_updated', newUser);
+        sendAuthJson(res, 201, { success: true, user: newUser });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'User creation failed';
+        sendAuthJson(res, 400, { error: message });
+      }
+      return;
+    }
+
+    // POST /api/auth/admin/resend-invite — Admin regenerates activation link
+    if (req.method === 'POST' && url === '/api/auth/admin/resend-invite') {
+      try {
+        const token = extractAuthToken(req);
+        const caller = authBackend.getSessionUser(token);
+        if (!caller || caller.role !== 'workspace_admin') {
+          sendAuthJson(res, 403, { error: 'Forbidden: Only Workspace Admins can resend invitations' });
+          return;
+        }
+
+        const body = await parseJsonBody<{ email: string }>(req);
+        const origin = (req.headers.origin as string) || 'http://localhost:5173';
+        const result = await authBackend.resendInvitation(body.email, caller, origin);
+        sendAuthJson(res, 200, result);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Resending invitation failed';
+        sendAuthJson(res, 400, { error: message });
+      }
+      return;
+    }
+
+    // POST /api/auth/admin/update-role — Admin modifies user role
+    if (req.method === 'POST' && url === '/api/auth/admin/update-role') {
+      try {
+        const token = extractAuthToken(req);
+        const caller = authBackend.getSessionUser(token);
+        if (!caller || caller.role !== 'workspace_admin') {
+          sendAuthJson(res, 403, { error: 'Forbidden: Only Workspace Admins can modify member roles' });
+          return;
+        }
+
+        const body = await parseJsonBody<{ targetUid: string; role: any }>(req);
+        const updated = authBackend.updateUserRole(body.targetUid, body.role, caller);
+        broadcastRealtimeEvent('sync', { accounts: authBackend.getAccounts() });
+        broadcastRealtimeEvent('user_updated', updated);
+        sendAuthJson(res, 200, { success: true, user: updated });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Role update failed';
+        sendAuthJson(res, 400, { error: message });
+      }
+      return;
+    }
+
+    // POST /api/auth/admin/update-status — Admin blocks or reactivates user
+    if (req.method === 'POST' && url === '/api/auth/admin/update-status') {
+      try {
+        const token = extractAuthToken(req);
+        const caller = authBackend.getSessionUser(token);
+        if (!caller || caller.role !== 'workspace_admin') {
+          sendAuthJson(res, 403, { error: 'Forbidden: Only Workspace Admins can modify member status' });
+          return;
+        }
+
+        const body = await parseJsonBody<{ targetUid: string; status: any }>(req);
+        const updated = authBackend.updateUserStatus(body.targetUid, body.status, caller);
+        broadcastRealtimeEvent('sync', { accounts: authBackend.getAccounts() });
+        broadcastRealtimeEvent('user_updated', updated);
+        sendAuthJson(res, 200, { success: true, user: updated });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Status update failed';
+        sendAuthJson(res, 400, { error: message });
+      }
+      return;
+    }
+
 
     // 0. GET /api/sync/events — Real-Time Zero-Latency Server-Sent Events (SSE) Stream
     if (req.method === 'GET' && url.startsWith('/api/sync/events')) {
@@ -454,6 +706,9 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
         notifications: sharedSyncData.notifications,
         logs: sharedSyncData.logs,
         directMessages: sharedSyncData.directMessages,
+        projects: sharedSyncData.projects,
+        tasks: sharedSyncData.tasks,
+        accounts: authBackend.getAccounts(),
       });
       return;
     }
@@ -465,9 +720,55 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
           notifications?: any[];
           logs?: any[];
           directMessages?: any[];
+          projects?: any[];
+          tasks?: any[];
         }>(req);
 
         let changed = false;
+
+        // Sync projects across clients
+        if (Array.isArray(body.projects) && body.projects.length > 0) {
+          for (const p of body.projects) {
+            if (!p || !p.id) continue;
+            const idx = sharedSyncData.projects.findIndex(item => item.id === p.id);
+            if (idx === -1) {
+              sharedSyncData.projects.push(p);
+              changed = true;
+            } else {
+              const existing = sharedSyncData.projects[idx];
+              const mergedMemberIds = Array.from(new Set([...(existing.memberIds || []), ...(p.memberIds || [])]));
+              const isNewer = !existing.updatedAt || !p.updatedAt || new Date(p.updatedAt) >= new Date(existing.updatedAt);
+              const updatedProject = {
+                ...(isNewer ? p : existing),
+                memberIds: mergedMemberIds,
+              };
+              if (JSON.stringify(updatedProject) !== JSON.stringify(existing)) {
+                sharedSyncData.projects[idx] = updatedProject;
+                changed = true;
+              }
+            }
+          }
+        }
+
+        // Sync tasks across clients
+        if (Array.isArray(body.tasks) && body.tasks.length > 0) {
+          for (const t of body.tasks) {
+            if (!t || !t.id) continue;
+            const idx = sharedSyncData.tasks.findIndex(item => item.id === t.id);
+            if (idx === -1) {
+              sharedSyncData.tasks.push(t);
+              changed = true;
+            } else {
+              const existing = sharedSyncData.tasks[idx];
+              const isNewer = !existing.updatedAt || !t.updatedAt || new Date(t.updatedAt) >= new Date(existing.updatedAt);
+              if (isNewer && JSON.stringify(t) !== JSON.stringify(existing)) {
+                sharedSyncData.tasks[idx] = t;
+                changed = true;
+              }
+            }
+          }
+        }
+
         if (Array.isArray(body.notifications)) {
           for (const n of body.notifications) {
             if (!n || !n.id) continue;
@@ -516,6 +817,8 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
             notifications: body.notifications,
             logs: body.logs,
             directMessages: body.directMessages,
+            projects: sharedSyncData.projects,
+            tasks: sharedSyncData.tasks,
           });
         }
 
@@ -527,17 +830,61 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
       return;
     }
 
+    // 11. POST /api/sync/delete-project — Remove project from server sync store and broadcast to clients
+    if (req.method === 'POST' && url === '/api/sync/delete-project') {
+      try {
+        const body = await parseJsonBody<{ projectId: string }>(req);
+        if (body.projectId) {
+          sharedSyncData.projects = sharedSyncData.projects.filter(p => p.id !== body.projectId);
+          sharedSyncData.tasks = sharedSyncData.tasks.filter(t => t.projectId !== body.projectId);
+          saveSyncData(sharedSyncData);
+          broadcastRealtimeEvent('sync', {
+            projects: sharedSyncData.projects,
+            tasks: sharedSyncData.tasks,
+            deletedProjectId: body.projectId,
+          });
+        }
+        sendJson(res, 200, { success: true });
+      } catch (err: unknown) {
+        sendJson(res, 500, { error: 'Delete project sync failed' });
+      }
+      return;
+    }
+
+    // 12. POST /api/sync/delete-task — Remove task from server sync store and broadcast to clients
+    if (req.method === 'POST' && url === '/api/sync/delete-task') {
+      try {
+        const body = await parseJsonBody<{ taskId: string }>(req);
+        if (body.taskId) {
+          sharedSyncData.tasks = sharedSyncData.tasks.filter(t => t.id !== body.taskId);
+          saveSyncData(sharedSyncData);
+          broadcastRealtimeEvent('sync', {
+            tasks: sharedSyncData.tasks,
+            deletedTaskId: body.taskId,
+          });
+        }
+        sendJson(res, 200, { success: true });
+      } catch (err: unknown) {
+        sendJson(res, 500, { error: 'Delete task sync failed' });
+      }
+      return;
+    }
+
     // POST /api/clear-all-data or POST /api/sync/clear: Clear all server-synced messages, logs, and notifications
     if (req.method === 'POST' && (url === '/api/clear-all-data' || url === '/api/sync/clear')) {
       try {
         sharedSyncData.notifications = [];
         sharedSyncData.logs = [];
         sharedSyncData.directMessages = [];
+        sharedSyncData.projects = [];
+        sharedSyncData.tasks = [];
         saveSyncData(sharedSyncData);
         broadcastRealtimeEvent('sync', {
           notifications: [],
           logs: [],
           directMessages: [],
+          projects: [],
+          tasks: [],
         });
         broadcastRealtimeEvent('cleared', { timestamp: Date.now() });
         sendJson(res, 200, { success: true, message: 'All server synced data cleared.' });

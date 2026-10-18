@@ -31,6 +31,10 @@ export const Badge: React.FC<BadgeProps> = ({ type, value, className = '' }) => 
       badgeClass += ' badge-status-blocked';
     } else if (value === 'terminated') {
       badgeClass += ' badge-urgent';
+    } else if (value === 'pending_activation') {
+      badgeClass += ' badge-status-in_progress';
+      label = 'PENDING ACTIVATION';
+      return <span className={`${badgeClass} ${className}`}>{label}</span>;
     }
     label = String(value).toUpperCase();
   }

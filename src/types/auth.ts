@@ -1,5 +1,5 @@
 export type UserRole = 'workspace_admin' | 'project_lead' | 'member' | 'viewer';
-export type UserStatus = 'active' | 'blocked' | 'terminated';
+export type UserStatus = 'active' | 'blocked' | 'terminated' | 'pending_activation';
 
 export interface UserProfile {
   readonly uid: string;
@@ -33,3 +33,47 @@ export interface UserFormData {
   role: UserRole;
   status?: UserStatus;
 }
+
+export interface UserInvitation {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  phone?: string;
+  token: string;
+  tokenHash: string;
+  expiresAt: string;
+  createdAt: string;
+  createdByUid: string;
+  createdByDisplayName: string;
+  isUsed: boolean;
+  usedAt?: string;
+  activationUrl?: string;
+}
+
+export interface AuthSession {
+  token: string;
+  user: UserProfile;
+  expiresAt: number;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface ActivateAccountInput {
+  token: string;
+  email?: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface InviteUserInput {
+  displayName: string;
+  email: string;
+  role: UserRole;
+  phone?: string;
+  projectId?: string;
+}
+

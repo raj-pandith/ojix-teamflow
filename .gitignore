@@ -34,4 +34,5 @@ Thumbs.db
 # Push Subscriptions (Local cache)
 .push-subscriptions.json
 .server-sync.json
+.server-auth.json
 

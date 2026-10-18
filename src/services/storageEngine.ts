@@ -143,9 +143,33 @@ class ReactiveStorageEngine {
               }
             }
 
+            if (Array.isArray(data.accounts)) {
+              this.syncAccountsWithServer(data.accounts);
+            }
+
+            if (Array.isArray(data.projects)) {
+              this.syncProjectsWithServer(data.projects, data.deletedProjectId);
+            }
+
+            if (Array.isArray(data.tasks)) {
+              this.syncTasksWithServer(data.tasks, data.deletedTaskId);
+            }
+
             if (updated) {
               this.persist();
               this.notify();
+            }
+
+            // Push local projects and tasks to server sync store
+            if (this.projects.length > 0 || this.tasks.length > 0) {
+              fetch('/api/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  projects: this.projects,
+                  tasks: this.tasks,
+                }),
+              }).catch(() => {});
             }
           }
         } catch {
@@ -253,9 +277,30 @@ class ReactiveStorageEngine {
               }
             }
 
+            if (Array.isArray(data.accounts)) {
+              this.syncAccountsWithServer(data.accounts);
+            }
+
+            if (Array.isArray(data.projects)) {
+              this.syncProjectsWithServer(data.projects, data.deletedProjectId);
+            }
+
+            if (Array.isArray(data.tasks)) {
+              this.syncTasksWithServer(data.tasks, data.deletedTaskId);
+            }
+
             if (updated) {
               this.persist();
               this.notify();
+            }
+          } catch {}
+        });
+
+        this.eventSource.addEventListener('user_updated', (event: MessageEvent) => {
+          try {
+            const user = JSON.parse(event.data);
+            if (user && user.uid) {
+              this.syncAccountsWithServer([user]);
             }
           } catch {}
         });
@@ -378,12 +423,10 @@ class ReactiveStorageEngine {
       }
     }
 
-    // In browser runtime, automatically enforce pristine zero-seed empty state on boot
+    // In browser runtime, mark initialized without wiping server data
     if (!isTestRuntime) {
-      if (typeof window !== 'undefined' && window.localStorage && localStorage.getItem(CLEAR_ALL_SEED_KEY) !== 'cleared') {
-        this.clearAllData(true);
+      if (typeof window !== 'undefined' && window.localStorage && !localStorage.getItem(CLEAR_ALL_SEED_KEY)) {
         localStorage.setItem(CLEAR_ALL_SEED_KEY, 'cleared');
-        return;
       }
     }
 
@@ -482,6 +525,241 @@ class ReactiveStorageEngine {
 
   public getUser(uid: string): UserProfile | undefined {
     return this.users.find(u => u.uid === uid);
+  }
+
+  public syncAccountsWithServer(serverAccounts: UserProfile[]): void {
+    if (!Array.isArray(serverAccounts) || serverAccounts.length === 0) return;
+    let changed = false;
+
+    for (const acc of serverAccounts) {
+      if (!acc || !acc.uid) continue;
+      const idx = this.users.findIndex(
+        u => u.uid === acc.uid || (u.email && acc.email && u.email.toLowerCase() === acc.email.toLowerCase())
+      );
+      if (idx >= 0) {
+        const existing = this.users[idx];
+        const newStatus = acc.status || existing.status || 'active';
+        const newRole = acc.role || existing.role;
+        const newName = acc.displayName || existing.displayName;
+        const newPhone = acc.phone !== undefined ? acc.phone : existing.phone;
+
+        if (
+          existing.status !== newStatus ||
+          existing.role !== newRole ||
+          existing.displayName !== newName ||
+          existing.phone !== newPhone ||
+          existing.uid !== acc.uid
+        ) {
+          this.users[idx] = {
+            ...existing,
+            uid: acc.uid,
+            displayName: newName,
+            email: acc.email || existing.email,
+            role: newRole,
+            status: newStatus,
+            phone: newPhone,
+            updatedAt: acc.updatedAt || new Date().toISOString(),
+          };
+          changed = true;
+        }
+      } else {
+        const newUser: UserProfile = {
+          uid: acc.uid,
+          displayName: acc.displayName || (acc.email ? acc.email.split('@')[0] : 'Member'),
+          email: acc.email ? acc.email.toLowerCase() : '',
+          role: acc.role || 'member',
+          status: acc.status || 'active',
+          phone: acc.phone,
+          createdAt: acc.createdAt || new Date().toISOString(),
+          updatedAt: acc.updatedAt || new Date().toISOString(),
+        };
+        this.users.push(newUser);
+        changed = true;
+      }
+
+      // Also ensure persona is kept in sync with user status and role
+      const pIdx = this.personas.findIndex(
+        p => p.uid === acc.uid || (p.email && acc.email && p.email.toLowerCase() === acc.email.toLowerCase())
+      );
+      const roleLabel =
+        acc.role === 'workspace_admin'
+          ? 'Workspace Admin'
+          : acc.role === 'project_lead'
+          ? 'Project Lead'
+          : acc.role === 'member'
+          ? 'Member'
+          : 'Viewer (Read-Only)';
+
+      const defaultDescription =
+        acc.role === 'workspace_admin'
+          ? 'Full workspace governance, member directory, and global settings.'
+          : acc.role === 'project_lead'
+          ? 'Creates projects, assigns work, and oversees project execution.'
+          : acc.role === 'member'
+          ? 'Executes assigned tasks, posts progress notes, and updates statuses.'
+          : 'Observes permitted boards and dashboards; cannot modify any data.';
+
+      if (pIdx >= 0) {
+        const existingP = this.personas[pIdx];
+        const targetStatus = acc.status || existingP.status || 'active';
+        if (
+          existingP.status !== targetStatus ||
+          existingP.role !== acc.role ||
+          existingP.displayName !== acc.displayName
+        ) {
+          this.personas[pIdx] = {
+            ...existingP,
+            uid: acc.uid,
+            displayName: acc.displayName || existingP.displayName,
+            role: acc.role || existingP.role,
+            roleLabel,
+            description: defaultDescription,
+            status: targetStatus,
+            phone: acc.phone !== undefined ? acc.phone : existingP.phone,
+          };
+          changed = true;
+        }
+      } else {
+        const permitted = this.getPermittedProjectsForUser(acc);
+        this.personas.push({
+          uid: acc.uid,
+          email: acc.email,
+          displayName: acc.displayName || (acc.email ? acc.email.split('@')[0] : 'Member'),
+          role: acc.role || 'member',
+          roleLabel,
+          description: defaultDescription,
+          phone: acc.phone,
+          status: acc.status || 'active',
+          permittedProjects: permitted.names,
+          permittedProjectIds: permitted.ids,
+        });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.syncPersonaProjectPermissions();
+      this.persist();
+      this.notify();
+    }
+  }
+
+  public syncProjectsWithServer(serverProjects: Project[], deletedProjectId?: string): void {
+    if (deletedProjectId) {
+      const prevLen = this.projects.length;
+      this.projects = this.projects.filter(p => p.id !== deletedProjectId);
+      this.tasks = this.tasks.filter(t => t.projectId !== deletedProjectId);
+      if (this.projects.length !== prevLen) {
+        this.syncPersonaProjectPermissions();
+        this.persist();
+        this.notify();
+      }
+    }
+
+    if (!Array.isArray(serverProjects) || serverProjects.length === 0) return;
+    let changed = false;
+
+    for (const sp of serverProjects) {
+      if (!sp || !sp.id) continue;
+      const idx = this.projects.findIndex(p => p.id === sp.id);
+      if (idx === -1) {
+        this.projects.push(sp);
+        changed = true;
+      } else {
+        const local = this.projects[idx];
+        const combinedMemberIds = Array.from(new Set([...(local.memberIds || []), ...(sp.memberIds || [])]));
+        const isServerNewer = !local.updatedAt || !sp.updatedAt || new Date(sp.updatedAt) >= new Date(local.updatedAt);
+        const merged: Project = {
+          ...(isServerNewer ? sp : local),
+          memberIds: combinedMemberIds,
+        };
+        if (JSON.stringify(merged) !== JSON.stringify(local)) {
+          this.projects[idx] = merged;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      this.syncPersonaProjectPermissions();
+      this.persist();
+      this.notify();
+    }
+  }
+
+  public syncTasksWithServer(serverTasks: Task[], deletedTaskId?: string): void {
+    if (deletedTaskId) {
+      const prevLen = this.tasks.length;
+      this.tasks = this.tasks.filter(t => t.id !== deletedTaskId);
+      if (this.tasks.length !== prevLen) {
+        this.persist();
+        this.notify();
+      }
+    }
+
+    if (!Array.isArray(serverTasks) || serverTasks.length === 0) return;
+    let changed = false;
+
+    for (const st of serverTasks) {
+      if (!st || !st.id) continue;
+      const idx = this.tasks.findIndex(t => t.id === st.id);
+      if (idx === -1) {
+        this.tasks.push(st);
+        changed = true;
+      } else {
+        const local = this.tasks[idx];
+        const isServerNewer = !local.updatedAt || !st.updatedAt || new Date(st.updatedAt) >= new Date(local.updatedAt);
+        if (isServerNewer && JSON.stringify(st) !== JSON.stringify(local)) {
+          this.tasks[idx] = st;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      this.persist();
+      this.notify();
+    }
+  }
+
+  public pushSyncToServer(payload?: {
+    notifications?: AppNotification[];
+    logs?: ActivityLogEntry[];
+    directMessages?: DirectMessage[];
+    projects?: Project[];
+    tasks?: Task[];
+  }): void {
+    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+    const body = payload || {
+      projects: this.projects,
+      tasks: this.tasks,
+      notifications: this.notifications,
+      logs: this.logs,
+      directMessages: this.directMessages,
+    };
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  }
+
+  public pushDeleteProjectToServer(projectId: string): void {
+    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+    fetch('/api/sync/delete-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId }),
+    }).catch(() => {});
+  }
+
+  public pushDeleteTaskToServer(taskId: string): void {
+    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+    fetch('/api/sync/delete-task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId }),
+    }).catch(() => {});
   }
 
   // ---- Dynamic Personas & Permitted Projects ----
@@ -952,6 +1230,7 @@ class ReactiveStorageEngine {
     this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
+    this.pushSyncToServer({ projects: [this.projects[pIndex]] });
     return this.projects[pIndex];
   }
 
@@ -1163,6 +1442,7 @@ class ReactiveStorageEngine {
     this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
+    this.pushSyncToServer({ projects: [this.projects[pIndex]], tasks: reassignedTasks });
 
     const updatedProject = this.projects[pIndex];
     const result: Project & RemoveMemberResult = {
@@ -1188,6 +1468,7 @@ class ReactiveStorageEngine {
       this.syncPersonaProjectPermissions();
       this.persist();
       this.notify();
+      this.pushSyncToServer({ projects: [this.projects[pIndex]] });
     }
   }
 
@@ -1237,6 +1518,7 @@ class ReactiveStorageEngine {
     this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
+    this.pushSyncToServer({ projects: [project] });
   }
 
   public deleteProject(projectId: string, user: UserProfile, reason?: string): void {
@@ -1306,6 +1588,7 @@ class ReactiveStorageEngine {
     this.syncPersonaProjectPermissions();
     this.persist();
     this.notify();
+    this.pushDeleteProjectToServer(projectId);
   }
 
   // ---- Project Deletion Notices for Members ----
@@ -1394,6 +1677,7 @@ class ReactiveStorageEngine {
     }
     this.persist();
     this.notify();
+    this.pushSyncToServer({ tasks: [task] });
   }
 
   public deleteTask(taskId: string, user: UserProfile): void {
@@ -1411,6 +1695,7 @@ class ReactiveStorageEngine {
     this.tasks = this.tasks.filter(t => t.id !== taskId);
     this.persist();
     this.notify();
+    this.pushDeleteTaskToServer(taskId);
   }
 
   // ---- Activity Logs ----
@@ -1420,21 +1705,6 @@ class ReactiveStorageEngine {
     return this.logs
       .filter(l => l.taskId === taskId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  private pushSyncToServer(payload: {
-    notifications?: AppNotification[];
-    logs?: ActivityLogEntry[];
-    directMessages?: DirectMessage[];
-  }): void {
-    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }).catch(() => {});
-    } catch {}
   }
 
   public addActivityLog(log: ActivityLogEntry, user: UserProfile): void {

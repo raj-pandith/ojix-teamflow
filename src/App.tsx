@@ -25,6 +25,8 @@ import { useMessages } from './hooks/useMessages';
 import { storageEngine } from './services/storageEngine';
 import { Task, TaskStatus } from './types/task';
 import { AppNotification } from './types/message';
+import { LoginPage } from './features/auth/LoginPage';
+import { ActivateAccountPage } from './features/auth/ActivateAccountPage';
 import './styles/global.css';
 
 const MainApp: React.FC = () => {
@@ -410,14 +412,72 @@ const MainApp: React.FC = () => {
   );
 };
 
+const AuthGate: React.FC = () => {
+  const { currentUser, isAuthenticated } = useAuth();
+  const [authView, setAuthView] = useState<'login' | 'activate'>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const search = window.location.search;
+      if (path === '/activate' || search.includes('token=')) {
+        return 'activate';
+      }
+    }
+    return 'login';
+  });
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        const search = window.location.search;
+        if (path === '/activate' || search.includes('token=')) {
+          setAuthView('activate');
+        } else {
+          setAuthView('login');
+        }
+      }
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, []);
+
+  if (!isAuthenticated || !currentUser) {
+    if (authView === 'activate') {
+      return (
+        <ActivateAccountPage
+          onNavigateToLogin={() => {
+            if (typeof window !== 'undefined' && window.history) {
+              window.history.pushState({}, '', '/');
+            }
+            setAuthView('login');
+          }}
+        />
+      );
+    }
+    return (
+      <LoginPage
+        onNavigateToActivate={() => {
+          if (typeof window !== 'undefined' && window.history) {
+            window.history.pushState({}, '', '/activate');
+          }
+          setAuthView('activate');
+        }}
+      />
+    );
+  }
+
+  return <MainApp />;
+};
+
 export const App: React.FC = () => {
   return (
     <ToastProvider>
       <AuthProvider>
-        <MainApp />
+        <AuthGate />
       </AuthProvider>
     </ToastProvider>
   );
 };
 
 export default App;
+
