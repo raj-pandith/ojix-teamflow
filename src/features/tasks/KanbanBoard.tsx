@@ -467,6 +467,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     const assignee = users.find(u => u.uid === task.assigneeId);
                     const moveAuth = canUserMoveTask(task, currentUser, project);
                     const canMove = canMutate && moveAuth.allowed;
+                    const isMyTask = Boolean(currentUser?.uid && task.assigneeId && task.assigneeId === currentUser.uid);
 
                     return (
                       <TaskCard
@@ -481,6 +482,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         canMove={canMove}
                         lockReason={moveAuth.reason}
                         isHighlighted={task.id === highlightedTaskId}
+                        isMyTask={isMyTask}
                       />
                     );
                   })}

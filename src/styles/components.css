@@ -1276,6 +1276,49 @@
   border-left: 3px solid var(--status-blocked);
 }
 
+/* Current User Assigned Task Distinct Highlight */
+.task-card.task-card-my-task {
+  border: 1.5px solid var(--accent-primary, #CC642D);
+  background: linear-gradient(180deg, #FFFFFF 0%, #FDFBF8 100%);
+  box-shadow: 0 0 0 1px rgba(204, 100, 45, 0.14), 0 2px 8px rgba(204, 100, 45, 0.08);
+}
+
+.task-card.task-card-my-task:hover {
+  border-color: var(--accent-primary-hover, #B55322);
+  box-shadow: 0 0 0 1px rgba(204, 100, 45, 0.24), 0 8px 24px -2px rgba(204, 100, 45, 0.16);
+}
+
+.task-card.task-card-my-task.task-card-overdue {
+  border-left: 3.5px solid var(--status-overdue);
+}
+
+.task-card.task-card-my-task.task-card-blocked {
+  border-left: 3.5px solid var(--status-blocked);
+}
+
+.task-my-task-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-primary-subtle, #FDF2EC);
+  color: var(--accent-primary, #CC642D);
+  border: 1px solid var(--accent-primary-border, #F3D2C1);
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
+.task-assignee-chip-mine .assignee-avatar-sm {
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 3.5px var(--accent-primary, #CC642D);
+}
+
+.task-assignee-chip-mine .assignee-name-sm {
+  color: var(--accent-primary, #CC642D);
+  font-weight: 600;
+}
+
 /* Card Focus & Highlight Animation (DEC-013) */
 @keyframes taskCardFocusHighlight {
   0% {

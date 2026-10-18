@@ -12,6 +12,7 @@ interface TaskCardProps {
   canMove: boolean;
   lockReason?: string;
   isHighlighted?: boolean;
+  isMyTask?: boolean;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -22,6 +23,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   canMove,
   lockReason,
   isHighlighted = false,
+  isMyTask = false,
 }) => {
   const isOverdue = isTaskOverdue(task.dueDate, task.status);
 
@@ -48,7 +50,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     <div
       id={`task-card-${task.id}`}
       data-task-id={task.id}
-      className={`task-card ${isOverdue ? 'task-card-overdue' : ''} ${task.status === 'blocked' ? 'task-card-blocked' : ''} ${!canMove ? 'task-card-locked' : ''} ${isHighlighted ? 'task-card-highlighted' : ''}`}
+      data-my-task={isMyTask ? 'true' : 'false'}
+      className={`task-card ${isOverdue ? 'task-card-overdue' : ''} ${task.status === 'blocked' ? 'task-card-blocked' : ''} ${!canMove ? 'task-card-locked' : ''} ${isHighlighted ? 'task-card-highlighted' : ''} ${isMyTask ? 'task-card-my-task' : ''}`}
       draggable={canMutate && canMove}
       onDragStart={handleDragStart}
       onClick={onClick}
@@ -64,21 +67,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       {/* 1. Task Title */}
       <h4 className="task-card-title">{task.title}</h4>
 
-      {/* 2. Priority Badge, 3. Category/Milestone, 7. Overdue/Restricted Indicator */}
+      {/* 2. Priority Badge, 3. Category/Milestone, My Task indicator, Overdue */}
       <div className="task-card-badges-row">
         <Badge type="priority" value={task.priority} />
         {task.milestoneId && (
           <span className="task-category-pill">{task.milestoneId}</span>
         )}
-        {isOverdue && <Badge type="overdue" value="OVERDUE" />}
-        {!canMove && (
-          <span
-            className="task-lock-indicator"
-            title={lockReason || 'Locked: Only the assigned member or Project Lead can move this task'}
-          >
-            🔒
+        {isMyTask && (
+          <span className="task-my-task-badge" title="Assigned to you">
+            My Task
           </span>
         )}
+        {isOverdue && <Badge type="overdue" value="OVERDUE" />}
       </div>
 
       {/* 6. Optional Blocker Information */}
@@ -97,9 +97,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         </div>
 
         {assigneeName ? (
-          <div className="task-assignee-chip" title={`Assigned to ${assigneeName}`}>
+          <div
+            className={`task-assignee-chip ${isMyTask ? 'task-assignee-chip-mine' : ''}`}
+            title={`Assigned to ${assigneeName}${isMyTask ? ' (You)' : ''}`}
+          >
             <span className="assignee-avatar-sm">{getInitials(assigneeName)}</span>
-            <span className="assignee-name-sm">{assigneeName}</span>
+            <span className="assignee-name-sm">{assigneeName}{isMyTask ? ' (You)' : ''}</span>
           </div>
         ) : (
           <span className="task-unassigned-chip">Unassigned</span>
