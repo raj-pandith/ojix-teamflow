@@ -7,6 +7,7 @@ import { pushBackend } from './pushBackend';
 interface SharedSyncData {
   notifications: any[];
   logs: any[];
+  directMessages: any[];
 }
 
 const syncFilePath = path.resolve(process.cwd(), '.server-sync.json');
@@ -18,15 +19,24 @@ export const DEFAULT_SEED_NOTIFICATIONS: any[] = [];
 
 function loadSyncData(): SharedSyncData {
   try {
-    // When server restarts, start with 0 seeded notifications
-    const seededData: SharedSyncData = {
+    if (fs.existsSync(syncFilePath)) {
+      const content = fs.readFileSync(syncFilePath, 'utf8');
+      const parsed = JSON.parse(content);
+      return {
+        notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+        logs: Array.isArray(parsed.logs) ? parsed.logs : [],
+        directMessages: Array.isArray(parsed.directMessages) ? parsed.directMessages : [],
+      };
+    }
+    const initialData: SharedSyncData = {
       notifications: [],
       logs: [],
+      directMessages: [],
     };
-    fs.writeFileSync(syncFilePath, JSON.stringify(seededData, null, 2), 'utf8');
-    return seededData;
+    fs.writeFileSync(syncFilePath, JSON.stringify(initialData, null, 2), 'utf8');
+    return initialData;
   } catch {
-    return { notifications: [], logs: [] };
+    return { notifications: [], logs: [], directMessages: [] };
   }
 }
 
@@ -107,7 +117,7 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
     const url = req.url || '';
 
     // Handle CORS preflight
-    if (req.method === 'OPTIONS' && (url.startsWith('/api/push') || url.startsWith('/api/sync'))) {
+    if (req.method === 'OPTIONS' && (url.startsWith('/api/push') || url.startsWith('/api/sync') || url.startsWith('/api/messages'))) {
       res.statusCode = 204;
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -306,22 +316,155 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
       return;
     }
 
-    // 7. GET /api/sync
+    // 7. GET /api/messages — Retrieve conversation history with participant authorization
+    if (req.method === 'GET' && url.startsWith('/api/messages')) {
+      const parsedUrl = new URL(url, 'http://localhost');
+      const conversationId = parsedUrl.searchParams.get('conversationId');
+      const userId = parsedUrl.searchParams.get('userId');
+
+      let list = [...sharedSyncData.directMessages];
+      if (conversationId) {
+        list = list.filter(m => m.conversationId === conversationId);
+      }
+      if (userId) {
+        // Enforce authorization: only messages where user is a participant
+        list = list.filter(m => m.senderId === userId || m.recipientId === userId);
+      }
+
+      // Sort chronologically ascending (oldest first, newest last)
+      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      sendJson(res, 200, { success: true, count: list.length, messages: list });
+      return;
+    }
+
+    // 8. POST /api/messages — Send, persist and broadcast direct message
+    if (req.method === 'POST' && url === '/api/messages') {
+      try {
+        const body = await parseJsonBody<{
+          id?: string;
+          senderId: string;
+          senderDisplayName?: string;
+          recipientId: string;
+          recipientDisplayName?: string;
+          subject?: string;
+          body: string;
+          conversationId?: string;
+        }>(req);
+
+        if (!body.senderId || !body.recipientId || !body.body?.trim()) {
+          sendJson(res, 400, { error: 'Missing senderId, recipientId, or body.' });
+          return;
+        }
+
+        const trimmedBody = body.body.trim();
+        if (trimmedBody.length > 2000) {
+          sendJson(res, 400, { error: 'Message body cannot exceed 2000 characters.' });
+          return;
+        }
+
+        const conversationId =
+          body.conversationId || `conv-${[body.senderId, body.recipientId].sort().join('-')}`;
+        const now = new Date().toISOString();
+        const messageId = body.id || `dm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+        const message = {
+          id: messageId,
+          conversationId,
+          senderId: body.senderId,
+          senderDisplayName: body.senderDisplayName || 'Team Member',
+          recipientId: body.recipientId,
+          recipientDisplayName: body.recipientDisplayName || 'Team Member',
+          subject: body.subject?.trim() || undefined,
+          body: trimmedBody,
+          isRead: false,
+          createdAt: now,
+        };
+
+        const existingIdx = sharedSyncData.directMessages.findIndex(m => m.id === message.id);
+        if (existingIdx === -1) {
+          sharedSyncData.directMessages.push(message);
+        } else {
+          sharedSyncData.directMessages[existingIdx] = message;
+        }
+
+        // Also create real-time notification for recipient
+        const bodyPreview = trimmedBody.length > 100 ? `${trimmedBody.slice(0, 100)}...` : trimmedBody;
+        const notifTitle = body.subject?.trim()
+          ? `New message: ${body.subject.trim()}`
+          : `Message from ${message.senderDisplayName}`;
+
+        const notif = {
+          id: `notif-dm-${message.id}`,
+          recipientUserId: body.recipientId,
+          actorUserId: body.senderId,
+          actorDisplayName: message.senderDisplayName,
+          type: 'DIRECT_MESSAGE_RECEIVED',
+          title: notifTitle,
+          body: `${message.senderDisplayName}: "${bodyPreview}"`,
+          entityType: 'conversation',
+          entityId: conversationId,
+          conversationId,
+          isRead: false,
+          createdAt: now,
+          deduplicationKey: `dm-notif-${message.id}`,
+        };
+
+        const notifExists = sharedSyncData.notifications.some(
+          n => n.id === notif.id || (n.deduplicationKey && n.deduplicationKey === notif.deduplicationKey)
+        );
+        if (!notifExists) {
+          sharedSyncData.notifications.unshift(notif);
+        }
+
+        saveSyncData(sharedSyncData);
+
+        // Real-time broadcast to all connected browsers
+        broadcastRealtimeEvent('message', message);
+        broadcastRealtimeEvent('sync', {
+          directMessages: [message],
+          notifications: [notif],
+        });
+
+        // Trigger native push delivery outside browser
+        pushBackend.sendPushToUser(body.recipientId, {
+          id: notif.id,
+          recipientUserId: body.recipientId,
+          actorUserId: body.senderId,
+          actorDisplayName: message.senderDisplayName,
+          title: notifTitle,
+          body: notif.body,
+          type: 'DIRECT_MESSAGE_RECEIVED',
+          conversationId,
+          timestamp: Date.now(),
+          requireInteraction: true,
+        }).catch(() => {});
+
+        sendJson(res, 201, { success: true, message });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Send message failed';
+        sendJson(res, 500, { error: message });
+      }
+      return;
+    }
+
+    // 9. GET /api/sync
     if (req.method === 'GET' && url.startsWith('/api/sync')) {
       sendJson(res, 200, {
         bootId: SERVER_BOOT_ID,
         notifications: sharedSyncData.notifications,
         logs: sharedSyncData.logs,
+        directMessages: sharedSyncData.directMessages,
       });
       return;
     }
 
-    // 8. POST /api/sync
+    // 10. POST /api/sync
     if (req.method === 'POST' && url === '/api/sync') {
       try {
         const body = await parseJsonBody<{
           notifications?: any[];
           logs?: any[];
+          directMessages?: any[];
         }>(req);
 
         let changed = false;
@@ -353,9 +496,27 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
           }
         }
 
+        if (Array.isArray(body.directMessages)) {
+          for (const m of body.directMessages) {
+            if (!m || !m.id) continue;
+            const idx = sharedSyncData.directMessages.findIndex(item => item.id === m.id);
+            if (idx === -1) {
+              sharedSyncData.directMessages.push(m);
+              changed = true;
+            } else if (m.isRead !== sharedSyncData.directMessages[idx].isRead) {
+              sharedSyncData.directMessages[idx] = { ...sharedSyncData.directMessages[idx], isRead: m.isRead };
+              changed = true;
+            }
+          }
+        }
+
         if (changed) {
           saveSyncData(sharedSyncData);
-          broadcastRealtimeEvent('sync', { notifications: body.notifications, logs: body.logs });
+          broadcastRealtimeEvent('sync', {
+            notifications: body.notifications,
+            logs: body.logs,
+            directMessages: body.directMessages,
+          });
         }
 
         sendJson(res, 200, sharedSyncData);

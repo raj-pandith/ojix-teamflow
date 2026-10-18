@@ -11,6 +11,10 @@ class DirectMessageService {
     return storageEngine.getDirectMessages(user, conversationId);
   }
 
+  public async fetchConversationMessages(user: UserProfile, conversationId: string): Promise<DirectMessage[]> {
+    return storageEngine.fetchConversationMessages(conversationId, user);
+  }
+
   public async sendMessage(data: SendDirectMessageInput, sender: UserProfile): Promise<DirectMessage> {
     return storageEngine.sendDirectMessage(data, sender);
   }

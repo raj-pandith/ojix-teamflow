@@ -127,6 +127,19 @@ class ReactiveStorageEngine {
               }
             }
 
+            if (Array.isArray(data.directMessages)) {
+              for (const m of data.directMessages) {
+                const idx = this.directMessages.findIndex(localM => localM.id === m.id);
+                if (idx === -1) {
+                  this.directMessages.push(m);
+                  updated = true;
+                } else if (m.isRead !== this.directMessages[idx].isRead) {
+                  this.directMessages[idx] = { ...this.directMessages[idx], isRead: m.isRead };
+                  updated = true;
+                }
+              }
+            }
+
             if (updated) {
               this.persist();
               this.notify();
@@ -185,6 +198,20 @@ class ReactiveStorageEngine {
           } catch {}
         });
 
+        this.eventSource.addEventListener('message', (event: MessageEvent) => {
+          try {
+            const msg: DirectMessage = JSON.parse(event.data);
+            if (msg && msg.id) {
+              const exists = this.directMessages.some(m => m.id === msg.id);
+              if (!exists) {
+                this.directMessages.push(msg);
+                this.persist();
+                this.notify();
+              }
+            }
+          } catch {}
+        });
+
         this.eventSource.addEventListener('sync', (event: MessageEvent) => {
           try {
             const data = JSON.parse(event.data);
@@ -208,6 +235,16 @@ class ReactiveStorageEngine {
                 const exists = this.logs.some(localL => localL.id === l.id);
                 if (!exists) {
                   this.logs.unshift(l);
+                  updated = true;
+                }
+              }
+            }
+
+            if (Array.isArray(data.directMessages)) {
+              for (const m of data.directMessages) {
+                const exists = this.directMessages.some(localM => localM.id === m.id);
+                if (!exists) {
+                  this.directMessages.push(m);
                   updated = true;
                 }
               }
@@ -1113,7 +1150,11 @@ class ReactiveStorageEngine {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  private pushSyncToServer(payload: { notifications?: AppNotification[]; logs?: ActivityLogEntry[] }): void {
+  private pushSyncToServer(payload: {
+    notifications?: AppNotification[];
+    logs?: ActivityLogEntry[];
+    directMessages?: DirectMessage[];
+  }): void {
     if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
     try {
       fetch('/api/sync', {
@@ -1455,7 +1496,56 @@ class ReactiveStorageEngine {
 
     this.persist();
     this.notify();
+
+    // Real-time backend API synchronization
+    try {
+      if (typeof fetch !== 'undefined') {
+        fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newMsg),
+        }).catch(() => {});
+      }
+    } catch {}
+
+    this.pushSyncToServer({ directMessages: [newMsg] });
     return newMsg;
+  }
+
+  public async fetchConversationMessages(conversationId: string, user: UserProfile): Promise<DirectMessage[]> {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Message access revoked.`);
+    }
+
+    try {
+      if (typeof fetch !== 'undefined') {
+        const res = await fetch(
+          `/api/messages?conversationId=${encodeURIComponent(conversationId)}&userId=${encodeURIComponent(user.uid)}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.messages)) {
+            let updated = false;
+            for (const m of data.messages) {
+              const idx = this.directMessages.findIndex(localM => localM.id === m.id);
+              if (idx === -1) {
+                this.directMessages.push(m);
+                updated = true;
+              } else if (m.isRead !== this.directMessages[idx].isRead) {
+                this.directMessages[idx] = { ...this.directMessages[idx], isRead: m.isRead };
+                updated = true;
+              }
+            }
+            if (updated) {
+              this.persist();
+              this.notify();
+            }
+          }
+        }
+      }
+    } catch {}
+
+    return this.getDirectMessages(user, conversationId);
   }
 
   public markDirectMessageRead(messageId: string, user: UserProfile): void {
@@ -1472,6 +1562,7 @@ class ReactiveStorageEngine {
       };
       this.persist();
       this.notify();
+      this.pushSyncToServer({ directMessages: [this.directMessages[idx]] });
     }
   }
 
@@ -1507,6 +1598,10 @@ class ReactiveStorageEngine {
     if (updated) {
       this.persist();
       this.notify();
+      const updatedMessages = this.directMessages.filter(
+        m => m.conversationId === conversationId && m.recipientId === user.uid
+      );
+      this.pushSyncToServer({ directMessages: updatedMessages });
     }
   }
 

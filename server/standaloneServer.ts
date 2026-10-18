@@ -110,9 +110,26 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // GET /api/messages
+  if (req.method === 'GET' && url.startsWith('/api/messages')) {
+    sendJson(res, 200, { success: true, count: 0, messages: [] });
+    return;
+  }
+
+  // POST /api/messages
+  if (req.method === 'POST' && url === '/api/messages') {
+    try {
+      const body = await parseJsonBody<any>(req);
+      sendJson(res, 201, { success: true, message: body });
+    } catch (err: any) {
+      sendJson(res, 500, { error: err.message || 'Failed to send message' });
+    }
+    return;
+  }
+
   // GET /api/sync
   if (req.method === 'GET' && url.startsWith('/api/sync')) {
-    sendJson(res, 200, { notifications: [], logs: [] });
+    sendJson(res, 200, { notifications: [], logs: [], directMessages: [] });
     return;
   }
 

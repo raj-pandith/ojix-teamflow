@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ToastProvider } from './hooks/useToast';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useProjects } from './hooks/useProjects';
@@ -54,6 +54,8 @@ const MainApp: React.FC = () => {
 
   const { totalUnreadCount } = useMessages();
   const [currentTab, setCurrentTab] = useState<ActiveNavTab>('kanban');
+  const [messagesActiveTab, setMessagesActiveTab] = useState<'all' | 'unread' | 'notifications' | 'direct_messages' | 'sent'>('all');
+  const [messagesSelectedConversationId, setMessagesSelectedConversationId] = useState<string | null>(null);
   const [isTriageOpen, setIsTriageOpen] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
@@ -65,6 +67,14 @@ const MainApp: React.FC = () => {
   const [deletionSummaryNotif, setDeletionSummaryNotif] = useState<AppNotification | null>(null);
 
   const canMutate = currentUser?.role !== 'viewer';
+
+  const handleOpenMessages = useCallback((conversationId?: string | null) => {
+    if (conversationId) {
+      setMessagesActiveTab('direct_messages');
+      setMessagesSelectedConversationId(conversationId);
+    }
+    setCurrentTab('messages');
+  }, []);
 
   const handleSelectTaskFromDashboard = (task: Task) => {
     if (task.projectId && task.projectId !== activeProjectId) {
@@ -129,7 +139,7 @@ const MainApp: React.FC = () => {
             }
           }}
           onOpenAddUser={() => setIsInviteUserOpen(true)}
-          onOpenMessages={() => setCurrentTab('messages')}
+          onOpenMessages={() => handleOpenMessages()}
           unreadMessagesCount={totalUnreadCount}
           canMutate={canMutate}
           onToggleMobileNav={() => setIsMobileNavOpen(prev => !prev)}
@@ -230,6 +240,10 @@ const MainApp: React.FC = () => {
             <MessageCenterView
               onNavigateToProject={handleNavigateToProject}
               onNavigateToTask={handleNavigateToTask}
+              initialTab={messagesActiveTab}
+              initialConversationId={messagesSelectedConversationId}
+              onConversationChange={setMessagesSelectedConversationId}
+              onTabChange={setMessagesActiveTab}
             />
           )}
         </main>
@@ -317,9 +331,7 @@ const MainApp: React.FC = () => {
         currentUser={currentUser}
         onNavigateToProject={handleNavigateToProject}
         onNavigateToTask={handleNavigateToTask}
-        onOpenMessages={() => {
-          setCurrentTab('messages');
-        }}
+        onOpenMessages={handleOpenMessages}
         onOpenDeletionSummary={notif => {
           setDeletionSummaryNotif(notif);
         }}

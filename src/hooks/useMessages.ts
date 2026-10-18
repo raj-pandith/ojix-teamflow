@@ -93,6 +93,16 @@ export function useMessages() {
     [currentUser]
   );
 
+  const fetchConversationMessages = useCallback(
+    async (convId: string): Promise<DirectMessage[]> => {
+      if (!currentUser) return [];
+      const msgs = await directMessageService.fetchConversationMessages(currentUser, convId);
+      refresh();
+      return msgs;
+    },
+    [currentUser, refresh]
+  );
+
   return {
     notifications,
     conversations,
@@ -106,5 +116,6 @@ export function useMessages() {
     sendDirectMessage,
     markConversationRead,
     getConversationMessages,
+    fetchConversationMessages,
   };
 }

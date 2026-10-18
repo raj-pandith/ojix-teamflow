@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useMessages } from '../../hooks/useMessages';
-import { AppNotification } from '../../types/message';
+import { AppNotification, DirectConversation, DirectMessage } from '../../types/message';
 import { storageEngine } from '../../services/storageEngine';
 import { Button } from '../../components/common/Button';
 import { formatDisplayDate } from '../../domain/timezone';
@@ -11,16 +11,24 @@ import { WebPushSettingsModal } from './WebPushSettingsModal';
 import { nativePushService } from '../../services/nativePushService';
 import { webPushClient } from '../../services/webPushClient';
 
-type MessageFilterTab = 'all' | 'unread' | 'notifications' | 'direct_messages' | 'sent';
+export type MessageFilterTab = 'all' | 'unread' | 'notifications' | 'direct_messages' | 'sent';
 
 interface MessageCenterViewProps {
   onNavigateToProject?: (projectId: string) => void;
   onNavigateToTask?: (projectId: string, taskId: string, commentId?: string | null) => void;
+  initialTab?: MessageFilterTab;
+  initialConversationId?: string | null;
+  onConversationChange?: (conversationId: string | null) => void;
+  onTabChange?: (tab: MessageFilterTab) => void;
 }
 
 export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
   onNavigateToProject,
   onNavigateToTask,
+  initialTab,
+  initialConversationId,
+  onConversationChange,
+  onTabChange,
 }) => {
   const { currentUser } = useAuth();
   const {
@@ -34,11 +42,12 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     sendDirectMessage,
     markConversationRead,
     getConversationMessages,
+    fetchConversationMessages,
   } = useMessages();
 
-  const [activeTab, setActiveTab] = useState<MessageFilterTab>('all');
+  const [activeTab, setActiveTabState] = useState<MessageFilterTab>(initialTab || 'all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationIdState] = useState<string | null>(initialConversationId || null);
   const [replyText, setReplyText] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [isNewDmOpen, setIsNewDmOpen] = useState(false);
@@ -49,7 +58,33 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     nativePushService.getPermission()
   );
 
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const setActiveTab = (tab: MessageFilterTab) => {
+    setActiveTabState(tab);
+    onTabChange?.(tab);
+  };
+
+  const setSelectedConversationId = (id: string | null) => {
+    setSelectedConversationIdState(id);
+    onConversationChange?.(id);
+  };
+
   const workspaceUsers = useMemo(() => storageEngine.getUsers(), []);
+
+  // Sync with initial props when navigated from outside (e.g. notification click)
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTabState(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (initialConversationId) {
+      setSelectedConversationIdState(initialConversationId);
+      setActiveTabState('direct_messages');
+    }
+  }, [initialConversationId]);
 
   // Sync selected conversation when opening direct messages
   useEffect(() => {
@@ -58,22 +93,60 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
     }
   }, [activeTab, selectedConversationId, conversations]);
 
-  // Mark conversation read when selected
+  // Mark conversation read and fetch latest history from server when selected
   useEffect(() => {
     if (selectedConversationId && currentUser) {
       markConversationRead(selectedConversationId);
+      fetchConversationMessages(selectedConversationId);
     }
-  }, [selectedConversationId, currentUser, markConversationRead]);
+  }, [selectedConversationId, currentUser, markConversationRead, fetchConversationMessages]);
 
-  // Messages in active conversation
-  const activeConversation = useMemo(() => {
-    return conversations.find(c => c.id === selectedConversationId) || null;
-  }, [conversations, selectedConversationId]);
+  // Messages in active conversation (with fallback synthesis so chat pane always opens)
+  const activeConversation = useMemo<DirectConversation | null>(() => {
+    if (!selectedConversationId) return null;
+    const found = conversations.find(c => c.id === selectedConversationId);
+    if (found) return found;
+
+    // Fallback: Synthesize conversation from conversationId
+    if (currentUser && selectedConversationId.startsWith('conv-')) {
+      const other = workspaceUsers.find(
+        u => u.uid !== currentUser.uid && selectedConversationId.includes(u.uid)
+      );
+      if (other) {
+        const msgs = getConversationMessages(selectedConversationId);
+        const lastMsg: DirectMessage = msgs[msgs.length - 1] || {
+          id: 'placeholder',
+          conversationId: selectedConversationId,
+          senderId: currentUser.uid,
+          senderDisplayName: currentUser.displayName,
+          recipientId: other.uid,
+          recipientDisplayName: other.displayName,
+          body: '',
+          isRead: true,
+          createdAt: new Date().toISOString(),
+        };
+        return {
+          id: selectedConversationId,
+          participantIds: [currentUser.uid, other.uid].sort() as unknown as [string, string],
+          otherUser: other,
+          lastMessage: lastMsg,
+          unreadCount: 0,
+          updatedAt: lastMsg.createdAt,
+        };
+      }
+    }
+    return null;
+  }, [conversations, selectedConversationId, currentUser, workspaceUsers, getConversationMessages]);
 
   const conversationMessages = useMemo(() => {
     if (!selectedConversationId) return [];
     return getConversationMessages(selectedConversationId);
   }, [selectedConversationId, getConversationMessages, conversations]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversationMessages.length, selectedConversationId]);
 
   // Sent DMs by current user
   const sentMessages = useMemo(() => {
@@ -727,6 +800,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     </div>
                   );
                 })}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Reply Form */}
