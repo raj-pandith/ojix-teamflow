@@ -32,6 +32,7 @@ export interface ProjectDeletionNotice {
   readonly deletedByRole: string;
   readonly memberIds: readonly string[];
   readonly deletedAt: string; // ISO date-time string
+  readonly reason?: string | null;
 }
 
 export interface TaskReassignmentDecision {

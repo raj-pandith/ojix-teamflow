@@ -30,6 +30,8 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
   const [extractedTasks, setExtractedTasks] = useState<Array<{ title: string; assignee: string; priority: TaskPriority }>>([]);
   const [addingTaskIndex, setAddingTaskIndex] = useState<number | null>(null);
 
+  const canCreateTask = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
+
   if (!isOpen) return null;
 
   const overdue = tasks.filter(t => isTaskOverdue(t.dueDate, t.status));
@@ -59,7 +61,7 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
   };
 
   const handleAddExtractedTask = async (task: { title: string; priority: TaskPriority }, index: number) => {
-    if (!project) return;
+    if (!project || !canCreateTask) return;
     setAddingTaskIndex(index);
     try {
       const today = new Date().toISOString().slice(0, 10);
@@ -182,60 +184,82 @@ export const WorkTriageDrawer: React.FC<WorkTriageDrawerProps> = ({
           {/* Meeting Notes Extraction */}
           {activeTab === 'extraction' && (
             <div className="triage-section">
-              <p className="triage-lead">
-                Paste notes or bullet points below to convert them directly into tasks.
-              </p>
-              <div className="notes-input-group">
-                <div className="notes-header-actions">
-                  <span className="form-label">Raw Meeting Notes</span>
-                  <button
-                    type="button"
-                    className="btn-sample-notes"
-                    onClick={() => setMeetingNotes(sampleMeetingNotes)}
-                  >
-                    Paste Sample Postmortem
-                  </button>
-                </div>
-                <textarea
-                  className="form-textarea"
-                  rows={5}
-                  value={meetingNotes}
-                  onChange={e => setMeetingNotes(e.target.value)}
-                  placeholder="Paste bullets starting with '- '..."
-                />
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleParseNotes}
-                  disabled={!meetingNotes.trim()}
-                  className="btn-extract-actions"
+              {!canCreateTask ? (
+                <div
+                  style={{
+                    padding: '32px 16px',
+                    textAlign: 'center',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-subtle, #30363d)',
+                  }}
                 >
-                  ⚡ Parse Action Items
-                </Button>
-              </div>
-
-              {extractedTasks.length > 0 && (
-                <div className="extracted-results">
-                  <h4 className="extracted-title">Extracted Action Items ({extractedTasks.length})</h4>
-                  <div className="extracted-list">
-                    {extractedTasks.map((task, i) => (
-                      <div key={i} className="extracted-item-row">
-                        <div className="extracted-info">
-                          <span className={`badge badge-${task.priority}`}>{task.priority.toUpperCase()}</span>
-                          <span className="extracted-task-name">{task.title}</span>
-                        </div>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          isLoading={addingTaskIndex === i}
-                          onClick={() => handleAddExtractedTask(task, i)}
-                        >
-                          + Add to Project
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔒</div>
+                  <h4 style={{ margin: '0 0 6px 0', color: 'var(--text-primary, #f0f6fc)' }}>
+                    Task Creation Restricted
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary, #8b949e)', lineHeight: 1.5 }}>
+                    Only Project Leads and Workspace Admins can convert meeting notes into tasks.
+                  </p>
                 </div>
+              ) : (
+                <>
+                  <p className="triage-lead">
+                    Paste notes or bullet points below to convert them directly into tasks.
+                  </p>
+                  <div className="notes-input-group">
+                    <div className="notes-header-actions">
+                      <span className="form-label">Raw Meeting Notes</span>
+                      <button
+                        type="button"
+                        className="btn-sample-notes"
+                        onClick={() => setMeetingNotes(sampleMeetingNotes)}
+                      >
+                        Paste Sample Postmortem
+                      </button>
+                    </div>
+                    <textarea
+                      className="form-textarea"
+                      rows={5}
+                      value={meetingNotes}
+                      onChange={e => setMeetingNotes(e.target.value)}
+                      placeholder="Paste bullets starting with '- '..."
+                    />
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleParseNotes}
+                      disabled={!meetingNotes.trim()}
+                      className="btn-extract-actions"
+                    >
+                      ⚡ Parse Action Items
+                    </Button>
+                  </div>
+
+                  {extractedTasks.length > 0 && (
+                    <div className="extracted-results">
+                      <h4 className="extracted-title">Extracted Action Items ({extractedTasks.length})</h4>
+                      <div className="extracted-list">
+                        {extractedTasks.map((task, i) => (
+                          <div key={i} className="extracted-item-row">
+                            <div className="extracted-info">
+                              <span className={`badge badge-${task.priority}`}>{task.priority.toUpperCase()}</span>
+                              <span className="extracted-task-name">{task.title}</span>
+                            </div>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              isLoading={addingTaskIndex === i}
+                              onClick={() => handleAddExtractedTask(task, i)}
+                            >
+                              + Add to Project
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

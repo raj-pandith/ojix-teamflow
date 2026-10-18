@@ -330,7 +330,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           </div>
 
           {/* Quick Create Task Trigger */}
-          {canMutate && onOpenNewTask && (
+          {canCreateTask && onOpenNewTask && (
             <button
               type="button"
               className="btn-add-task-toolbar"

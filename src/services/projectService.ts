@@ -124,8 +124,8 @@ class ProjectService {
     return updated;
   }
 
-  public async deleteProject(projectId: string, user: UserProfile): Promise<void> {
-    storageEngine.deleteProject(projectId, user);
+  public async deleteProject(projectId: string, user: UserProfile, reason?: string): Promise<void> {
+    storageEngine.deleteProject(projectId, user, reason);
   }
 
   public async removeTeamMember(

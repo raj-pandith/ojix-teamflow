@@ -1071,32 +1071,52 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                   }
                 }}
                 style={{
-                  background: isUnread ? '#f8faff' : '#ffffff',
-                  border: isUnread ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
-                  borderLeft: isUnread ? '4px solid #4f46e5' : '4px solid #cbd5e1',
+                  background: isDeletionEvent
+                    ? (isUnread ? '#fff5f5' : '#fef2f2')
+                    : isUnread ? '#f8faff' : '#ffffff',
+                  border: isDeletionEvent
+                    ? (isUnread ? '1px solid #fca5a5' : '1px solid #fecaca')
+                    : isUnread ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+                  borderLeft: isDeletionEvent
+                    ? '5px solid #dc2626'
+                    : isUnread ? '4px solid #4f46e5' : '4px solid #cbd5e1',
                   borderRadius: '10px',
                   padding: '14px 18px',
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '14px',
-                  boxShadow: isUnread ? '0 2px 8px rgba(79, 70, 229, 0.08)' : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                  boxShadow: isDeletionEvent
+                    ? '0 2px 10px rgba(220, 38, 38, 0.12)'
+                    : isUnread ? '0 2px 8px rgba(79, 70, 229, 0.08)' : '0 1px 3px rgba(0, 0, 0, 0.04)',
                   transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
                   cursor: isInteractiveRow ? 'pointer' : 'default',
                 }}
                 onMouseEnter={e => {
                   if (isInteractiveRow) {
-                    e.currentTarget.style.borderColor = '#a5b4fc';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.12)';
-                    e.currentTarget.style.background = isUnread ? '#f0f4ff' : '#f8fafc';
+                    if (isDeletionEvent) {
+                      e.currentTarget.style.borderColor = '#ef4444';
+                      e.currentTarget.style.boxShadow = '0 4px 14px rgba(220, 38, 38, 0.22)';
+                      e.currentTarget.style.background = '#fee2e2';
+                    } else {
+                      e.currentTarget.style.borderColor = '#a5b4fc';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.12)';
+                      e.currentTarget.style.background = isUnread ? '#f0f4ff' : '#f8fafc';
+                    }
                   }
                 }}
                 onMouseLeave={e => {
                   if (isInteractiveRow) {
-                    e.currentTarget.style.borderColor = isUnread ? '#c7d2fe' : '#e2e8f0';
-                    e.currentTarget.style.boxShadow = isUnread
-                      ? '0 2px 8px rgba(79, 70, 229, 0.08)'
-                      : '0 1px 3px rgba(0, 0, 0, 0.04)';
-                    e.currentTarget.style.background = isUnread ? '#f8faff' : '#ffffff';
+                    if (isDeletionEvent) {
+                      e.currentTarget.style.borderColor = isUnread ? '#fca5a5' : '#fecaca';
+                      e.currentTarget.style.boxShadow = '0 2px 10px rgba(220, 38, 38, 0.12)';
+                      e.currentTarget.style.background = isUnread ? '#fff5f5' : '#fef2f2';
+                    } else {
+                      e.currentTarget.style.borderColor = isUnread ? '#c7d2fe' : '#e2e8f0';
+                      e.currentTarget.style.boxShadow = isUnread
+                        ? '0 2px 8px rgba(79, 70, 229, 0.08)'
+                        : '0 1px 3px rgba(0, 0, 0, 0.04)';
+                      e.currentTarget.style.background = isUnread ? '#f8faff' : '#ffffff';
+                    }
                   }
                 }}
                 title={rowTooltip}
@@ -1107,12 +1127,16 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     fontSize: '20px',
                     padding: '8px',
                     borderRadius: '8px',
-                    background: isUnread ? '#e0e7ff' : '#f1f5f9',
+                    background: isDeletionEvent
+                      ? '#fee2e2'
+                      : isUnread ? '#e0e7ff' : '#f1f5f9',
+                    color: isDeletionEvent ? '#dc2626' : undefined,
+                    border: isDeletionEvent ? '1px solid #fca5a5' : undefined,
                     lineHeight: 1,
                     userSelect: 'none',
                   }}
                 >
-                  {icon}
+                  {isDeletionEvent ? '⚠️' : icon}
                 </div>
 
                 {/* Main Body */}
@@ -1130,32 +1154,56 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                         margin: 0,
                         fontSize: '14px',
                         fontWeight: 600,
-                        color: isDirectMessage ? '#4338ca' : '#0f172a',
+                        color: isDeletionEvent
+                          ? '#991b1b'
+                          : isDirectMessage ? '#4338ca' : '#0f172a',
                         cursor: isInteractiveRow ? 'pointer' : 'default',
                         transition: 'color 0.15s ease, text-decoration 0.15s ease',
                       }}
                       onMouseEnter={e => {
                         if (isInteractiveRow) {
-                          e.currentTarget.style.color = '#4f46e5';
+                          e.currentTarget.style.color = isDeletionEvent ? '#dc2626' : '#4f46e5';
                           e.currentTarget.style.textDecoration = 'underline';
                         }
                       }}
                       onMouseLeave={e => {
                         if (isInteractiveRow) {
-                          e.currentTarget.style.color = isDirectMessage ? '#4338ca' : '#0f172a';
+                          e.currentTarget.style.color = isDeletionEvent
+                            ? '#991b1b'
+                            : isDirectMessage ? '#4338ca' : '#0f172a';
                           e.currentTarget.style.textDecoration = 'none';
                         }
                       }}
                     >
                       {notif.title}
                     </h4>
+                    {isDeletionEvent && (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          background: '#fee2e2',
+                          color: '#b91c1c',
+                          border: '1px solid #fca5a5',
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                        }}
+                      >
+                        ⚠️ Project Deleted
+                      </span>
+                    )}
                     {isUnread && (
                       <span
                         style={{
                           width: '8px',
                           height: '8px',
                           borderRadius: '50%',
-                          background: '#4f46e5',
+                          background: isDeletionEvent ? '#dc2626' : '#4f46e5',
                           display: 'inline-block',
                         }}
                         title="Unread"
@@ -1171,12 +1219,32 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     style={{
                       margin: '0 0 8px',
                       fontSize: '13px',
-                      color: isUnread ? '#1e293b' : '#475569',
+                      color: isDeletionEvent ? '#7f1d1d' : isUnread ? '#1e293b' : '#475569',
                       lineHeight: 1.5,
+                      whiteSpace: 'pre-line',
                     }}
                   >
                     {notif.body}
                   </p>
+
+                  {/* Highlighted Reason for Deletion */}
+                  {isDeletionEvent && notif.deletionReason && (
+                    <div
+                      style={{
+                        margin: '6px 0 10px',
+                        padding: '8px 12px',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        borderLeft: '4px solid #dc2626',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        color: '#991b1b',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <strong style={{ color: '#7f1d1d' }}>Reason for Deletion:</strong> {notif.deletionReason}
+                    </div>
+                  )}
 
                   {/* Context Meta Tags (Project, Task, Comment Preview) */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
@@ -1186,8 +1254,8 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           fontSize: '11px',
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          background: '#e0f2fe',
-                          color: '#0369a1',
+                          background: isDeletionEvent ? '#fee2e2' : '#e0f2fe',
+                          color: isDeletionEvent ? '#991b1b' : '#0369a1',
                           fontWeight: 500,
                         }}
                       >
@@ -1237,7 +1305,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#4f46e5',
+                        color: isDeletionEvent ? '#dc2626' : '#4f46e5',
                         fontSize: '12px',
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -1251,14 +1319,14 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
 
                   {isDeletionEvent && (
                     <Button
-                      variant="secondary"
+                      variant="danger"
                       size="sm"
                       onClick={e => {
                         e.stopPropagation();
                         handleNotificationTitleClick(notif);
                       }}
                     >
-                      View Summary
+                      ⚠️ View Details
                     </Button>
                   )}
 

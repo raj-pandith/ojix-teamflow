@@ -35,6 +35,7 @@ export interface AppNotification {
   readonly createdAt: string; // ISO-8601 UTC string
   readonly readAt?: string | null;
   readonly deduplicationKey?: string;
+  readonly deletionReason?: string | null;
 }
 
 export interface DirectMessage {

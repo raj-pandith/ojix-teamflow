@@ -74,12 +74,12 @@ export function useProjects() {
     }
   };
 
-  const deleteProject = async (projectId: string): Promise<void> => {
+  const deleteProject = async (projectId: string, reason?: string): Promise<void> => {
     if (!currentUser) return;
     try {
       const targetProj = projects.find(p => p.id === projectId);
       const name = targetProj ? targetProj.name : 'Project';
-      await projectService.deleteProject(projectId, currentUser);
+      await projectService.deleteProject(projectId, currentUser, reason);
       showToast('info', 'Project Deleted', `"${name}" and all associated tasks have been removed.`);
       // If we deleted the active project, switch to the first remaining one
       const remaining = projects.filter(p => p.id !== projectId);

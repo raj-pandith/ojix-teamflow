@@ -123,6 +123,74 @@ describe('Security & RBAC Boundary Enforcement', () => {
     await expect(taskService.deleteTask('task-102', leadUser)).resolves.not.toThrow();
   });
 
+  it('NEG-02e: Member cannot create a task in any project', async () => {
+    await expect(
+      taskService.createTask(
+        'proj-infra-01',
+        {
+          title: 'Member Attempted Task',
+          description: 'Should be rejected',
+          priority: 'medium',
+          status: 'todo',
+          dueDate: '2026-10-25',
+          assigneeId: null,
+        },
+        memberUser
+      )
+    ).rejects.toThrow(/Permission denied: Members cannot create tasks. Only Workspace Admins and Project Leads can create tasks./);
+  });
+
+  it('NEG-02f: Viewer cannot create a task in any project', async () => {
+    await expect(
+      taskService.createTask(
+        'proj-infra-01',
+        {
+          title: 'Viewer Attempted Task',
+          description: 'Should be rejected',
+          priority: 'medium',
+          status: 'todo',
+          dueDate: '2026-10-25',
+          assigneeId: null,
+        },
+        viewerUser
+      )
+    ).rejects.toThrow(/Permission denied: Viewers cannot create tasks./);
+  });
+
+  it('Project Lead CAN create a task in project they manage', async () => {
+    const task = await taskService.createTask(
+      'proj-infra-01',
+      {
+        title: 'Lead Created Task',
+        description: 'Valid lead task',
+        priority: 'high',
+        status: 'todo',
+        dueDate: '2026-10-25',
+        assigneeId: null,
+      },
+      leadUser
+    );
+    expect(task.id).toBeDefined();
+    expect(task.title).toBe('Lead Created Task');
+  });
+
+  it('Workspace Admin CAN create a task in any project', async () => {
+    const task = await taskService.createTask(
+      'proj-infra-01',
+      {
+        title: 'Admin Created Task',
+        description: 'Valid admin task',
+        priority: 'urgent',
+        status: 'todo',
+        dueDate: '2026-10-25',
+        assigneeId: null,
+      },
+      adminUser
+    );
+    expect(task.id).toBeDefined();
+    expect(task.title).toBe('Admin Created Task');
+  });
+
   it('NEG-06: Repeated submission is protected against duplicate mutation', async () => {
     const key = 'test-idempotency-key';
     let counter = 0;

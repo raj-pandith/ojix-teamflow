@@ -87,6 +87,29 @@ export const ProjectDeletionSummaryModal: React.FC<ProjectDeletionSummaryModalPr
             </div>
           </div>
 
+          {notification.deletionReason && (
+            <div>
+              <div style={{ fontSize: '12px', color: 'var(--color-danger, #ef4444)', fontWeight: 600, marginBottom: '4px' }}>
+                Reason for Deletion
+              </div>
+              <div
+                style={{
+                  fontSize: '13px',
+                  color: 'var(--text-primary, #f0f6fc)',
+                  lineHeight: 1.5,
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  borderLeft: '4px solid #ef4444',
+                  fontWeight: 500,
+                }}
+              >
+                {notification.deletionReason}
+              </div>
+            </div>
+          )}
+
           <div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted, #8b949e)', marginBottom: '4px' }}>
               Notice Summary

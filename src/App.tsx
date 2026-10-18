@@ -16,7 +16,6 @@ import { TaskCreateModal } from './components/tasks/TaskCreateModal';
 import { ProjectCreateModal } from './components/projects/ProjectCreateModal';
 import { ProjectDeleteModal } from './components/projects/ProjectDeleteModal';
 import { UserInviteModal } from './components/users/UserInviteModal';
-import { StickyDeletionBanner } from './components/layout/StickyDeletionBanner';
 import { MessageCenterView } from './features/messages/MessageCenterView';
 import { ProjectDeletionSummaryModal } from './features/messages/ProjectDeletionSummaryModal';
 import { PushNotificationBanner } from './components/notifications/PushNotificationBanner';
@@ -34,8 +33,6 @@ const MainApp: React.FC = () => {
     activeProject,
     activeProjectId,
     setActiveProjectId,
-    deletionNotices,
-    dismissNotice,
     createProject,
     updateProject,
     deleteProject,
@@ -136,7 +133,6 @@ const MainApp: React.FC = () => {
 
       {/* Main Shell */}
       <div className="main-layout">
-        <StickyDeletionBanner notices={deletionNotices} onDismiss={dismissNotice} />
         <Topbar
           onOpenTriage={() => setIsTriageOpen(true)}
           onOpenNewTask={() => {
@@ -315,8 +311,8 @@ const MainApp: React.FC = () => {
         projectId={projectToDelete?.id || ''}
         projectName={projectToDelete?.name || ''}
         onClose={() => setProjectToDelete(null)}
-        onConfirm={async id => {
-          await deleteProject(id);
+        onConfirm={async (id, reason) => {
+          await deleteProject(id, reason);
           setProjectToDelete(null);
         }}
       />

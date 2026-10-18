@@ -167,13 +167,32 @@ describe('OJIX TeamFlow Message Center, Notifications & Direct Messaging', () =>
       expect(notifsB.some(n => n.type === 'PROJECT_DELETED')).toBe(false);
     });
 
-    it('captures project deletion notice history to prevent broken links', () => {
-      storageEngine.deleteProject(testProject.id, adminUser);
+    it('captures project deletion notice history and deletion reason', () => {
+      storageEngine.deleteProject(testProject.id, adminUser, 'Sprint goals reorganized');
       const notices = storageEngine.getDeletionNotices(memberA);
       const match = notices.find(n => n.projectId === testProject.id);
       expect(match).toBeDefined();
       expect(match?.projectName).toBe('Website Redesign');
       expect(match?.deletedByName).toBe(adminUser.displayName);
+      expect(match?.reason).toBe('Sprint goals reorganized');
+
+      const notifsMemberA = storageEngine.getNotifications(memberA);
+      const delNotif = notifsMemberA.find(n => n.type === 'PROJECT_DELETED');
+      expect(delNotif?.deletionReason).toBe('Sprint goals reorganized');
+      expect(delNotif?.body).toContain('Reason: Sprint goals reorganized');
+    });
+
+    it('ensures project deletion notifications strictly go ONLY to project team members', () => {
+      // adminUser is NOT in testProject.memberIds and not the owner
+      storageEngine.deleteProject(testProject.id, leadUser, 'Team phased out');
+
+      // Member A (in project) receives it
+      const notifsMemberA = storageEngine.getNotifications(memberA);
+      expect(notifsMemberA.some(n => n.type === 'PROJECT_DELETED')).toBe(true);
+
+      // adminUser (NOT in memberIds of this project) does NOT receive it
+      const notifsAdmin = storageEngine.getNotifications(adminUser);
+      expect(notifsAdmin.some(n => n.type === 'PROJECT_DELETED')).toBe(false);
     });
   });
 

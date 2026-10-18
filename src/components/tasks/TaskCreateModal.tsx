@@ -46,6 +46,25 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
     });
   }, [isOpen]);
 
+  if (!isOpen) return null;
+
+  if (!canCreateTask) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Access Restricted" maxWidth="480px">
+        <div style={{ textAlign: 'center', padding: '24px 12px' }}>
+          <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔒</div>
+          <h3 style={{ color: 'var(--text-primary, #f0f6fc)', marginBottom: '8px' }}>Task Creation Restricted</h3>
+          <p style={{ color: 'var(--text-secondary, #8b949e)', fontSize: '14px', lineHeight: 1.5, marginBottom: '20px' }}>
+            Only Project Leads and Workspace Admins can create tasks. Team Members have permission to view, work on, and update tasks assigned to them.
+          </p>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </Modal>
+    );
+  }
+
   // Task Assignment Eligibility: Only active project team members with eligible role (Member or Project Lead)
   const projectTeamMembers = getEligibleProjectAssignees(users, project)
     .sort((a, b) => a.displayName.localeCompare(b.displayName));

@@ -980,7 +980,7 @@ class ReactiveStorageEngine {
     this.notify();
   }
 
-  public deleteProject(projectId: string, user: UserProfile): void {
+  public deleteProject(projectId: string, user: UserProfile, reason?: string): void {
     if (user.role !== 'workspace_admin' && user.role !== 'project_lead') {
       throw new Error('Permission denied: Only Workspace Admins and Project Leads can delete projects.');
     }
@@ -988,6 +988,7 @@ class ReactiveStorageEngine {
     if (index === -1) return;
 
     const project = this.projects[index];
+    const cleanReason = reason?.trim() || '';
 
     // Create deletion notification record for all project members
     const notice: ProjectDeletionNotice = {
@@ -999,16 +1000,23 @@ class ReactiveStorageEngine {
       deletedByRole: user.role,
       memberIds: [...project.memberIds],
       deletedAt: new Date().toISOString(),
+      reason: cleanReason || null,
     };
     this.deletionNotices.unshift(notice);
 
-    // Create persistent inbox notifications for affected members and project lead (excluding actor)
+    // Create persistent inbox notifications strictly for project team members (excluding actor)
     const now = new Date().toISOString();
     const formattedDate = new Date().toLocaleString();
-    const affectedMembers = project.memberIds.filter(id => id !== user.uid);
-    const allRecipients = Array.from(
-      new Set([...affectedMembers, ...(project.ownerId !== user.uid ? [project.ownerId] : [])])
-    );
+    const teamMemberSet = new Set(project.memberIds || []);
+    if (project.ownerId) {
+      teamMemberSet.add(project.ownerId);
+    }
+    teamMemberSet.delete(user.uid);
+    const allRecipients = Array.from(teamMemberSet);
+
+    const bodyText = cleanReason
+      ? `The project "${project.name}" has been deleted by ${user.displayName}.\nReason: ${cleanReason}`
+      : `The project "${project.name}" has been deleted by ${user.displayName} on ${formattedDate}.`;
 
     for (const recipientId of allRecipients) {
       this.notifications.unshift({
@@ -1018,7 +1026,8 @@ class ReactiveStorageEngine {
         actorDisplayName: user.displayName,
         type: 'PROJECT_DELETED',
         title: 'Project deleted',
-        body: `The project "${project.name}" has been deleted by ${user.displayName} on ${formattedDate}.`,
+        body: bodyText,
+        deletionReason: cleanReason || null,
         entityType: 'project',
         entityId: project.id,
         projectId: project.id,
