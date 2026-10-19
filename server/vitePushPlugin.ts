@@ -82,7 +82,7 @@ function loadSyncData(): SharedSyncData {
 function saveSyncData(data: SharedSyncData) {
   try {
     fs.writeFileSync(syncFilePath, JSON.stringify(data, null, 2), 'utf8');
-  } catch {}
+  } catch { }
 }
 
 const sharedSyncData: SharedSyncData = loadSyncData();
@@ -733,9 +733,10 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
           body: notif.body,
           type: 'DIRECT_MESSAGE_RECEIVED',
           conversationId,
+
           timestamp: Date.now(),
           requireInteraction: true,
-        }).catch(() => {});
+        }).catch(() => { });
 
         sendJson(res, 201, { success: true, message });
       } catch (err: unknown) {
