@@ -51,7 +51,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Health check
-  if (req.method === 'GET' && url === '/health') {
+  if (req.method === 'GET' && (url === '/health' || url === '/api/health')) {
     sendJson(res, 200, { status: 'ok', pushReady: pushBackend.isReady(), timestamp: new Date().toISOString() });
     return;
   }

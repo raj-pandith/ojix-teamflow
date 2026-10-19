@@ -155,12 +155,24 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
     const url = req.url || '';
 
     // Handle CORS preflight
-    if (req.method === 'OPTIONS' && (url.startsWith('/api/push') || url.startsWith('/api/sync') || url.startsWith('/api/messages') || url.startsWith('/api/auth'))) {
+    if (req.method === 'OPTIONS' && (url === '/health' || url === '/api/health' || url.startsWith('/api/push') || url.startsWith('/api/sync') || url.startsWith('/api/messages') || url.startsWith('/api/auth'))) {
       res.statusCode = 204;
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Auth-Token');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.end();
+      return;
+    }
+
+    // =========================================================================
+    // HEALTH CHECK ENDPOINTS (/health & /api/health)
+    // =========================================================================
+    if (req.method === 'GET' && (url === '/health' || url === '/api/health')) {
+      sendAuthJson(res, 200, {
+        status: 'ok',
+        pushReady: pushBackend.isReady(),
+        timestamp: new Date().toISOString(),
+      });
       return;
     }
 
