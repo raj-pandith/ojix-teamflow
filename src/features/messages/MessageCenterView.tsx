@@ -34,6 +34,7 @@ import { formatDisplayDate } from '../../domain/timezone';
 import { ProjectDeletionSummaryModal } from './ProjectDeletionSummaryModal';
 import { DirectMessageModal } from './DirectMessageModal';
 import { WebPushSettingsModal } from './WebPushSettingsModal';
+import { LinkifiedText } from '../../components/common/LinkifiedText';
 import { nativePushService } from '../../services/nativePushService';
 import { webPushClient } from '../../services/webPushClient';
 
@@ -151,7 +152,7 @@ const renderFormattedMessageContent = (msg: DirectMessage, isMine: boolean) => {
               Reviewer Feedback:
             </div>
             <div style={{ fontStyle: 'italic', color: isMine ? '#ffffff' : '#78350f', whiteSpace: 'pre-wrap' }}>
-              "{feedbackText}"
+              "<LinkifiedText text={feedbackText} isCurrentSender={isMine} />"
             </div>
           </div>
         )}
@@ -171,7 +172,7 @@ const renderFormattedMessageContent = (msg: DirectMessage, isMine: boolean) => {
         </div>
       )}
       <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
-        {msg.body}
+        <LinkifiedText text={msg.body} isCurrentSender={isMine} />
       </div>
     </div>
   );
@@ -1173,7 +1174,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                   placeholder={
                     isBlocked
                       ? 'Messaging disabled for blocked accounts.'
-                      : `Reply to ${activeConversation.otherUser.displayName}...`
+                      : `Reply or paste links to ${activeConversation.otherUser.displayName}...`
                   }
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
@@ -1537,7 +1538,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                       whiteSpace: 'pre-line',
                     }}
                   >
-                    {notif.body}
+                    <LinkifiedText text={notif.body} />
                   </p>
 
                   {/* Highlighted Reason for Deletion */}
@@ -1830,7 +1831,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
               </h3>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary, #8b949e)', lineHeight: 1.6 }}>
-              {activeBlockedNotice.body}
+              <LinkifiedText text={activeBlockedNotice.body} />
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
               <Button variant="secondary" size="sm" onClick={() => setActiveBlockedNotice(null)}>

@@ -2,6 +2,15 @@ export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low';
 
 export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'blocked';
 
+export interface TaskLink {
+  readonly id: string;
+  readonly url: string;
+  readonly title?: string;
+  readonly addedAt: string;
+  readonly addedByUid: string;
+  readonly addedByName: string;
+}
+
 export interface Task {
   readonly id: string;
   readonly workspaceId: string;
@@ -15,6 +24,7 @@ export interface Task {
   readonly dueDate: string; // ISO date 'YYYY-MM-DD'
   readonly milestoneId?: string;
   readonly dependencies?: string[];
+  readonly links?: readonly TaskLink[];
   readonly reviewerId?: string | null;
   readonly submittedForReviewBy?: string;
   readonly submittedForReviewAt?: string;
@@ -39,6 +49,7 @@ export interface TaskFormData {
   dueDate: string;
   milestoneId?: string;
   dependencies?: string[];
+  links?: TaskLink[];
 }
 
 export interface TaskFilterOptions {

@@ -14,6 +14,7 @@ import {
   validateAssigneeEligibility,
   validateReviewerEligibility,
 } from '../../domain/validation';
+import { extractUrls, normalizeUrl, getDomainFromUrl } from '../../domain/linkUtils';
 
 interface TaskUpdateModalProps {
   isOpen: boolean;
@@ -160,8 +161,30 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
             rows={3}
             value={description}
             onChange={e => setDescription(e.target.value)}
-            placeholder="Key deliverables, acceptance conditions, links..."
+            placeholder="Key deliverables, acceptance conditions, paste links (e.g. https://...)..."
           />
+          {(() => {
+            const detectedUrls = extractUrls(description);
+            if (detectedUrls.length === 0) return null;
+            return (
+              <div style={{ marginTop: '6px', fontSize: '11.5px', color: 'var(--text-muted, #8b949e)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--accent-primary-light, #818cf8)', fontWeight: 600 }}>Detected Links:</span>
+                {detectedUrls.map((url, i) => (
+                  <a
+                    key={i}
+                    href={normalizeUrl(url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="clickable-web-link"
+                    style={{ fontSize: '11px' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {getDomainFromUrl(url)} ↗
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="form-row-2">

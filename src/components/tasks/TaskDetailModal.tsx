@@ -16,7 +16,9 @@ import { useToast } from '../../hooks/useToast';
 import { formatDisplayDate } from '../../domain/timezone';
 import { isUserEligibleForAssignment } from '../../domain/validation';
 import { getMentionSuggestions } from '../../domain/mentionParser';
-import { UserCheck } from 'lucide-react';
+import { normalizeUrl, getDomainFromUrl, formatUrlTitle, extractUrls } from '../../domain/linkUtils';
+import { LinkifiedText } from '../common/LinkifiedText';
+import { UserCheck, ExternalLink, Link as LinkIcon, Copy, Plus, Trash2 } from 'lucide-react';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -55,6 +57,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [users, setUsers] = useState<UserProfile[]>(() => storageEngine.getUsers());
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [newLinkTitle, setNewLinkTitle] = useState('');
+  const [isAddingLink, setIsAddingLink] = useState(false);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const highlightedRef = React.useRef<HTMLDivElement>(null);
 
@@ -127,30 +133,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
-  const findMentionedUser = (token: string): UserProfile | undefined => {
-    const clean = token.replace(/^@/, '').trim().toLowerCase();
-    if (!clean) return undefined;
-    return users.find(u => {
-      const emailLower = u.email.toLowerCase();
-      const localPart = emailLower.split('@')[0];
-      const nameLower = u.displayName.toLowerCase();
-      const parts = nameLower.split(/\s+/);
-      const firstName = parts[0];
-      const lastName = parts.length > 1 ? parts[parts.length - 1] : '';
-      const nameNoSpaces = nameLower.replace(/\s+/g, '');
-      const nameWithDots = nameLower.replace(/\s+/g, '.');
 
-      return (
-        clean === nameLower ||
-        clean === emailLower ||
-        clean === localPart ||
-        clean === nameNoSpaces ||
-        clean === nameWithDots ||
-        clean === firstName ||
-        (Boolean(lastName) && clean === lastName)
-      );
-    });
-  };
 
   const handleSelectMention = (sUser: UserProfile) => {
     if (!textareaRef.current) return;
@@ -174,56 +157,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
-  const renderCommentWithMentions = (text: string) => {
-    if (!text) return null;
 
-    // Dynamically build regex to match full display names first, followed by email and token patterns
-    const escapedNames = users
-      .map(u => u.displayName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length);
-
-    const namePatterns = escapedNames.length > 0 ? `${escapedNames.join('|')}|` : '';
-    const mentionRegex = new RegExp(
-      `(@(?:${namePatterns}[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9._-]+|[a-zA-Z0-9._-]+))`,
-      'gi'
-    );
-
-    const parts = text.split(mentionRegex);
-    return parts.map((part, i) => {
-      if (part.startsWith('@')) {
-        const matchedUser = findMentionedUser(part);
-        const displayName = matchedUser ? matchedUser.displayName : part.slice(1);
-        const emailInfo = matchedUser ? ` • ${matchedUser.email}` : '';
-
-        return (
-          <span
-            key={i}
-            className="comment-mention-pill"
-            title={matchedUser ? `${matchedUser.displayName}${emailInfo} (${matchedUser.role.replace('_', ' ')})` : part}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '3px',
-              background: 'rgba(99, 102, 241, 0.18)',
-              color: 'var(--accent-primary-light, #818cf8)',
-              fontWeight: 600,
-              padding: '2px 8px',
-              borderRadius: '6px',
-              margin: '0 2px',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              fontSize: '12px',
-              verticalAlign: 'baseline',
-            }}
-          >
-            <span style={{ opacity: 0.75 }}>@</span>
-            <span>{displayName}</span>
-          </span>
-        );
-      }
-      return part;
-    });
-  };
 
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,6 +170,51 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       setMentionQuery(null);
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const handleAddLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLinkUrl.trim() || !currentUser || !activeTask) return;
+    setIsAddingLink(true);
+    try {
+      const normalized = normalizeUrl(newLinkUrl);
+      const updated = await taskService.addTaskLink(
+        activeTask.id,
+        normalized,
+        newLinkTitle.trim() || undefined,
+        currentUser
+      );
+      setCurrentTask(updated);
+      setNewLinkUrl('');
+      setNewLinkTitle('');
+      showToast('success', 'Link Attached', 'Resource link added to task.');
+    } catch (err) {
+      showToast('error', 'Failed to Add Link', err instanceof Error ? err.message : 'Could not attach link.');
+    } finally {
+      setIsAddingLink(false);
+    }
+  };
+
+  const handleRemoveLink = async (linkId: string) => {
+    if (!currentUser || !activeTask) return;
+    try {
+      const updated = await taskService.removeTaskLink(activeTask.id, linkId, currentUser);
+      setCurrentTask(updated);
+      showToast('info', 'Link Removed', 'Attached link removed.');
+    } catch (err) {
+      showToast('error', 'Failed to Remove Link', err instanceof Error ? err.message : 'Could not remove link.');
+    }
+  };
+
+  const handleCopyLink = async (url: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLinkId(id);
+      showToast('success', 'Link Copied', 'URL copied to clipboard.');
+      setTimeout(() => setCopiedLinkId(null), 2000);
+    } catch {
+      showToast('info', 'Link', url);
     }
   };
 
@@ -503,7 +482,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="blocker-icon">⚠️</span>
               <div className="blocker-details">
-                <strong>Blocker:</strong> {activeTask.blockerReason || 'Blocked dependency'}
+                <strong>Blocker:</strong> <LinkifiedText text={activeTask.blockerReason || 'Blocked dependency'} users={users} />
               </div>
             </div>
             {canResumeFromBlocked && (
@@ -523,10 +502,194 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         {/* Description */}
         <div className="task-detail-section">
           <h4 className="section-heading">Description</h4>
-          <p className="task-description-body">
-            {activeTask.description || 'No description provided.'}
-          </p>
+          <div className="task-description-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
+            {activeTask.description ? (
+              <LinkifiedText text={activeTask.description} users={users} />
+            ) : (
+              'No description provided.'
+            )}
+          </div>
         </div>
+
+        {/* Attached Links & Resources */}
+        {(() => {
+          const descriptionUrls = activeTask.description ? extractUrls(activeTask.description) : [];
+          const attachedLinks = activeTask.links || [];
+          const standaloneDescUrls = descriptionUrls.filter(
+            url => !attachedLinks.some(al => normalizeUrl(al.url) === normalizeUrl(url))
+          );
+          const totalLinksCount = attachedLinks.length + standaloneDescUrls.length;
+
+          return (
+            <div className="task-detail-section task-links-section" id="task-links-section">
+              <div className="task-links-header-row">
+                <h4 className="task-links-title">
+                  <LinkIcon size={14} style={{ color: 'var(--accent-primary-light, #818cf8)' }} />
+                  Attached Links &amp; Resources
+                  <span className="task-links-count-badge">{totalLinksCount}</span>
+                </h4>
+              </div>
+
+              {canMutate && (
+                <form onSubmit={handleAddLink} className="task-link-paste-form">
+                  <div className="task-link-paste-inputs">
+                    <input
+                      type="text"
+                      className="form-input task-link-url-input"
+                      placeholder="Paste link (e.g. https://github.com/..., Figma, Google Docs)..."
+                      value={newLinkUrl}
+                      onChange={e => setNewLinkUrl(e.target.value)}
+                      disabled={isAddingLink}
+                      id="task-link-url-input"
+                    />
+                    <input
+                      type="text"
+                      className="form-input task-link-title-input"
+                      placeholder="Link label (optional)"
+                      value={newLinkTitle}
+                      onChange={e => setNewLinkTitle(e.target.value)}
+                      disabled={isAddingLink}
+                      id="task-link-title-input"
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="primary"
+                      isLoading={isAddingLink}
+                      disabled={!newLinkUrl.trim() || isAddingLink}
+                      id="task-add-link-btn"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Plus size={13} /> Add Link
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              <div className="task-links-list">
+                {attachedLinks.map(link => {
+                  const domain = getDomainFromUrl(link.url);
+                  const title = link.title || formatUrlTitle(link.url);
+                  const normalized = normalizeUrl(link.url);
+                  const isCopied = copiedLinkId === link.id;
+
+                  return (
+                    <div key={link.id} className="task-link-item-row" id={`task-link-${link.id}`}>
+                      <div className="task-link-item-main">
+                        <span className="task-link-domain-badge">{domain}</span>
+                        <div className="task-link-item-text">
+                          <a
+                            href={normalized}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="task-link-anchor"
+                            title={`Visit ${normalized} (opens in new tab)`}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <span>{title}</span>
+                            <ExternalLink size={12} style={{ opacity: 0.7 }} />
+                          </a>
+                          <span className="task-link-raw-url">{link.url}</span>
+                        </div>
+                      </div>
+
+                      <div className="task-link-actions-group">
+                        <a
+                          href={normalized}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="task-link-action-btn visit-btn"
+                          title="Visit link in new tab"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          Visit <ExternalLink size={11} />
+                        </a>
+                        <button
+                          type="button"
+                          className="task-link-action-btn"
+                          onClick={() => handleCopyLink(normalized, link.id)}
+                          title="Copy link to clipboard"
+                        >
+                          <Copy size={11} /> {isCopied ? 'Copied!' : 'Copy'}
+                        </button>
+                        {canMutate && (
+                          <button
+                            type="button"
+                            className="task-link-action-btn"
+                            onClick={() => handleRemoveLink(link.id)}
+                            title="Remove link"
+                            style={{ color: 'var(--status-blocked, #ef4444)' }}
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {standaloneDescUrls.map((rawUrl, idx) => {
+                  const domain = getDomainFromUrl(rawUrl);
+                  const title = formatUrlTitle(rawUrl);
+                  const normalized = normalizeUrl(rawUrl);
+                  const itemKey = `desc-link-${idx}`;
+                  const isCopied = copiedLinkId === itemKey;
+
+                  return (
+                    <div key={itemKey} className="task-link-item-row" style={{ opacity: 0.9 }}>
+                      <div className="task-link-item-main">
+                        <span className="task-link-domain-badge">{domain}</span>
+                        <div className="task-link-item-text">
+                          <a
+                            href={normalized}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="task-link-anchor"
+                            title={`Visit ${normalized} (opens in new tab)`}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <span>{title}</span>
+                            <ExternalLink size={12} style={{ opacity: 0.7 }} />
+                          </a>
+                          <span className="task-link-raw-url">
+                            {rawUrl} <em style={{ opacity: 0.7 }}>(from description)</em>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="task-link-actions-group">
+                        <a
+                          href={normalized}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="task-link-action-btn visit-btn"
+                          title="Visit link in new tab"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          Visit <ExternalLink size={11} />
+                        </a>
+                        <button
+                          type="button"
+                          className="task-link-action-btn"
+                          onClick={() => handleCopyLink(normalized, itemKey)}
+                          title="Copy link to clipboard"
+                        >
+                          <Copy size={11} /> {isCopied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {attachedLinks.length === 0 && standaloneDescUrls.length === 0 && (
+                  <p className="task-link-empty-hint">
+                    No links attached yet. Paste a link above or into description to attach docs, Figma designs, PRs, or websites.
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Activity & Comments Timeline */}
         <div className="task-detail-section">
@@ -540,7 +703,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   ref={textareaRef}
                   className="form-textarea"
                   rows={2}
-                  placeholder="Write an update or comment (type @ to mention a team member)..."
+                  placeholder="Write an update, paste links, or type @ to mention a team member..."
                   value={newComment}
                   onChange={handleCommentChange}
                   onKeyDown={e => {
@@ -675,7 +838,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       </span>
                     </div>
                     {log.commentText && (
-                      <div className="timeline-text">{renderCommentWithMentions(log.commentText)}</div>
+                      <div className="timeline-text"><LinkifiedText text={log.commentText} users={users} /></div>
                     )}
                     {log.fieldChanged && (
                       <div className="timeline-field-diff">

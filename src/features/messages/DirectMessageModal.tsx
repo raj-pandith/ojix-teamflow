@@ -164,7 +164,7 @@ export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
             id="dm-body-input"
             className="form-textarea"
             rows={5}
-            placeholder="Write your private message here..."
+            placeholder="Write your private message or paste links here (e.g. docs, specs, websites)..."
             value={body}
             onChange={e => setBody(e.target.value)}
             disabled={isSubmitting}

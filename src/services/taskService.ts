@@ -1,4 +1,4 @@
-import { Task, TaskFormData, TaskStatus } from '../types/task';
+import { Task, TaskFormData, TaskStatus, TaskLink } from '../types/task';
 import { Project } from '../types/project';
 import { UserProfile } from '../types/auth';
 import { storageEngine } from './storageEngine';
@@ -93,6 +93,7 @@ class TaskService {
         blockerReason: data.status === 'blocked' ? data.blockerReason?.trim() : undefined,
         dueDate: data.dueDate,
         milestoneId: data.milestoneId,
+        links: data.links || [],
         createdBy: user.uid,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -380,6 +381,7 @@ class TaskService {
       blockerReason: merged.status === 'blocked' ? merged.blockerReason?.trim() : undefined,
       dueDate: merged.dueDate,
       milestoneId: merged.milestoneId,
+      links: merged.links !== undefined ? merged.links : existing.links,
       updatedAt: new Date().toISOString(),
     };
 
@@ -560,6 +562,106 @@ class TaskService {
       throw new Error('Permission denied: Only Workspace Admins and Project Leads can delete tasks.');
     }
     storageEngine.deleteTask(taskId, user);
+  }
+
+  public async addTaskLink(
+    taskId: string,
+    url: string,
+    title: string | undefined,
+    user: UserProfile
+  ): Promise<Task> {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
+    }
+    if (user.role === 'viewer') {
+      throw new Error('Permission denied: Viewers have read-only access and cannot mutate tasks.');
+    }
+    const existing = this.getTaskById(taskId, user);
+    if (!existing) {
+      throw new Error('Task not found.');
+    }
+    const cleanUrl = url.trim();
+    if (!cleanUrl) {
+      throw new Error('A valid URL is required.');
+    }
+
+    const newLink: TaskLink = {
+      id: `link-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      url: cleanUrl,
+      title: title?.trim() || undefined,
+      addedAt: new Date().toISOString(),
+      addedByUid: user.uid,
+      addedByName: user.displayName,
+    };
+
+    const currentLinks = existing.links || [];
+    const updatedLinks = [...currentLinks, newLink];
+    const updatedTask: Task = {
+      ...existing,
+      links: updatedLinks,
+      updatedAt: new Date().toISOString(),
+    };
+    storageEngine.saveTask(updatedTask, user);
+
+    auditService.logActivity({
+      id: `log-${Date.now().toString(36)}-link`,
+      workspaceId: existing.workspaceId,
+      projectId: existing.projectId,
+      taskId: existing.id,
+      userId: user.uid,
+      userDisplayName: user.displayName,
+      action: 'edited',
+      fieldChanged: 'attached link',
+      newValue: cleanUrl,
+      commentText: `${user.displayName} attached link: "${title?.trim() || cleanUrl}".`,
+      createdAt: new Date().toISOString(),
+    }, user);
+
+    return updatedTask;
+  }
+
+  public async removeTaskLink(
+    taskId: string,
+    linkId: string,
+    user: UserProfile
+  ): Promise<Task> {
+    if (user.status === 'blocked' || user.status === 'terminated') {
+      throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
+    }
+    if (user.role === 'viewer') {
+      throw new Error('Permission denied: Viewers have read-only access and cannot mutate tasks.');
+    }
+    const existing = this.getTaskById(taskId, user);
+    if (!existing) {
+      throw new Error('Task not found.');
+    }
+    const currentLinks = existing.links || [];
+    const removedLink = currentLinks.find(l => l.id === linkId);
+    const updatedLinks = currentLinks.filter(l => l.id !== linkId);
+    const updatedTask: Task = {
+      ...existing,
+      links: updatedLinks,
+      updatedAt: new Date().toISOString(),
+    };
+    storageEngine.saveTask(updatedTask, user);
+
+    if (removedLink) {
+      auditService.logActivity({
+        id: `log-${Date.now().toString(36)}-link-rm`,
+        workspaceId: existing.workspaceId,
+        projectId: existing.projectId,
+        taskId: existing.id,
+        userId: user.uid,
+        userDisplayName: user.displayName,
+        action: 'edited',
+        fieldChanged: 'removed link',
+        oldValue: removedLink.url,
+        commentText: `${user.displayName} removed attached link "${removedLink.title || removedLink.url}".`,
+        createdAt: new Date().toISOString(),
+      }, user);
+    }
+
+    return updatedTask;
   }
 
   public subscribe(
