@@ -4,8 +4,10 @@ import { UserProfile } from '../../types/auth';
 import { Project } from '../../types/project';
 import { TaskCard } from '../../components/tasks/TaskCard';
 import { BlockerModal } from '../../components/tasks/BlockerModal';
+import { RequestChangesModal } from '../../components/tasks/RequestChangesModal';
 import { TaskDetailModal } from '../../components/tasks/TaskDetailModal';
 import { storageEngine } from '../../services/storageEngine';
+import { taskService } from '../../services/taskService';
 import { canUserMoveTask } from '../../domain/taskStateMachine';
 import {
   LucideIcon,
@@ -79,6 +81,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [pendingBlockerTask, setPendingBlockerTask] = useState<Task | null>(null);
+  const [pendingChangesTask, setPendingChangesTask] = useState<Task | null>(null);
   const [activeDragOverCol, setActiveDragOverCol] = useState<TaskStatus | null>(null);
 
   // Local Filter & Sort Controls
@@ -205,6 +208,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       return;
     }
 
+    if (task.status === 'in_review' && targetStatus === 'in_progress') {
+      setPendingChangesTask(task);
+      return;
+    }
+
     try {
       await onTransitionStatus(task.id, targetStatus);
     } catch {
@@ -218,6 +226,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       await onTransitionStatus(pendingBlockerTask.id, 'blocked', reason);
     } finally {
       setPendingBlockerTask(null);
+    }
+  };
+
+  const handleChangesConfirm = async (comment: string) => {
+    if (!pendingChangesTask || !currentUser) return;
+    try {
+      await taskService.requestChanges(pendingChangesTask.id, comment, currentUser);
+    } catch {
+      // Toast / domain error handled
+    } finally {
+      setPendingChangesTask(null);
     }
   };
 
@@ -501,6 +520,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 <div className="kanban-cards-list">
                   {colTasks.map(task => {
                     const assignee = users.find(u => u.uid === task.assigneeId);
+                    const reviewer = users.find(u => u.uid === task.reviewerId);
                     const moveAuth = canUserMoveTask(task, currentUser, project);
                     const canMove = canMutate && moveAuth.allowed;
                     const isMyTask = Boolean(currentUser?.uid && task.assigneeId && task.assigneeId === currentUser.uid);
@@ -510,6 +530,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         key={task.id}
                         task={task}
                         assigneeName={assignee?.displayName}
+                        reviewerName={reviewer?.displayName}
                         onClick={() => {
                           setSelectedTask(task);
                           setIsDetailOpen(true);
@@ -556,6 +577,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onClose={() => setPendingBlockerTask(null)}
         onConfirm={handleBlockerConfirm}
         taskTitle={pendingBlockerTask?.title || ''}
+      />
+
+      {/* Mandatory Request Changes Explanation Modal */}
+      <RequestChangesModal
+        isOpen={!!pendingChangesTask}
+        onClose={() => setPendingChangesTask(null)}
+        onConfirm={handleChangesConfirm}
+        taskTitle={pendingChangesTask?.title || ''}
       />
     </div>
   );

@@ -7,11 +7,16 @@ import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { TaskUpdateModal } from './TaskUpdateModal';
+import { BlockerModal } from './BlockerModal';
+import { RequestChangesModal } from './RequestChangesModal';
 import { auditService } from '../../services/auditService';
 import { storageEngine } from '../../services/storageEngine';
+import { taskService } from '../../services/taskService';
+import { useToast } from '../../hooks/useToast';
 import { formatDisplayDate } from '../../domain/timezone';
 import { isUserEligibleForAssignment } from '../../domain/validation';
 import { getMentionSuggestions } from '../../domain/mentionParser';
+import { UserCheck } from 'lucide-react';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -40,6 +45,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 }) => {
   const [currentTask, setCurrentTask] = useState<Task | null>(task);
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
+  const [isChangesModalOpen, setIsChangesModalOpen] = useState(false);
+  const [isBlockerModalOpen, setIsBlockerModalOpen] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const { showToast } = useToast();
   const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -234,6 +243,94 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const canDelete = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
   const canUpdate = currentUser?.role === 'workspace_admin' || currentUser?.role === 'project_lead';
 
+  const reviewer = users.find(u => u.uid === activeTask.reviewerId);
+  const isAssignee = Boolean(currentUser && activeTask.assigneeId === currentUser.uid);
+  const isAuthorizedManager = Boolean(
+    currentUser && (currentUser.role === 'workspace_admin' || currentUser.role === 'project_lead')
+  );
+  const isDesignatedReviewer = Boolean(currentUser && activeTask.reviewerId === currentUser.uid);
+
+  // Review permissions:
+  // Authorized reviewer, project lead, or workspace admin can make decisions on In Review tasks.
+  // Enforces self-review policy: Assignee cannot approve their own task.
+  const canApprove = Boolean(
+    currentUser &&
+    activeTask.status === 'in_review' &&
+    !isAssignee &&
+    (isDesignatedReviewer || isAuthorizedManager)
+  );
+
+  const canRequestChanges = Boolean(
+    currentUser &&
+    activeTask.status === 'in_review' &&
+    !isAssignee &&
+    (isDesignatedReviewer || isAuthorizedManager)
+  );
+
+  const canResumeFromBlocked = Boolean(
+    currentUser &&
+    activeTask.status === 'blocked' &&
+    (isAssignee || isAuthorizedManager)
+  );
+
+  const handleApprove = async () => {
+    if (!currentUser || !activeTask) return;
+    setIsTransitioning(true);
+    try {
+      const updated = await taskService.approveTask(activeTask.id, currentUser);
+      setCurrentTask(updated);
+      showToast('success', 'Task Approved', 'Task marked as Done.');
+    } catch (err) {
+      showToast('error', 'Approval Rejected', err instanceof Error ? err.message : 'Failed to approve task.');
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
+  const handleConfirmChanges = async (comment: string) => {
+    if (!currentUser || !activeTask) return;
+    setIsTransitioning(true);
+    try {
+      const updated = await taskService.requestChanges(activeTask.id, comment, currentUser);
+      setCurrentTask(updated);
+      setIsChangesModalOpen(false);
+      showToast('info', 'Changes Requested', 'Task returned to In Progress.');
+    } catch (err) {
+      showToast('error', 'Failed to Request Changes', err instanceof Error ? err.message : 'Error requesting changes.');
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
+  const handleConfirmBlocker = async (reason: string) => {
+    if (!currentUser || !activeTask) return;
+    setIsTransitioning(true);
+    try {
+      const updated = await taskService.transitionStatus(activeTask.id, 'blocked', reason, currentUser);
+      setCurrentTask(updated);
+      setIsBlockerModalOpen(false);
+      showToast('warning', 'Task Blocked', 'Task flagged as blocked and reviewer notified.');
+    } catch (err) {
+      showToast('error', 'Blocker Update Failed', err instanceof Error ? err.message : 'Failed to block task.');
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
+  const handleResumeWork = async () => {
+    if (!currentUser || !activeTask) return;
+    setIsTransitioning(true);
+    try {
+      const updated = await taskService.transitionStatus(activeTask.id, 'in_progress', undefined, currentUser);
+      setCurrentTask(updated);
+      showToast('success', 'Work Resumed', 'Task returned to In Progress.');
+    } catch (err) {
+      showToast('error', 'Resume Failed', err instanceof Error ? err.message : 'Failed to resume task.');
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={activeTask.title} maxWidth="720px" zIndex={zIndex}>
       <div className="task-detail-container">
@@ -274,6 +371,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               )}
             </span>
           </div>
+          <div className="meta-item">
+            <span className="meta-label">Reviewer</span>
+            <span className="meta-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <UserCheck size={14} style={{ color: 'var(--color-primary, #6366f1)', flexShrink: 0 }} />
+              <strong>{reviewer?.displayName || 'Unassigned'}</strong>
+            </span>
+          </div>
         </div>
 
         {/* Reassignment Prompt if Ineligible */}
@@ -304,13 +408,115 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
         )}
 
-        {/* Blocker Notice if Blocked */}
-        {activeTask.status === 'blocked' && activeTask.blockerReason && (
-          <div className="task-blocker-banner">
-            <span className="blocker-icon">⚠️</span>
-            <div className="blocker-details">
-              <strong>Blocker:</strong> {activeTask.blockerReason}
+        {/* Changes Requested Banner */}
+        {activeTask.changesRequestedComment && (
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: '8px',
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderLeft: '4px solid var(--status-blocked, #f59e0b)',
+              marginBottom: '16px',
+              fontSize: '13px',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontWeight: 600, color: '#f59e0b' }}>
+              <span>⚠️ Changes Requested</span>
+              {activeTask.changesRequestedAt && (
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                  ({formatDisplayDate(activeTask.changesRequestedAt.slice(0, 10))})
+                </span>
+              )}
             </div>
+            <div style={{ whiteSpace: 'pre-line', lineHeight: 1.5 }}>{activeTask.changesRequestedComment}</div>
+          </div>
+        )}
+
+        {/* In Review Workflow Banner */}
+        {activeTask.status === 'in_review' && (
+          <div
+            style={{
+              padding: '14px 18px',
+              borderRadius: '8px',
+              background: 'rgba(56, 189, 248, 0.08)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              borderLeft: '4px solid #38bdf8',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#38bdf8' }}>
+                <span>🔍 Awaiting Review</span>
+                {activeTask.submittedForReviewAt && (
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                    (Submitted on {formatDisplayDate(activeTask.submittedForReviewAt.slice(0, 10))})
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Reviewer: <strong>{reviewer?.displayName || 'Unassigned'}</strong>
+              </div>
+            </div>
+
+            {/* Self-review warning if currentUser is the assignee */}
+            {isAssignee && (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '6px' }}>
+                ℹ️ You submitted this task for review. In accordance with the self-review policy, assignees cannot approve their own tasks.
+              </div>
+            )}
+
+            {/* Decision actions if authorized */}
+            {(canApprove || canRequestChanges) && (
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                {canApprove && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    isLoading={isTransitioning}
+                    onClick={handleApprove}
+                    id="approve-review-btn"
+                  >
+                    ✓ Approve and Complete
+                  </Button>
+                )}
+                {canRequestChanges && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={isTransitioning}
+                    onClick={() => setIsChangesModalOpen(true)}
+                    id="request-changes-btn"
+                  >
+                    ↩ Request Changes
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Blocker Notice if Blocked */}
+        {activeTask.status === 'blocked' && (
+          <div className="task-blocker-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="blocker-icon">⚠️</span>
+              <div className="blocker-details">
+                <strong>Blocker:</strong> {activeTask.blockerReason || 'Blocked dependency'}
+              </div>
+            </div>
+            {canResumeFromBlocked && (
+              <Button
+                variant="secondary"
+                size="sm"
+                isLoading={isTransitioning}
+                onClick={handleResumeWork}
+                id="resume-work-btn"
+              >
+                ▶️ Resume Work
+              </Button>
+            )}
           </div>
         )}
 
@@ -534,6 +740,26 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             setCurrentTask(updated);
             setIsUpdateOpen(false);
           }}
+        />
+      )}
+
+      {/* Request Changes Feedback Modal */}
+      {isChangesModalOpen && activeTask && (
+        <RequestChangesModal
+          isOpen={isChangesModalOpen}
+          onClose={() => setIsChangesModalOpen(false)}
+          onConfirm={handleConfirmChanges}
+          taskTitle={activeTask.title}
+        />
+      )}
+
+      {/* Flag as Blocked Modal */}
+      {isBlockerModalOpen && activeTask && (
+        <BlockerModal
+          isOpen={isBlockerModalOpen}
+          onClose={() => setIsBlockerModalOpen(false)}
+          onConfirm={handleConfirmBlocker}
+          taskTitle={activeTask.title}
         />
       )}
     </Modal>

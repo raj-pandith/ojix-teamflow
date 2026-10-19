@@ -1,10 +1,12 @@
 import { Task, TaskFormData, TaskStatus } from '../types/task';
+import { Project } from '../types/project';
 import { UserProfile } from '../types/auth';
 import { storageEngine } from './storageEngine';
-import { validateTaskForm, validateAssigneeEligibility } from '../domain/validation';
-import { validateTaskTransition, canUserMoveTask } from '../domain/taskStateMachine';
+import { validateTaskForm, validateAssigneeEligibility, validateReviewerEligibility } from '../domain/validation';
+import { validateTaskTransition, canUserTransitionTask } from '../domain/taskStateMachine';
 import { auditService } from './auditService';
 import { notificationService } from './notificationService';
+import { directMessageService } from './directMessageService';
 
 class TaskService {
   public getTasks(projectId: string, user: UserProfile): Task[] {
@@ -60,7 +62,23 @@ class TaskService {
       throw new Error(firstError);
     }
 
-    const idempotencyKey = `create-task-${projectId}-${data.title}-${data.description || ''}-${data.status}-${data.priority}-${data.dueDate}-${user.uid}`;
+    // Reviewer validation
+    let resolvedReviewerId = data.reviewerId?.trim();
+    if (data.reviewerId !== undefined) {
+      if (!resolvedReviewerId) {
+        throw new Error('A designated reviewer is required for this task.');
+      }
+      const targetReviewer = storageEngine.getUser(resolvedReviewerId);
+      const reviewerEligibility = validateReviewerEligibility(targetReviewer, project);
+      if (!reviewerEligibility.eligible) {
+        throw new Error(`Permission denied: Cannot select reviewer. ${reviewerEligibility.reason}`);
+      }
+    } else {
+      // Default to valid project owner / lead if omitted in legacy programmatic calls
+      resolvedReviewerId = project.ownerId || 'user-lead-sarah';
+    }
+
+    const idempotencyKey = `create-task-${projectId}-${data.title}-${data.description || ''}-${data.status}-${data.priority}-${data.dueDate}-${resolvedReviewerId}-${user.uid}`;
     return storageEngine.executeIdempotent(idempotencyKey, async () => {
       const newTask: Task = {
         id: `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
@@ -69,6 +87,7 @@ class TaskService {
         title: data.title.trim(),
         description: data.description?.trim() || '',
         assigneeId: data.assigneeId || null,
+        reviewerId: resolvedReviewerId || null,
         priority: data.priority,
         status: data.status,
         blockerReason: data.status === 'blocked' ? data.blockerReason?.trim() : undefined,
@@ -82,6 +101,7 @@ class TaskService {
       storageEngine.saveTask(newTask, user);
 
       // Audit log
+      const reviewerUser = resolvedReviewerId ? storageEngine.getUser(resolvedReviewerId) : null;
       auditService.logActivity({
         id: `log-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         workspaceId: 'ws-ojix-main',
@@ -90,7 +110,9 @@ class TaskService {
         userId: user.uid,
         userDisplayName: user.displayName,
         action: 'created',
-        commentText: `Task created with priority "${newTask.priority}" and status "${newTask.status}".`,
+        commentText: reviewerUser
+          ? `Task created with priority "${newTask.priority}", status "${newTask.status}", and designated reviewer "${reviewerUser.displayName}".`
+          : `Task created with priority "${newTask.priority}" and status "${newTask.status}".`,
         createdAt: new Date().toISOString(),
       }, user);
 
@@ -110,7 +132,8 @@ class TaskService {
     taskId: string,
     targetStatus: TaskStatus,
     blockerReason: string | undefined,
-    user: UserProfile
+    user: UserProfile,
+    reviewComment?: string
   ): Promise<Task> {
     if (user.status === 'blocked' || user.status === 'terminated') {
       throw new Error(`Permission denied: Your workspace account is ${user.status}. Access has been revoked.`);
@@ -126,9 +149,11 @@ class TaskService {
     }
 
     const project = storageEngine.getProjectById(existing.projectId, user);
-    const moveAuth = canUserMoveTask(existing, user, project);
-    if (!moveAuth.allowed) {
-      throw new Error(moveAuth.reason || 'Permission denied: You are not authorized to move this task.');
+
+    // Validate permission for this specific status transition (enforces RBAC and self-review policy)
+    const transitionAuth = canUserTransitionTask(existing, targetStatus, user, project);
+    if (!transitionAuth.allowed) {
+      throw new Error(transitionAuth.reason || 'Permission denied: You are not authorized to make this transition.');
     }
 
     const transitionResult = validateTaskTransition(existing, targetStatus, blockerReason);
@@ -139,12 +164,31 @@ class TaskService {
     const oldStatus = existing.status;
     const isNowBlocked = targetStatus === 'blocked';
     const wasBlocked = oldStatus === 'blocked';
+    const isRequestReview = targetStatus === 'in_review';
+    const isApprove = oldStatus === 'in_review' && targetStatus === 'done';
+    const isRequestChanges = oldStatus === 'in_review' && targetStatus === 'in_progress';
+
+    if (isRequestChanges) {
+      const cleanComment = reviewComment?.trim() || '';
+      if (!cleanComment) {
+        throw new Error('A comment explaining the changes needed is required.');
+      }
+    }
+
+    const now = new Date().toISOString();
 
     const updatedTask: Task = {
       ...existing,
       status: targetStatus,
       blockerReason: isNowBlocked ? blockerReason?.trim() : undefined,
-      updatedAt: new Date().toISOString(),
+      submittedForReviewBy: isRequestReview ? user.uid : existing.submittedForReviewBy,
+      submittedForReviewAt: isRequestReview ? now : existing.submittedForReviewAt,
+      approvedBy: isApprove ? user.uid : existing.approvedBy,
+      approvedAt: isApprove ? now : existing.approvedAt,
+      changesRequestedBy: isRequestChanges ? user.uid : existing.changesRequestedBy,
+      changesRequestedAt: isRequestChanges ? now : existing.changesRequestedAt,
+      changesRequestedComment: isRequestChanges ? reviewComment?.trim() : existing.changesRequestedComment,
+      updatedAt: now,
     };
 
     storageEngine.saveTask(updatedTask, user);
@@ -152,7 +196,31 @@ class TaskService {
     // Audit log
     const oldStatusLabel = oldStatus.replace('_', ' ').toUpperCase();
     const targetStatusLabel = targetStatus.replace('_', ' ').toUpperCase();
-    const action = isNowBlocked ? 'blocked' : wasBlocked ? 'unblocked' : 'status_changed';
+    const action = isNowBlocked
+      ? 'blocked'
+      : wasBlocked
+      ? 'unblocked'
+      : isRequestReview
+      ? 'status_changed'
+      : isApprove
+      ? 'status_changed'
+      : isRequestChanges
+      ? 'status_changed'
+      : 'status_changed';
+
+    let commentText = `${user.displayName} moved status from "${oldStatusLabel}" to "${targetStatusLabel}".`;
+    if (isNowBlocked) {
+      commentText = `${user.displayName} marked task as BLOCKED: "${blockerReason}"`;
+    } else if (wasBlocked) {
+      commentText = `${user.displayName} resolved blocker and moved status to "${targetStatusLabel}".`;
+    } else if (isRequestReview) {
+      commentText = `${user.displayName} requested review of task.`;
+    } else if (isApprove) {
+      commentText = `${user.displayName} approved task and marked it Done.`;
+    } else if (isRequestChanges) {
+      commentText = `${user.displayName} requested changes: "${reviewComment?.trim()}".`;
+    }
+
     auditService.logActivity({
       id: `log-${Date.now().toString(36)}`,
       workspaceId: existing.workspaceId,
@@ -164,15 +232,84 @@ class TaskService {
       fieldChanged: 'status',
       oldValue: oldStatusLabel,
       newValue: targetStatusLabel,
-      commentText: isNowBlocked
-        ? `${user.displayName} marked task as BLOCKED: "${blockerReason}"`
-        : wasBlocked
-        ? `${user.displayName} resolved blocker and moved status to "${targetStatusLabel}".`
-        : `${user.displayName} moved status from "${oldStatusLabel}" to "${targetStatusLabel}".`,
-      createdAt: new Date().toISOString(),
+      commentText,
+      createdAt: now,
     }, user);
 
+    // Resolve project object safely for notifications
+    const activeProject: Project = project || (storageEngine.getProjectById(existing.projectId, user) as Project) || {
+      id: existing.projectId,
+      name: 'Project',
+      description: '',
+      objective: '',
+      status: 'active',
+      priority: 'medium',
+      ownerId: '',
+      memberIds: [],
+      startDate: '',
+      dueDate: '',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Trigger Notifications only when database mutation successfully completes
+    if (isRequestReview && updatedTask.reviewerId) {
+      const reviewerUser = storageEngine.getUser(updatedTask.reviewerId);
+      if (reviewerUser) {
+        notificationService.notifyReviewRequested(updatedTask, activeProject, reviewerUser, user);
+      }
+    } else if (isApprove && updatedTask.assigneeId) {
+      const assigneeUser = storageEngine.getUser(updatedTask.assigneeId);
+      if (assigneeUser) {
+        notificationService.notifyReviewApproved(updatedTask, activeProject, assigneeUser, user);
+        if (assigneeUser.uid !== user.uid) {
+          try {
+            directMessageService.sendMessage({
+              recipientId: updatedTask.assigneeId,
+              subject: `Task Approved & Completed: ${updatedTask.title}`,
+              body: `Hello ${assigneeUser.displayName},\n\nYour task "${updatedTask.title}" in project "${activeProject.name}" has been approved by reviewer ${user.displayName}.\n\nStage/State: In Review ➔ Done (Completed)`,
+            }, user);
+          } catch (err) {
+            console.warn('Failed to send direct message for task approval:', err);
+          }
+        }
+      }
+    } else if (isRequestChanges && updatedTask.assigneeId && reviewComment) {
+      const assigneeUser = storageEngine.getUser(updatedTask.assigneeId);
+      if (assigneeUser) {
+        notificationService.notifyChangesRequested(updatedTask, activeProject, assigneeUser, user, reviewComment.trim());
+        if (assigneeUser.uid !== user.uid) {
+          try {
+            directMessageService.sendMessage({
+              recipientId: updatedTask.assigneeId,
+              subject: `Changes Requested: ${updatedTask.title}`,
+              body: `Hello ${assigneeUser.displayName},\n\nReviewer ${user.displayName} has requested changes on your task "${updatedTask.title}" in project "${activeProject.name}".\n\nStage/State: In Review ➔ In Progress (Changes Requested)\n\nFeedback:\n"${reviewComment.trim()}"\n\nPlease address the requested changes and submit for re-review.`,
+            }, user);
+          } catch (err) {
+            console.warn('Failed to send direct message for changes requested:', err);
+          }
+        }
+      }
+    } else if (isNowBlocked && updatedTask.reviewerId && blockerReason) {
+      const reviewerUser = storageEngine.getUser(updatedTask.reviewerId);
+      if (reviewerUser) {
+        notificationService.notifyTaskBlocked(updatedTask, activeProject, reviewerUser, user, blockerReason.trim());
+      }
+    }
+
     return updatedTask;
+  }
+
+  public async requestReview(taskId: string, user: UserProfile): Promise<Task> {
+    return this.transitionStatus(taskId, 'in_review', undefined, user);
+  }
+
+  public async approveTask(taskId: string, user: UserProfile): Promise<Task> {
+    return this.transitionStatus(taskId, 'done', undefined, user);
+  }
+
+  public async requestChanges(taskId: string, comment: string, user: UserProfile): Promise<Task> {
+    return this.transitionStatus(taskId, 'in_progress', undefined, user, comment);
   }
 
   public async updateTask(
@@ -202,6 +339,7 @@ class TaskService {
       title: updates.title ?? existing.title,
       description: updates.description ?? existing.description,
       assigneeId: updates.assigneeId !== undefined ? updates.assigneeId : existing.assigneeId,
+      reviewerId: updates.reviewerId !== undefined ? updates.reviewerId : (existing.reviewerId || undefined),
       priority: updates.priority ?? existing.priority,
       status: updates.status ?? existing.status,
       blockerReason: updates.blockerReason ?? existing.blockerReason,
@@ -217,6 +355,14 @@ class TaskService {
       }
     }
 
+    if (merged.reviewerId && merged.reviewerId !== existing.reviewerId) {
+      const targetReviewer = storageEngine.getUser(merged.reviewerId);
+      const eligibility = validateReviewerEligibility(targetReviewer, project);
+      if (!eligibility.eligible) {
+        throw new Error(`Permission denied: Cannot set reviewer. ${eligibility.reason}`);
+      }
+    }
+
     const validation = validateTaskForm(merged);
     if (!validation.isValid) {
       const firstError = Object.values(validation.errors)[0];
@@ -228,6 +374,7 @@ class TaskService {
       title: merged.title.trim(),
       description: merged.description.trim(),
       assigneeId: merged.assigneeId,
+      reviewerId: merged.reviewerId || existing.reviewerId || null,
       priority: merged.priority,
       status: merged.status,
       blockerReason: merged.status === 'blocked' ? merged.blockerReason?.trim() : undefined,

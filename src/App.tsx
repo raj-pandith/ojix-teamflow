@@ -129,9 +129,7 @@ const MainApp: React.FC = () => {
     try {
       const target = storageEngine.getTaskById(taskId, currentUser);
       if (target) {
-        if (commentId) {
-          setInspectedTask({ task: target, commentId });
-        }
+        setInspectedTask({ task: target, commentId: commentId || null });
         setHighlightedTaskId(taskId);
       } else {
         showToast('error', 'Task Not Found', 'This task could not be found or you do not have permission to view it.');

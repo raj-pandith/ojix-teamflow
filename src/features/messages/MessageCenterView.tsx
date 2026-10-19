@@ -18,6 +18,11 @@ import {
   AlertTriangle,
   Crown,
   Mail,
+  Eye,
+  CheckCircle2,
+  RotateCcw,
+  ArrowRight,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useMessages } from '../../hooks/useMessages';
@@ -42,6 +47,135 @@ interface MessageCenterViewProps {
   onConversationChange?: (conversationId: string | null) => void;
   onTabChange?: (tab: MessageFilterTab) => void;
 }
+
+const renderFormattedMessageContent = (msg: DirectMessage, isMine: boolean) => {
+  const isApproved = Boolean(
+    msg.subject?.toLowerCase().includes('task approved') ||
+    msg.body.toLowerCase().includes('approved by reviewer') ||
+    msg.body.toLowerCase().includes('in review ➔ done')
+  );
+
+  const isChangesRequested = Boolean(
+    msg.subject?.toLowerCase().includes('changes requested') ||
+    msg.body.toLowerCase().includes('requested changes on your task')
+  );
+
+  if (isApproved) {
+    const taskMatch = msg.body.match(/task ["']([^"']+)["']/i);
+    const projMatch = msg.body.match(/project ["']([^"']+)["']/i);
+    const reviewerMatch = msg.body.match(/reviewer\s+([^.\n]+)/i);
+
+    const taskTitle = taskMatch ? taskMatch[1] : (msg.subject ? msg.subject.replace(/^Task Approved & Completed:\s*/i, '') : 'Task');
+    const projectName = projMatch ? projMatch[1] : null;
+    const reviewerName = reviewerMatch ? reviewerMatch[1].trim() : msg.senderDisplayName;
+
+    return (
+      <div style={{ minWidth: '260px', maxWidth: '480px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingBottom: '8px', borderBottom: isMine ? '1px solid rgba(255,255,255,0.2)' : '1px solid #e2e8f0', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <CheckCircle2 size={16} style={{ color: isMine ? '#86efac' : '#10b981', flexShrink: 0 }} />
+            <strong style={{ fontSize: '13px', fontWeight: 700 }}>Task Approved & Completed</strong>
+          </div>
+          <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: isMine ? 'rgba(255,255,255,0.2)' : '#dcfce7', color: isMine ? '#ffffff' : '#166534' }}>
+            Done
+          </span>
+        </div>
+
+        <div style={{ fontSize: '12.5px', marginBottom: '8px', opacity: isMine ? 0.95 : 0.85, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <UserCheck size={13} style={{ color: isMine ? '#86efac' : '#10b981', flexShrink: 0 }} />
+          <span>Task <strong>"{taskTitle}"</strong> approved by reviewer <strong>{reviewerName}</strong></span>
+        </div>
+
+        {projectName && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', opacity: isMine ? 0.9 : 0.75, marginBottom: '8px' }}>
+            <FolderKanban size={13} />
+            <span>Project: <strong>{projectName}</strong></span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', background: isMine ? 'rgba(0,0,0,0.15)' : '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: isMine ? '1px solid rgba(255,255,255,0.15)' : '1px solid #e2e8f0' }}>
+          <span style={{ opacity: 0.8 }}>Stage / State:</span>
+          <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>In Review</span>
+          <ArrowRight size={11} />
+          <strong style={{ color: isMine ? '#86efac' : '#10b981' }}>Done (Completed)</strong>
+        </div>
+      </div>
+    );
+  }
+
+  if (isChangesRequested) {
+    const taskMatch = msg.body.match(/task ["']([^"']+)["']/i);
+    const projMatch = msg.body.match(/project ["']([^"']+)["']/i);
+    const reviewerMatch = msg.body.match(/reviewer\s+([^.\n]+)/i);
+    const feedbackMatch = msg.body.match(/Feedback:\s*["']?([^"'\n]+(?:[\r\n]+[^"'\n]+)*?)["']?(?:\s*Please address|\n\nPlease|\nNext Steps|$)/i);
+
+    const taskTitle = taskMatch ? taskMatch[1] : (msg.subject ? msg.subject.replace(/^Changes Requested:\s*/i, '') : 'Task');
+    const projectName = projMatch ? projMatch[1] : null;
+    const reviewerName = reviewerMatch ? reviewerMatch[1].trim() : msg.senderDisplayName;
+    const feedbackText = feedbackMatch ? feedbackMatch[1].trim() : null;
+
+    return (
+      <div style={{ minWidth: '260px', maxWidth: '480px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingBottom: '8px', borderBottom: isMine ? '1px solid rgba(255,255,255,0.2)' : '1px solid #fed7aa', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <RotateCcw size={16} style={{ color: isMine ? '#fed7aa' : '#ea580c', flexShrink: 0 }} />
+            <strong style={{ fontSize: '13px', fontWeight: 700 }}>Changes Requested</strong>
+          </div>
+          <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: isMine ? 'rgba(255,255,255,0.2)' : '#ffedd5', color: isMine ? '#ffffff' : '#9a3412' }}>
+            In Progress
+          </span>
+        </div>
+
+        <div style={{ fontSize: '12.5px', marginBottom: '8px', opacity: isMine ? 0.95 : 0.85, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <UserCheck size={13} style={{ color: isMine ? '#fed7aa' : '#ea580c', flexShrink: 0 }} />
+          <span>Reviewer <strong>{reviewerName}</strong> requested revisions on <strong>"{taskTitle}"</strong></span>
+        </div>
+
+        {projectName && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', opacity: isMine ? 0.9 : 0.75, marginBottom: '8px' }}>
+            <FolderKanban size={13} />
+            <span>Project: <strong>{projectName}</strong></span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', background: isMine ? 'rgba(0,0,0,0.15)' : '#fff7ed', padding: '6px 10px', borderRadius: '6px', border: isMine ? '1px solid rgba(255,255,255,0.15)' : '1px solid #fed7aa', marginBottom: '8px' }}>
+          <span style={{ opacity: 0.8 }}>Stage / State:</span>
+          <span>In Review</span>
+          <ArrowRight size={11} />
+          <strong style={{ color: isMine ? '#fed7aa' : '#ea580c' }}>In Progress (Changes Requested)</strong>
+        </div>
+
+        {feedbackText && (
+          <div style={{ background: isMine ? 'rgba(0,0,0,0.2)' : '#fffbeb', borderLeft: isMine ? '3px solid #fed7aa' : '3px solid #f59e0b', padding: '8px 10px', borderRadius: '4px', fontSize: '12px', marginBottom: '8px' }}>
+            <div style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: isMine ? '#fed7aa' : '#b45309', marginBottom: '3px' }}>
+              Reviewer Feedback:
+            </div>
+            <div style={{ fontStyle: 'italic', color: isMine ? '#ffffff' : '#78350f', whiteSpace: 'pre-wrap' }}>
+              "{feedbackText}"
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: '11px', opacity: isMine ? 0.85 : 0.7 }}>
+          Please address the requested changes and submit for re-review.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {msg.subject && (
+        <div style={{ fontWeight: 700, marginBottom: '6px', fontSize: '13px', color: isMine ? 'rgba(255, 255, 255, 0.95)' : '#0f172a' }}>
+          {msg.subject}
+        </div>
+      )}
+      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
+        {msg.body}
+      </div>
+    </div>
+  );
+};
 
 export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
   onNavigateToProject,
@@ -369,6 +503,14 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
       case 'TASK_ASSIGNED':
       case 'TASK_REASSIGNED':
         return <ListTodo size={16} style={{ color: 'var(--accent-primary, #C9662F)' }} />;
+      case 'TASK_REVIEW_REQUESTED':
+        return <Eye size={16} style={{ color: 'var(--status-in-review, #38bdf8)' }} />;
+      case 'TASK_REVIEW_APPROVED':
+        return <CheckCheck size={16} style={{ color: 'var(--status-done, #10b981)' }} />;
+      case 'TASK_CHANGES_REQUESTED':
+        return <AlertTriangle size={16} style={{ color: 'var(--status-blocked, #f59e0b)' }} />;
+      case 'TASK_BLOCKED':
+        return <AlertTriangle size={16} style={{ color: 'var(--status-overdue, #ef4444)' }} />;
       case 'USER_BLOCKED':
         return <Ban size={16} style={{ color: 'var(--status-overdue, #ef4444)' }} />;
       case 'DIRECT_MESSAGE_RECEIVED':
@@ -980,7 +1122,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
 
                       <div
                         style={{
-                          padding: '11px 16px',
+                          padding: '12px 16px',
                           borderRadius: isMine ? '14px 14px 3px 14px' : '14px 14px 14px 3px',
                           background: isMine ? '#4f46e5' : '#ffffff',
                           color: isMine ? '#ffffff' : '#0f172a',
@@ -993,19 +1135,7 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                           wordBreak: 'break-word',
                         }}
                       >
-                        {msg.subject && (
-                          <div
-                            style={{
-                              fontWeight: 700,
-                              marginBottom: '4px',
-                              fontSize: '13px',
-                              color: isMine ? 'rgba(255, 255, 255, 0.92)' : '#0f172a',
-                            }}
-                          >
-                            {msg.subject}
-                          </div>
-                        )}
-                        {msg.body}
+                        {renderFormattedMessageContent(msg, isMine)}
                       </div>
 
                       {isMine && (
@@ -1140,13 +1270,8 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                   )}
                 </span>
               </div>
-              {msg.subject && (
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                  {msg.subject}
-                </div>
-              )}
-              <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5 }}>
-                {msg.body}
+              <div style={{ marginTop: '8px' }}>
+                {renderFormattedMessageContent(msg, false)}
               </div>
             </div>
           ))}
@@ -1546,7 +1671,18 @@ export const MessageCenterView: React.FC<MessageCenterViewProps> = ({
                     </Button>
                   )}
 
-                  {(isTaskAssignment || (isTaskEvent && !isCommentMention)) && (
+                  {notif.type === 'TASK_BLOCKED' ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleNotificationTitleClick(notif);
+                      }}
+                    >
+                      View Blocked Task
+                    </Button>
+                  ) : (isTaskAssignment || (isTaskEvent && !isCommentMention)) && (
                     <Button
                       variant="primary"
                       size="sm"

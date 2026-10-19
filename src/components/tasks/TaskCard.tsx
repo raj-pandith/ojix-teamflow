@@ -2,11 +2,12 @@ import React from 'react';
 import { Task, TaskStatus } from '../../types/task';
 import { Badge } from '../common/Badge';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
-import { Calendar, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Calendar, AlertCircle, AlertTriangle, UserCheck } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
   assigneeName?: string;
+  reviewerName?: string;
   onClick: () => void;
   onQuickMove?: (targetStatus: TaskStatus) => void;
   canMutate: boolean;
@@ -19,6 +20,7 @@ interface TaskCardProps {
 export const TaskCard: React.FC<TaskCardProps> = ({
   task,
   assigneeName,
+  reviewerName,
   onClick,
   canMutate,
   canMove,
@@ -111,6 +113,27 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </div>
         ) : (
           <span className="task-unassigned-chip">Unassigned</span>
+        )}
+
+        {reviewerName && (
+          <div
+            className="task-reviewer-chip"
+            title={`Designated Reviewer: ${reviewerName}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '11px',
+              color: 'var(--text-muted, #94a3b8)',
+              background: 'rgba(255, 255, 255, 0.04)',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              border: '1px solid var(--border-default, rgba(255, 255, 255, 0.08))',
+            }}
+          >
+            <UserCheck size={12} style={{ color: 'var(--color-primary, #6366f1)', flexShrink: 0 }} />
+            <span>{reviewerName}</span>
+          </div>
         )}
       </div>
     </div>

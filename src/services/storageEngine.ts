@@ -17,7 +17,7 @@ import {
   INITIAL_NOTIFICATIONS,
   INITIAL_DIRECT_MESSAGES,
 } from './mockData';
-import { validateAssigneeEligibility } from '../domain/validation';
+import { validateAssigneeEligibility, validateReviewerEligibility } from '../domain/validation';
 
 const STORAGE_KEYS = {
   USERS: 'ojix_teamflow_users',
@@ -109,9 +109,12 @@ class ReactiveStorageEngine {
 
             if (Array.isArray(data.notifications)) {
               for (const n of data.notifications) {
-                const idx = this.notifications.findIndex(localN => localN.id === n.id);
+                const canonicalKey = n.deduplicationKey || this.computeCanonicalNotificationKey(n);
+                const idx = this.notifications.findIndex(
+                  localN => localN.id === n.id || (localN.deduplicationKey && localN.deduplicationKey === canonicalKey)
+                );
                 if (idx === -1) {
-                  this.notifications.unshift(n);
+                  this.notifications.unshift({ ...n, deduplicationKey: canonicalKey });
                   updated = true;
                 } else if (n.isRead !== this.notifications[idx].isRead) {
                   this.notifications[idx] = { ...this.notifications[idx], isRead: n.isRead };
@@ -377,6 +380,19 @@ class ReactiveStorageEngine {
           localStorage.removeItem(k);
         }
       }
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.clear();
+      }
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        caches.keys().then(names => Promise.all(names.map(name => caches.delete(name)))).catch(() => {});
+      }
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          for (const reg of regs) {
+            reg.unregister();
+          }
+        }).catch(() => {});
+      }
     } catch {}
 
     this.persist();
@@ -399,7 +415,7 @@ class ReactiveStorageEngine {
       (typeof process !== 'undefined' && (process.env?.NODE_ENV === 'test' || Boolean(process.env?.VITEST))) ||
       (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
 
-    const CLEAR_ALL_SEED_KEY = 'ojix_teamflow_cleared_all_v4';
+    const CLEAR_ALL_SEED_KEY = 'ojix_teamflow_cleared_all_v6';
 
     if (forceReset) {
       if (isTestRuntime) {
@@ -423,10 +439,12 @@ class ReactiveStorageEngine {
       }
     }
 
-    // In browser runtime, mark initialized without wiping server data
+    // In browser runtime, trigger automatic clean wipe if not yet executed on this version
     if (!isTestRuntime) {
-      if (typeof window !== 'undefined' && window.localStorage && !localStorage.getItem(CLEAR_ALL_SEED_KEY)) {
+      if (typeof window !== 'undefined' && window.localStorage && localStorage.getItem(CLEAR_ALL_SEED_KEY) !== 'cleared') {
+        this.clearAllData(true);
         localStorage.setItem(CLEAR_ALL_SEED_KEY, 'cleared');
+        return;
       }
     }
 
@@ -451,7 +469,17 @@ class ReactiveStorageEngine {
         }));
         this.personas = JSON.parse(localStorage.getItem(STORAGE_KEYS.PERSONAS) || 'null') ?? [...DEMO_PERSONAS];
         this.projects = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROJECTS) || '[]') || INITIAL_PROJECTS;
-        this.tasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.TASKS) || '[]') || INITIAL_TASKS;
+        const loadedTasks: Task[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.TASKS) || '[]') || INITIAL_TASKS;
+        this.tasks = loadedTasks.map(t => {
+          if (!t.reviewerId) {
+            const proj = this.projects.find(p => p.id === t.projectId);
+            const defaultReviewer = (proj?.ownerId && proj.ownerId !== t.assigneeId)
+              ? proj.ownerId
+              : 'user-lead-sarah';
+            return { ...t, reviewerId: defaultReviewer };
+          }
+          return t;
+        });
         this.logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGS) || '[]') || INITIAL_ACTIVITY_LOGS;
         this.deletionNotices = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTICES) || '[]');
         this.notifications = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || 'null') ?? INITIAL_NOTIFICATIONS;
@@ -1666,6 +1694,20 @@ class ReactiveStorageEngine {
       }
     }
 
+    // Database-level enforcement of mandatory task reviewer eligibility rules:
+    if (task.reviewerId) {
+      const existingTask = this.tasks.find(t => t.id === task.id);
+      const isReviewerChanging = !existingTask || existingTask.reviewerId !== task.reviewerId;
+
+      if (isReviewerChanging) {
+        const targetReviewer = this.getUser(task.reviewerId);
+        const eligibility = validateReviewerEligibility(targetReviewer, project);
+        if (!eligibility.eligible) {
+          throw new Error(`Permission denied: Cannot set reviewer. ${eligibility.reason}`);
+        }
+      }
+    }
+
     const index = this.tasks.findIndex(t => t.id === task.id);
     if (index >= 0) {
       this.tasks[index] = task;
@@ -1724,9 +1766,22 @@ class ReactiveStorageEngine {
 
   public getNotifications(user: UserProfile): AppNotification[] {
     // Strictly isolate notifications: user only sees notifications addressed to them
-    return this.notifications
-      .filter(n => n.recipientUserId === user.uid)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const userNotifs = this.notifications.filter(n => n.recipientUserId === user.uid);
+    const seen = new Set<string>();
+    const deduped: AppNotification[] = [];
+    for (const notif of userNotifs) {
+      const canonicalKey = notif.deduplicationKey || this.computeCanonicalNotificationKey(notif);
+      const uniqueKey = notif.type === 'DIRECT_MESSAGE_RECEIVED'
+        ? (notif.deduplicationKey || `dm-${notif.conversationId || notif.entityId}-${notif.body}`)
+        : canonicalKey;
+
+      if (!seen.has(notif.id) && !seen.has(uniqueKey)) {
+        seen.add(notif.id);
+        seen.add(uniqueKey);
+        deduped.push(notif);
+      }
+    }
+    return deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   // ---- Notification Canonical Deduplication & Observability ----
@@ -1749,10 +1804,20 @@ class ReactiveStorageEngine {
         return `tskasg-${taskId}-${recipient}-${type}`;
       case 'TASK_COMMENT_MENTION':
         return `mnt-${notification.commentId || taskId}-${recipient}`;
+      case 'TASK_REVIEW_REQUESTED':
+        return `revreq-${taskId}-${recipient}`;
+      case 'TASK_REVIEW_APPROVED':
+        return `revapp-${taskId}-${recipient}`;
+      case 'TASK_CHANGES_REQUESTED':
+        return `revchg-${taskId}-${recipient}`;
+      case 'TASK_BLOCKED':
+        return `taskblk-${taskId}-${recipient}`;
       case 'PROJECT_DELETED':
         return `pdel-${projId}-${recipient}`;
       case 'USER_BLOCKED':
         return `blk-${notification.entityId || recipient}`;
+      case 'DIRECT_MESSAGE_RECEIVED':
+        return notification.deduplicationKey || `dm-notif-${notification.id.replace(/^notif-dm-/, '')}`;
       default:
         return `notif-${type}-${recipient}-${projId}-${taskId}`;
     }
@@ -2021,8 +2086,11 @@ class ReactiveStorageEngine {
       ? `New message: ${data.subject.trim()}`
       : `Message from ${sender.displayName}`;
 
+    const dmNotifId = `notif-dm-${newMsg.id}`;
+    const dmDedupKey = `dm-notif-${newMsg.id}`;
+
     this.addNotification({
-      id: `notif-dm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      id: dmNotifId,
       recipientUserId: targetUser.uid,
       actorUserId: sender.uid,
       actorDisplayName: sender.displayName,
@@ -2034,6 +2102,7 @@ class ReactiveStorageEngine {
       conversationId,
       isRead: false,
       createdAt: now,
+      deduplicationKey: dmDedupKey,
     });
 
     this.persist();

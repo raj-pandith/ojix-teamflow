@@ -7,7 +7,13 @@ import { Button } from '../common/Button';
 import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { storageEngine } from '../../services/storageEngine';
-import { getEligibleProjectAssignees, isUserEligibleForAssignment, validateAssigneeEligibility } from '../../domain/validation';
+import {
+  getEligibleProjectAssignees,
+  getEligibleProjectReviewers,
+  isUserEligibleForAssignment,
+  validateAssigneeEligibility,
+  validateReviewerEligibility,
+} from '../../domain/validation';
 
 interface TaskUpdateModalProps {
   isOpen: boolean;
@@ -32,6 +38,7 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [status, setStatus] = useState<TaskStatus>('todo');
   const [assigneeId, setAssigneeId] = useState<string>('');
+  const [reviewerId, setReviewerId] = useState<string>('');
   const [dueDate, setDueDate] = useState<string>('');
   const [blockerReason, setBlockerReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,6 +53,7 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
       setPriority(task.priority);
       setStatus(task.status);
       setAssigneeId(task.assigneeId || '');
+      setReviewerId(task.reviewerId || '');
       setDueDate(task.dueDate);
       setBlockerReason(task.blockerReason || '');
       setError('');
@@ -97,12 +105,21 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
           return;
         }
       }
+      if (reviewerId && reviewerId !== task.reviewerId) {
+        const targetReviewer = users.find(u => u.uid === reviewerId);
+        const eligibility = validateReviewerEligibility(targetReviewer, project);
+        if (!eligibility.eligible) {
+          setError(eligibility.reason || 'Selected reviewer is not eligible for this project.');
+          return;
+        }
+      }
       const updated = await onUpdateTask(task.id, {
         title: title.trim(),
         description: description.trim(),
         priority,
         status,
         assigneeId: assigneeId || null,
+        reviewerId: reviewerId || (task.reviewerId ?? undefined),
         dueDate,
         blockerReason: status === 'blocked' ? blockerReason.trim() : undefined,
       });
@@ -219,6 +236,25 @@ export const TaskUpdateModal: React.FC<TaskUpdateModalProps> = ({
             onChange={e => setDueDate(e.target.value)}
             required
             id="update-task-duedate-input"
+          />
+        </div>
+
+        <div className="form-group">
+          <Select
+            label="Designated Reviewer *"
+            value={reviewerId}
+            onChange={e => setReviewerId(e.target.value)}
+            options={[
+              { value: '', label: 'Select a reviewer...' },
+              ...getEligibleProjectReviewers(users, project)
+                .sort((a, b) => a.displayName.localeCompare(b.displayName))
+                .map(r => ({
+                  value: r.uid,
+                  label: `${r.displayName} (${r.role.replace('_', ' ')})`,
+                })),
+            ]}
+            required
+            id="update-task-reviewer-select"
           />
         </div>
 

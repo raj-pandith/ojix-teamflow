@@ -904,8 +904,8 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
       return;
     }
 
-    // POST /api/clear-all-data or POST /api/sync/clear: Clear all server-synced messages, logs, and notifications
-    if (req.method === 'POST' && (url === '/api/clear-all-data' || url === '/api/sync/clear')) {
+    // POST or GET /api/clear-all-data or /api/sync/clear: Clear all server-synced messages, logs, notifications, and reset auth & push
+    if ((req.method === 'POST' || req.method === 'GET') && (url === '/api/clear-all-data' || url === '/api/sync/clear')) {
       try {
         sharedSyncData.notifications = [];
         sharedSyncData.logs = [];
@@ -913,15 +913,18 @@ function setupPushMiddlewares(middlewares: { use: (fn: (req: IncomingMessage, re
         sharedSyncData.projects = [];
         sharedSyncData.tasks = [];
         saveSyncData(sharedSyncData);
+        authBackend.reset();
+        pushBackend.clearAllSubscriptions();
         broadcastRealtimeEvent('sync', {
           notifications: [],
           logs: [],
           directMessages: [],
           projects: [],
           tasks: [],
+          accounts: authBackend.getAccounts(),
         });
         broadcastRealtimeEvent('cleared', { timestamp: Date.now() });
-        sendJson(res, 200, { success: true, message: 'All server synced data cleared.' });
+        sendJson(res, 200, { success: true, message: 'All server synced data cleared and database reset.' });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Clear failed';
         sendJson(res, 500, { error: message });

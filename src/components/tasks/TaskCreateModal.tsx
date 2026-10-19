@@ -8,7 +8,12 @@ import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { storageEngine } from '../../services/storageEngine';
 import { getLocalTodayDateString } from '../../domain/timezone';
-import { getEligibleProjectAssignees, validateAssigneeEligibility } from '../../domain/validation';
+import {
+  getEligibleProjectAssignees,
+  validateAssigneeEligibility,
+  getEligibleProjectReviewers,
+  validateReviewerEligibility,
+} from '../../domain/validation';
 
 interface TaskCreateModalProps {
   isOpen: boolean;
@@ -32,6 +37,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [status, setStatus] = useState<TaskStatus>('todo');
   const [assigneeId, setAssigneeId] = useState<string>('');
+  const [reviewerId, setReviewerId] = useState<string>('');
   const [dueDate, setDueDate] = useState<string>(getLocalTodayDateString());
   const [blockerReason, setBlockerReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +75,10 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
   const projectTeamMembers = getEligibleProjectAssignees(users, project)
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
+  // Eligible Reviewers: Any active user with access to this project (Member, Lead, or Admin)
+  const projectReviewers = getEligibleProjectReviewers(users, project)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canCreateTask) {
@@ -79,6 +89,10 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
       setError('Task title is required.');
       return;
     }
+    if (!reviewerId) {
+      setError('A designated reviewer is required.');
+      return;
+    }
     if (status === 'blocked' && (!blockerReason || blockerReason.trim().length < 5)) {
       setError('A blocker reason (min 5 characters) is required when starting as Blocked.');
       return;
@@ -87,6 +101,13 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
     setIsSubmitting(true);
     setError('');
     try {
+      const targetReviewer = users.find(u => u.uid === reviewerId);
+      const reviewerEligibility = validateReviewerEligibility(targetReviewer, project);
+      if (!reviewerEligibility.eligible) {
+        setError(reviewerEligibility.reason || 'Selected reviewer is not eligible for this project.');
+        return;
+      }
+
       if (assigneeId) {
         const targetUser = users.find(u => u.uid === assigneeId);
         const eligibility = validateAssigneeEligibility(targetUser, project);
@@ -101,6 +122,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
         priority,
         status,
         assigneeId: assigneeId || null,
+        reviewerId,
         dueDate,
         blockerReason: status === 'blocked' ? blockerReason.trim() : undefined,
       });
@@ -109,6 +131,8 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
       setDescription('');
       setStatus('todo');
       setPriority('medium');
+      setAssigneeId('');
+      setReviewerId('');
       setBlockerReason('');
       onClose();
     } catch (err: unknown) {
@@ -198,6 +222,30 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
             )}
           </div>
 
+          <div>
+            <Select
+              label="Reviewer *"
+              value={reviewerId}
+              onChange={e => setReviewerId(e.target.value)}
+              required
+              options={[
+                { value: '', label: 'Select a designated reviewer...' },
+                ...projectReviewers.map(r => ({
+                  value: r.uid,
+                  label: `${r.displayName} (${r.role.replace('_', ' ')})`,
+                })),
+              ]}
+              id="new-task-reviewer-select"
+            />
+            {projectReviewers.length === 0 && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-blocked)', display: 'block', marginTop: '4px' }}>
+                ⚠️ No eligible reviewers found for this project.
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="form-group">
           <Input
             label="Due Date"
             type="date"

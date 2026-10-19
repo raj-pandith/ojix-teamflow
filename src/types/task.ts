@@ -15,6 +15,14 @@ export interface Task {
   readonly dueDate: string; // ISO date 'YYYY-MM-DD'
   readonly milestoneId?: string;
   readonly dependencies?: string[];
+  readonly reviewerId?: string | null;
+  readonly submittedForReviewBy?: string;
+  readonly submittedForReviewAt?: string;
+  readonly approvedBy?: string;
+  readonly approvedAt?: string;
+  readonly changesRequestedBy?: string;
+  readonly changesRequestedAt?: string;
+  readonly changesRequestedComment?: string;
   readonly createdBy: string;
   readonly createdAt: string; // ISO-8601 UTC
   readonly updatedAt: string; // ISO-8601 UTC
@@ -24,6 +32,7 @@ export interface TaskFormData {
   title: string;
   description: string;
   assigneeId: string | null;
+  reviewerId?: string;
   priority: TaskPriority;
   status: TaskStatus;
   blockerReason?: string;

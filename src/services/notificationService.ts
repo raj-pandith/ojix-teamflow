@@ -228,6 +228,140 @@ class NotificationService {
       deduplicationKey: dedupKey,
     });
   }
+
+  public notifyReviewRequested(
+    task: Task,
+    project: Project,
+    reviewer: UserProfile,
+    actor: UserProfile
+  ): void {
+    if (reviewer.uid === actor.uid) return;
+
+    const now = new Date().toISOString();
+    const title = 'Review requested';
+    const body = `${actor.displayName} has requested a review of task "${task.title}" in project "${project.name}".`;
+    const dedupKey = `revreq-${task.id}-${task.submittedForReviewAt || task.updatedAt || now}`;
+
+    storageEngine.addNotification({
+      id: `notif-revreq-${task.id}-${reviewer.uid}`,
+      recipientUserId: reviewer.uid,
+      actorUserId: actor.uid,
+      actorDisplayName: actor.displayName,
+      type: 'TASK_REVIEW_REQUESTED',
+      title,
+      body,
+      entityType: 'task',
+      entityId: task.id,
+      projectId: project.id,
+      projectName: project.name,
+      taskId: task.id,
+      taskTitle: task.title,
+      isRead: false,
+      createdAt: now,
+      deduplicationKey: dedupKey,
+    });
+  }
+
+  public notifyTaskBlocked(
+    task: Task,
+    project: Project,
+    reviewer: UserProfile,
+    actor: UserProfile,
+    blockerReason: string
+  ): void {
+    if (reviewer.uid === actor.uid) return;
+
+    const now = new Date().toISOString();
+    const title = 'Task blocked';
+    const body = `${actor.displayName} has marked "${task.title}" as Blocked in project "${project.name}".\nReason: ${blockerReason}`;
+    const dedupKey = `taskblk-${task.id}-${task.updatedAt || now}`;
+
+    storageEngine.addNotification({
+      id: `notif-taskblk-${task.id}-${reviewer.uid}`,
+      recipientUserId: reviewer.uid,
+      actorUserId: actor.uid,
+      actorDisplayName: actor.displayName,
+      type: 'TASK_BLOCKED',
+      title,
+      body,
+      entityType: 'task',
+      entityId: task.id,
+      projectId: project.id,
+      projectName: project.name,
+      taskId: task.id,
+      taskTitle: task.title,
+      isRead: false,
+      createdAt: now,
+      deduplicationKey: dedupKey,
+    });
+  }
+
+  public notifyReviewApproved(
+    task: Task,
+    project: Project,
+    assignee: UserProfile,
+    actor: UserProfile
+  ): void {
+    if (assignee.uid === actor.uid) return;
+
+    const now = new Date().toISOString();
+    const title = 'Review approved';
+    const body = `${actor.displayName} has approved task "${task.title}" in project "${project.name}".`;
+    const dedupKey = `revapp-${task.id}-${task.approvedAt || task.updatedAt || now}`;
+
+    storageEngine.addNotification({
+      id: `notif-revapp-${task.id}-${assignee.uid}`,
+      recipientUserId: assignee.uid,
+      actorUserId: actor.uid,
+      actorDisplayName: actor.displayName,
+      type: 'TASK_REVIEW_APPROVED',
+      title,
+      body,
+      entityType: 'task',
+      entityId: task.id,
+      projectId: project.id,
+      projectName: project.name,
+      taskId: task.id,
+      taskTitle: task.title,
+      isRead: false,
+      createdAt: now,
+      deduplicationKey: dedupKey,
+    });
+  }
+
+  public notifyChangesRequested(
+    task: Task,
+    project: Project,
+    assignee: UserProfile,
+    actor: UserProfile,
+    comment: string
+  ): void {
+    if (assignee.uid === actor.uid) return;
+
+    const now = new Date().toISOString();
+    const title = 'Changes requested';
+    const body = `${actor.displayName} has requested changes on task "${task.title}" in project "${project.name}".\nReason: ${comment}`;
+    const dedupKey = `revchg-${task.id}-${task.changesRequestedAt || task.updatedAt || now}`;
+
+    storageEngine.addNotification({
+      id: `notif-revchg-${task.id}-${assignee.uid}`,
+      recipientUserId: assignee.uid,
+      actorUserId: actor.uid,
+      actorDisplayName: actor.displayName,
+      type: 'TASK_CHANGES_REQUESTED',
+      title,
+      body,
+      entityType: 'task',
+      entityId: task.id,
+      projectId: project.id,
+      projectName: project.name,
+      taskId: task.id,
+      taskTitle: task.title,
+      isRead: false,
+      createdAt: now,
+      deduplicationKey: dedupKey,
+    });
+  }
 }
 
 export const notificationService = new NotificationService();

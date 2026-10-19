@@ -16,7 +16,7 @@ export const ALLOWED_TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
   todo: ['in_progress', 'blocked', 'backlog'],
   in_progress: ['in_review', 'blocked', 'todo'],
   in_review: ['done', 'in_progress', 'blocked'],
-  blocked: ['todo', 'in_progress', 'done'],
+  blocked: ['todo', 'in_progress'], // Blocked must return to In Progress/Todo and go through review before completion
   done: ['todo'], // Done can only be reopened to Todo; cannot jump directly to Blocked
 };
 
@@ -42,6 +42,24 @@ export function validateTaskTransition(
   // No-op transition
   if (currentStatus === targetStatus) {
     return { valid: true };
+  }
+
+  // Explicit guard: In Progress cannot transition directly to Done (must go through review)
+  if (currentStatus === 'in_progress' && targetStatus === 'done') {
+    return {
+      valid: false,
+      error: 'Cannot move task directly from In Progress to Done. Tasks must be submitted for review first.',
+      code: 'INVALID_TRANSITION',
+    };
+  }
+
+  // Explicit guard: Blocked cannot jump directly to Done
+  if (currentStatus === 'blocked' && targetStatus === 'done') {
+    return {
+      valid: false,
+      error: 'A blocked task must return to work and go through review before it can be completed.',
+      code: 'INVALID_TRANSITION',
+    };
   }
 
   // Explicit guard: Done cannot transition directly to Blocked
@@ -87,17 +105,12 @@ export function validateTaskTransition(
 }
 
 /**
- * Evaluates whether a specific user is authorized to drag, drop, or change the status of a task.
- *
- * Rules:
- * 1. Assigned Task Member: Can drag and move only the tasks assigned to them, and only through the permitted workflow.
- * 2. Project Lead: Can drag and move any task within the projects they manage, regardless of who the task is assigned to.
- * 3. Other Project Members: Must not be allowed to drag, drop, or change the status of tasks assigned to other members, even in the same project.
- * 4. Unassigned Members / Tasks: Must not be allowed to move tasks unless explicitly authorized as Project Lead or the task's assigned member.
- * 5. Workspace Admin: Can override these restrictions with administrative permissions.
+ * Validates whether a specific user is authorized to perform a specific target status transition on a task.
+ * Enforces server-side RBAC, designated reviewer authority, and the self-review policy.
  */
-export function canUserMoveTask(
-  task: Pick<Task, 'assigneeId' | 'projectId'>,
+export function canUserTransitionTask(
+  task: Pick<Task, 'status' | 'assigneeId' | 'projectId'> & { reviewerId?: string | null },
+  targetStatus: TaskStatus,
   user: UserProfile | null | undefined,
   project?: Pick<Project, 'id' | 'ownerId'> | null
 ): { allowed: boolean; reason?: string } {
@@ -105,7 +118,111 @@ export function canUserMoveTask(
     return { allowed: false, reason: 'Authentication required.' };
   }
 
-  // 5. Workspace Admin override
+  if (user.status === 'blocked' || user.status === 'terminated') {
+    return { allowed: false, reason: `Your workspace account is ${user.status}. Access has been revoked.` };
+  }
+
+  if (user.role === 'viewer') {
+    return { allowed: false, reason: 'Viewers have read-only access and cannot change task status.' };
+  }
+
+  const currentStatus = task.status;
+
+  // Cannot transition directly from In Progress to Done
+  if (currentStatus === 'in_progress' && targetStatus === 'done') {
+    return {
+      allowed: false,
+      reason: 'The assigned member must not be able to move their task directly from In Progress to Done. Submit for review first.',
+    };
+  }
+
+  // Decision on task in In Review (Approve to Done OR Request Changes to In Progress)
+  if (currentStatus === 'in_review') {
+    // 1. Self-Review Policy: The assigned member cannot approve their own task
+    if (targetStatus === 'done' && task.assigneeId && task.assigneeId === user.uid) {
+      return {
+        allowed: false,
+        reason: 'Self-review policy: The assigned member cannot approve their own task.',
+      };
+    }
+
+    // 2. Who is authorized to make decisions on an In Review task:
+    // - Designated reviewer
+    // - Project Lead with permission to manage the project
+    // - Workspace Admin
+    const isDesignatedReviewer = Boolean(task.reviewerId && task.reviewerId === user.uid);
+    const isWorkspaceAdmin = user.role === 'workspace_admin';
+    const isProjectLead = user.role === 'project_lead' && (!project || project.id === task.projectId);
+
+    if (!isDesignatedReviewer && !isWorkspaceAdmin && !isProjectLead) {
+      return {
+        allowed: false,
+        reason: 'Only the designated reviewer, Project Lead, or Workspace Admin can make decisions on a task In Review.',
+      };
+    }
+
+    return { allowed: true };
+  }
+
+  // Workspace Admin override for non-in-review transitions
+  if (user.role === 'workspace_admin') {
+    return { allowed: true };
+  }
+
+  // Project Lead permissions
+  if (user.role === 'project_lead') {
+    return { allowed: true };
+  }
+
+  // Member permissions
+  if (user.role === 'member') {
+    if (!task.assigneeId) {
+      return {
+        allowed: false,
+        reason: 'Unassigned task: Only the Project Lead or Workspace Admin can move unassigned tasks.',
+      };
+    }
+    if (task.assigneeId !== user.uid) {
+      return {
+        allowed: false,
+        reason: 'Permission denied: Members can only drag and move tasks assigned directly to them.',
+      };
+    }
+
+    // Member can move Todo -> In Progress, In Progress -> In Review, In Progress -> Blocked, Blocked -> In Progress
+    if (
+      (currentStatus === 'todo' && targetStatus === 'in_progress') ||
+      (currentStatus === 'in_progress' && targetStatus === 'in_review') ||
+      (currentStatus === 'in_progress' && targetStatus === 'blocked') ||
+      (currentStatus === 'todo' && targetStatus === 'blocked') ||
+      (currentStatus === 'blocked' && targetStatus === 'in_progress') ||
+      (currentStatus === 'blocked' && targetStatus === 'todo')
+    ) {
+      return { allowed: true };
+    }
+
+    return {
+      allowed: false,
+      reason: `Members are not authorized to transition this task from "${currentStatus}" to "${targetStatus}".`,
+    };
+  }
+
+  return { allowed: false, reason: 'Unauthorized transition.' };
+}
+
+/**
+ * Evaluates whether a specific user is authorized to drag, drop, or change the status of a task.
+ */
+export function canUserMoveTask(
+  task: Pick<Task, 'assigneeId' | 'projectId'> & { status?: TaskStatus; reviewerId?: string | null },
+  user: UserProfile | null | undefined,
+  project?: Pick<Project, 'id' | 'ownerId'> | null
+): { allowed: boolean; reason?: string } {
+  if (!user) {
+    return { allowed: false, reason: 'Authentication required.' };
+  }
+
+  // Workspace Admin override
   if (user.role === 'workspace_admin') {
     return { allowed: true };
   }
@@ -115,20 +232,24 @@ export function canUserMoveTask(
     return { allowed: false, reason: 'Viewers have read-only access and cannot move or update tasks.' };
   }
 
-  // 2. Project Lead: Can drag and move any task within the projects they manage
+  // Project Lead: Can drag and move any task within the projects they manage
   if (user.role === 'project_lead') {
     if (project && project.id === task.projectId) {
       if (project.ownerId === user.uid) {
         return { allowed: true };
       }
     }
-    // If project owner check is not explicitly bound or lead manages workspace project
     return { allowed: true };
   }
 
-  // 1 & 3 & 4. Member evaluation
+  // Designated Reviewer can move an in_review task
+  if (task.status === 'in_review' && task.reviewerId && task.reviewerId === user.uid) {
+    return { allowed: true };
+  }
+
+  // Member evaluation
   if (user.role === 'member') {
-    // 4. Unassigned tasks: member is not the assigned member
+    // Unassigned tasks: member is not the assigned member
     if (!task.assigneeId) {
       return {
         allowed: false,
@@ -136,12 +257,12 @@ export function canUserMoveTask(
       };
     }
 
-    // 1. Assigned to this member
+    // Assigned to this member
     if (task.assigneeId === user.uid) {
       return { allowed: true };
     }
 
-    // 3. Assigned to other members: must not be allowed to move
+    // Assigned to other members: must not be allowed to move
     return {
       allowed: false,
       reason: 'Permission denied: Members can only drag and move tasks assigned directly to them.',

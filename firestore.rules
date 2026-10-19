@@ -54,6 +54,15 @@ service cloud.firestore {
       );
     }
 
+    function isValidReviewer(projectId, reviewerId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId)).data;
+      let reviewer = get(/databases/$(database)/documents/users/$(reviewerId)).data;
+      return reviewerId != null &&
+        (reviewerId in project.memberIds || reviewer.role == 'workspace_admin' || reviewerId == project.ownerId) &&
+        (reviewer.status == 'active' || !('status' in reviewer)) &&
+        reviewer.role != 'viewer';
+    }
+
     // Collection: Users
     match /users/{userId} {
       allow read: if isAuthenticated();
@@ -78,12 +87,21 @@ service cloud.firestore {
     // Collection: Tasks
     match /tasks/{taskId} {
       allow read: if isProjectMember(resource.data.projectId);
-      allow create: if isProjectMember(request.resource.data.projectId) && !isViewer() &&
-        isValidAssignee(request.resource.data.projectId, request.resource.data.assigneeId);
-      allow update: if isProjectMember(resource.data.projectId) && !isViewer() && (
-        request.resource.data.assigneeId == resource.data.assigneeId ||
-        isValidAssignee(resource.data.projectId, request.resource.data.assigneeId)
-      );
+      allow create: if isProjectMember(request.resource.data.projectId) && (isWorkspaceAdmin() || isProjectLead()) &&
+        isValidAssignee(request.resource.data.projectId, request.resource.data.assigneeId) &&
+        isValidReviewer(request.resource.data.projectId, request.resource.data.reviewerId);
+      allow update: if isProjectMember(resource.data.projectId) && !isViewer() &&
+        // Cannot jump directly from in_progress to done
+        !(resource.data.status == 'in_progress' && request.resource.data.status == 'done') &&
+        // Self-review policy: assigned member cannot approve task to done
+        !(request.resource.data.status == 'done' && resource.data.status == 'in_review' && resource.data.assigneeId == request.auth.uid) &&
+        (
+          request.resource.data.assigneeId == resource.data.assigneeId ||
+          isValidAssignee(resource.data.projectId, request.resource.data.assigneeId)
+        ) && (
+          request.resource.data.reviewerId == resource.data.reviewerId ||
+          isValidReviewer(resource.data.projectId, request.resource.data.reviewerId)
+        );
       allow delete: if isWorkspaceAdmin() || isProjectOwner(resource.data.projectId);
     }
 

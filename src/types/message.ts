@@ -9,7 +9,11 @@ export type NotificationType =
   | 'TASK_ASSIGNED'
   | 'TASK_REASSIGNED'
   | 'USER_BLOCKED'
-  | 'DIRECT_MESSAGE_RECEIVED';
+  | 'DIRECT_MESSAGE_RECEIVED'
+  | 'TASK_REVIEW_REQUESTED'
+  | 'TASK_REVIEW_APPROVED'
+  | 'TASK_CHANGES_REQUESTED'
+  | 'TASK_BLOCKED';
 
 export type EntityType = 'project' | 'task' | 'comment' | 'user' | 'conversation';
 

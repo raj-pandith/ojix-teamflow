@@ -676,6 +676,16 @@ class AuthBackend {
     this.save();
     return this.sanitizeUser(account);
   }
+
+  public reset(): void {
+    this.data = {
+      accounts: SEED_ACCOUNTS.map(a => ({ ...a })),
+      invitations: [],
+      sessions: {},
+    };
+    loginAttempts.clear();
+    this.save();
+  }
 }
 
 export const authBackend = new AuthBackend();

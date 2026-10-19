@@ -6,10 +6,12 @@ import { Badge } from '../../components/common/Badge';
 import { Pagination } from '../../components/common/Pagination';
 import { TaskDetailModal } from '../../components/tasks/TaskDetailModal';
 import { BlockerModal } from '../../components/tasks/BlockerModal';
+import { RequestChangesModal } from '../../components/tasks/RequestChangesModal';
 import { storageEngine } from '../../services/storageEngine';
+import { taskService } from '../../services/taskService';
 import { isTaskOverdue, formatDisplayDate } from '../../domain/timezone';
-import { ALLOWED_TRANSITIONS, canUserMoveTask } from '../../domain/taskStateMachine';
-import { Search, X, AlertTriangle, ArrowRight, FolderOpen, User, RotateCcw, FilterX } from 'lucide-react';
+import { ALLOWED_TRANSITIONS, canUserMoveTask, canUserTransitionTask } from '../../domain/taskStateMachine';
+import { Search, X, AlertTriangle, ArrowRight, FolderOpen, User, RotateCcw, FilterX, UserCheck } from 'lucide-react';
 
 interface GroupedListViewProps {
   tasks: Task[];
@@ -37,6 +39,7 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [pendingBlockerTask, setPendingBlockerTask] = useState<Task | null>(null);
+  const [pendingChangesTask, setPendingChangesTask] = useState<Task | null>(null);
 
   const [users, setUsers] = useState<UserProfile[]>(() => storageEngine.getUsers());
 
@@ -66,6 +69,10 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
       setPendingBlockerTask(task);
       return;
     }
+    if (task.status === 'in_review' && targetStatus === 'in_progress') {
+      setPendingChangesTask(task);
+      return;
+    }
     await onTransitionStatus(task.id, targetStatus);
   };
 
@@ -75,6 +82,15 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
       await onTransitionStatus(pendingBlockerTask.id, 'blocked', reason);
     } finally {
       setPendingBlockerTask(null);
+    }
+  };
+
+  const handleChangesConfirm = async (comment: string) => {
+    if (!pendingChangesTask || !currentUser) return;
+    try {
+      await taskService.requestChanges(pendingChangesTask.id, comment, currentUser);
+    } finally {
+      setPendingChangesTask(null);
     }
   };
 
@@ -208,8 +224,11 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
           <tbody>
             {paginatedTasks.map(task => {
               const assignee = users.find(u => u.uid === task.assigneeId);
+              const reviewer = users.find(u => u.uid === task.reviewerId);
               const isOverdue = isTaskOverdue(task.dueDate, task.status);
-              const allowedMoves = ALLOWED_TRANSITIONS[task.status] || [];
+              const allowedMoves = (ALLOWED_TRANSITIONS[task.status] || []).filter(st => {
+                return canUserTransitionTask(task, st, currentUser, project).allowed;
+              });
               const moveAuth = canUserMoveTask(task, currentUser, project);
               const canMove = canMutate && moveAuth.allowed;
 
@@ -273,6 +292,15 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
                       </span>
                     ) : (
                       <span className="unassigned-text">Unassigned</span>
+                    )}
+                    {reviewer && (
+                      <span
+                        style={{ fontSize: '11px', color: 'var(--text-muted, #8b949e)', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}
+                        title={`Designated Reviewer: ${reviewer.displayName}`}
+                      >
+                        <UserCheck size={12} style={{ color: 'var(--color-primary, #6366f1)', flexShrink: 0 }} />
+                        <span>{reviewer.displayName}</span>
+                      </span>
                     )}
                   </td>
 
@@ -366,6 +394,14 @@ export const GroupedListView: React.FC<GroupedListViewProps> = ({
         onClose={() => setPendingBlockerTask(null)}
         onConfirm={handleBlockerConfirm}
         taskTitle={pendingBlockerTask?.title || ''}
+      />
+
+      {/* Mandatory Request Changes Explanation Modal */}
+      <RequestChangesModal
+        isOpen={!!pendingChangesTask}
+        onClose={() => setPendingChangesTask(null)}
+        onConfirm={handleChangesConfirm}
+        taskTitle={pendingChangesTask?.title || ''}
       />
     </div>
   );

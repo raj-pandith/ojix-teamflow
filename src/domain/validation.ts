@@ -71,6 +71,76 @@ export function validateAssigneeEligibility(
 }
 
 /**
+ * Validates whether a user is eligible to be designated as a reviewer in a given project.
+ * Rules:
+ * 1. User account must exist.
+ * 2. User account must be 'active' (not 'blocked' or 'terminated').
+ * 3. User's role must not be 'viewer' (viewers have read-only permissions and cannot review or approve tasks).
+ * 4. User must have access to the same project (in project.memberIds, or project.ownerId, or workspace_admin).
+ */
+export function validateReviewerEligibility(
+  user: UserProfile | null | undefined,
+  project: Project | null | undefined
+): AssigneeEligibilityResult {
+  if (!user) {
+    return { eligible: false, reason: 'Reviewer user account does not exist in workspace.' };
+  }
+
+  if (user.status !== 'active') {
+    return {
+      eligible: false,
+      reason: `Cannot select "${user.displayName}" as reviewer: User account is ${user.status}.`,
+    };
+  }
+
+  if (user.role === 'viewer') {
+    return {
+      eligible: false,
+      reason: 'Viewers have read-only access and cannot review or approve tasks.',
+    };
+  }
+
+  if (!project) {
+    return { eligible: false, reason: 'Target project does not exist.' };
+  }
+
+  const hasAccess =
+    user.role === 'workspace_admin' ||
+    project.memberIds.includes(user.uid) ||
+    project.ownerId === user.uid;
+
+  if (!hasAccess) {
+    return {
+      eligible: false,
+      reason: `User "${user.displayName}" does not have access to project "${project.name}".`,
+    };
+  }
+
+  return { eligible: true };
+}
+
+/**
+ * Convenience predicate returning true if user is eligible to be a reviewer for the project.
+ */
+export function isUserEligibleForReview(
+  user: UserProfile | null | undefined,
+  project: Project | null | undefined
+): boolean {
+  return validateReviewerEligibility(user, project).eligible;
+}
+
+/**
+ * Filters workspace users down to only eligible, active project reviewers.
+ */
+export function getEligibleProjectReviewers(
+  users: readonly UserProfile[],
+  project: Project | null | undefined
+): UserProfile[] {
+  if (!project) return [];
+  return users.filter(u => isUserEligibleForReview(u, project));
+}
+
+/**
  * Convenience predicate returning true if user is assignable in the project.
  */
 export function isUserEligibleForAssignment(
@@ -94,7 +164,10 @@ export function getEligibleProjectAssignees(
 /**
  * Validates Task creation or update form data.
  */
-export function validateTaskForm(data: Partial<TaskFormData>): ValidationResult {
+export function validateTaskForm(
+  data: Partial<TaskFormData>,
+  options?: { requireReviewer?: boolean }
+): ValidationResult {
   const errors: Record<string, string> = {};
 
   const title = data.title?.trim() || '';
@@ -122,6 +195,14 @@ export function validateTaskForm(data: Partial<TaskFormData>): ValidationResult 
     errors.dueDate = 'Due date is required.';
   } else if (!/^\d{4}-\d{2}-\d{2}$/.test(data.dueDate)) {
     errors.dueDate = 'Due date must be in YYYY-MM-DD format.';
+  }
+
+  if (options?.requireReviewer) {
+    if (!data.reviewerId || !data.reviewerId.trim()) {
+      errors.reviewerId = 'A designated reviewer is required for this task.';
+    }
+  } else if (data.reviewerId !== undefined && !data.reviewerId?.trim()) {
+    errors.reviewerId = 'A designated reviewer cannot be empty.';
   }
 
   if (data.status === 'blocked') {
