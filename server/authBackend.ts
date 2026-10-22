@@ -103,8 +103,10 @@ class AuthBackend {
 
   constructor() {
     this.load();
-    this.cleanExpiredSessions();
-    setInterval(() => this.cleanExpiredSessions(), 60 * 60 * 1000);
+    const timer = setInterval(() => this.cleanExpiredSessions(), 60 * 60 * 1000);
+    if (timer && typeof timer.unref === 'function') {
+      timer.unref();
+    }
   }
 
   private load(): void {

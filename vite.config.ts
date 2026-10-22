@@ -5,17 +5,24 @@ import { viteWebPushPlugin } from './server/vitePushPlugin';
 import { pushBackend } from './server/pushBackend';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
+  const isBuild = command === 'build';
   const env = loadEnv(mode, process.cwd(), '');
-  // Initialize server push backend with environment variables
-  pushBackend.initVapid({
-    publicKey: env.VITE_VAPID_PUBLIC_KEY || env.VAPID_PUBLIC_KEY,
-    privateKey: env.VAPID_PRIVATE_KEY,
-    subject: env.VAPID_SUBJECT || 'mailto:admin@ojix.local',
-  });
+
+  if (!isBuild) {
+    // Initialize server push backend only in dev/preview server mode
+    pushBackend.initVapid({
+      publicKey: env.VITE_VAPID_PUBLIC_KEY || env.VAPID_PUBLIC_KEY,
+      privateKey: env.VAPID_PRIVATE_KEY,
+      subject: env.VAPID_SUBJECT || 'mailto:admin@ojix.local',
+    });
+  }
 
   return {
-    plugins: [react(), viteWebPushPlugin()],
+    plugins: [
+      react(),
+      ...(!isBuild ? [viteWebPushPlugin()] : []),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
