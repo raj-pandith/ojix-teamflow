@@ -1,6 +1,7 @@
 import { UserProfile, DemoPersona, UserInvitation, UserRole, UserStatus } from '../types/auth';
 import { INITIAL_USERS } from './mockData';
 import { storageEngine } from './storageEngine';
+import { apiUrl } from './apiConfig';
 
 const AUTH_STORAGE_KEY = 'ojix_teamflow_current_user_uid';
 const AUTH_TOKEN_KEY = 'ojix_teamflow_session_token';
@@ -59,16 +60,24 @@ class AuthService {
     this.currentUser = null;
   }
 
-  private async safeParseJson(res: Response): Promise<{ isJson: boolean; data: any }> {
+  private async safeParseJson(res: Response): Promise<{ isJson: boolean; data: any; error?: string }> {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      return { isJson: false, data: null };
+      return {
+        isJson: false,
+        data: null,
+        error: `Server returned non-JSON response (${res.status} ${res.statusText || 'OK'})`,
+      };
     }
     try {
       const data = await res.json();
       return { isJson: true, data };
-    } catch {
-      return { isJson: false, data: null };
+    } catch (err: unknown) {
+      return {
+        isJson: false,
+        data: null,
+        error: err instanceof Error ? err.message : 'Invalid JSON response from server',
+      };
     }
   }
 
@@ -77,7 +86,7 @@ class AuthService {
     if (!token) return null;
 
     try {
-      const res = await fetch('/api/auth/me', {
+      const res = await fetch(apiUrl('/api/auth/me'), {
         headers: this.getAuthHeaders(),
       });
 
@@ -129,13 +138,13 @@ class AuthService {
     }
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
-      const { isJson, data } = await this.safeParseJson(res);
+      const { isJson, data, error } = await this.safeParseJson(res);
 
       if (isJson && data) {
         if (!res.ok) {
@@ -158,20 +167,38 @@ class AuthService {
         }
       }
 
-      // If server returned non-JSON (e.g. static host returning index.html) or no session, trigger fallback
+      // If server returned non-JSON (e.g. Cloudflare Static SPA returning index.html) or error
+      if (!isJson) {
+        throw new Error(
+          error || 'The backend API returned an HTML or non-JSON response. Please ensure the backend server is running and VITE_API_URL is configured.'
+        );
+      }
+
       throw new Error('SERVER_OFFLINE_STATIC');
     } catch (err: unknown) {
-      // If error is explicit user authentication failure from a real server, rethrow it
-      if (err instanceof Error && err.message.includes('Authentication failed')) {
-        throw err;
-      }
-      if (err instanceof Error && (err.message.includes('Account Suspended') || err.message.includes('Account Terminated') || err.message.includes('Account pending activation'))) {
+      // If error is explicit user authentication failure or non-JSON server error, rethrow it
+      if (err instanceof Error && (
+        err.message.includes('Authentication failed') ||
+        err.message.includes('Account Suspended') ||
+        err.message.includes('Account Terminated') ||
+        err.message.includes('Account pending activation') ||
+        err.message.includes('non-JSON response') ||
+        err.message.includes('VITE_API_URL')
+      )) {
         throw err;
       }
 
-      // Offline / Static deployment fallback (DEC-008):
-      // When /api/auth/login is not available (e.g. Cloudflare Pages or network offline),
-      // authenticate using the reactive storage engine.
+      // In production or when VITE_API_URL is configured, never silently fall back to insecure client demo passwords
+      const isProductionOrApiConfigured = Boolean(import.meta.env.PROD || import.meta.env.VITE_API_URL);
+      if (isProductionOrApiConfigured) {
+        throw new Error(
+          err instanceof Error && err.message !== 'SERVER_OFFLINE_STATIC'
+            ? err.message
+            : 'Unable to reach backend authentication service. Please verify that the backend API server is deployed and online.'
+        );
+      }
+
+      // Local offline mock fallback (local development only)
       const user = storageEngine.getUsers().find(u => u.email.toLowerCase() === normalizedEmail);
       if (!user) {
         throw new Error('Invalid email or password.');
@@ -186,7 +213,6 @@ class AuthService {
         throw new Error('Account pending activation. Please use your activation link to set your password.');
       }
 
-      // In client-side storage engine mode, verify standard demo password
       if (password !== 'Password123!' && password !== 'admin123' && password !== 'password' && password !== 'demo') {
         throw new Error('Invalid email or password. Use demo password: Password123!');
       }
@@ -205,7 +231,7 @@ class AuthService {
     const token = this.getToken();
     if (token) {
       try {
-        await fetch('/api/auth/logout', {
+        await fetch(apiUrl('/api/auth/logout'), {
           method: 'POST',
           headers: this.getAuthHeaders(),
         });
@@ -230,13 +256,16 @@ class AuthService {
     password: string,
     confirmPassword: string
   ): Promise<{ success: boolean; user: UserProfile; message: string }> {
-    const res = await fetch('/api/auth/activate', {
+    const res = await fetch(apiUrl('/api/auth/activate'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, password, confirmPassword }),
     });
 
-    const data = await res.json();
+    const { isJson, data, error } = await this.safeParseJson(res);
+    if (!isJson || !data) {
+      throw new Error(error || 'Activation failed: backend returned non-JSON response.');
+    }
     if (!res.ok) {
       throw new Error(data.error || 'Account activation failed.');
     }
@@ -263,13 +292,16 @@ class AuthService {
       throw new Error('Permission denied: Only Workspace Admins can invite new users.');
     }
 
-    const res = await fetch('/api/auth/admin/invite-user', {
+    const res = await fetch(apiUrl('/api/auth/admin/invite-user'), {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(params),
     });
 
-    const data = await res.json();
+    const { isJson, data, error } = await this.safeParseJson(res);
+    if (!isJson || !data) {
+      throw new Error(error || 'Failed to send invitation: backend returned non-JSON response.');
+    }
     if (!res.ok) {
       throw new Error(data.error || 'Failed to send invitation.');
     }
@@ -299,13 +331,16 @@ class AuthService {
       throw new Error('Permission denied: Only Workspace Admins can resend invitations.');
     }
 
-    const res = await fetch('/api/auth/admin/resend-invite', {
+    const res = await fetch(apiUrl('/api/auth/admin/resend-invite'), {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ email }),
     });
 
-    const data = await res.json();
+    const { isJson, data, error } = await this.safeParseJson(res);
+    if (!isJson || !data) {
+      throw new Error(error || 'Failed to resend invitation: backend returned non-JSON response.');
+    }
     if (!res.ok) {
       throw new Error(data.error || 'Failed to resend invitation.');
     }
@@ -318,13 +353,16 @@ class AuthService {
       throw new Error('Permission denied: Only Workspace Admins can modify member roles.');
     }
 
-    const res = await fetch('/api/auth/admin/update-role', {
+    const res = await fetch(apiUrl('/api/auth/admin/update-role'), {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ targetUid, role }),
     });
 
-    const data = await res.json();
+    const { isJson, data, error } = await this.safeParseJson(res);
+    if (!isJson || !data) {
+      throw new Error(error || 'Failed to update role: backend returned non-JSON response.');
+    }
     if (!res.ok) {
       throw new Error(data.error || 'Failed to update role.');
     }
@@ -342,13 +380,16 @@ class AuthService {
       throw new Error('Permission denied: Only Workspace Admins can modify member status.');
     }
 
-    const res = await fetch('/api/auth/admin/update-status', {
+    const res = await fetch(apiUrl('/api/auth/admin/update-status'), {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ targetUid, status }),
     });
 
-    const data = await res.json();
+    const { isJson, data, error } = await this.safeParseJson(res);
+    if (!isJson || !data) {
+      throw new Error(error || 'Failed to update member status: backend returned non-JSON response.');
+    }
     if (!res.ok) {
       throw new Error(data.error || 'Failed to update member status.');
     }
@@ -366,7 +407,7 @@ class AuthService {
       return storageEngine.getUsers();
     }
     try {
-      const res = await fetch('/api/auth/admin/users', {
+      const res = await fetch(apiUrl('/api/auth/admin/users'), {
         headers: this.getAuthHeaders(),
       });
       const { isJson, data } = await this.safeParseJson(res);

@@ -8,6 +8,7 @@ import { Select } from '../common/Select';
 import { authService } from '../../services/authService';
 import { storageEngine } from '../../services/storageEngine';
 import { useToast } from '../../hooks/useToast';
+import { apiUrl } from '../../services/apiConfig';
 
 interface UserInviteModalProps {
   isOpen: boolean;
@@ -81,7 +82,7 @@ export const UserInviteModal: React.FC<UserInviteModalProps> = ({
     try {
       if (isDirectPasswordMode) {
         // Direct password provisioning
-        const res = await fetch('/api/auth/admin/create-user', {
+        const res = await fetch(apiUrl('/api/auth/admin/create-user'), {
           method: 'POST',
           headers: authService.getAuthHeaders(),
           body: JSON.stringify({
@@ -92,6 +93,11 @@ export const UserInviteModal: React.FC<UserInviteModalProps> = ({
             phone: phone.trim() || undefined,
           }),
         });
+
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error(`Server returned non-JSON response (${res.status})`);
+        }
 
         const data = await res.json();
         if (!res.ok) {

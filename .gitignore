@@ -6,6 +6,7 @@ node_modules/
 # Production build artifacts
 dist/
 dist-ssr/
+dist-server/
 *.local
 
 # Logs

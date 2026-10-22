@@ -18,6 +18,7 @@ import {
   INITIAL_DIRECT_MESSAGES,
 } from './mockData';
 import { validateAssigneeEligibility, validateReviewerEligibility } from '../domain/validation';
+import { apiUrl } from './apiConfig';
 
 const STORAGE_KEYS = {
   USERS: 'ojix_teamflow_users',
@@ -89,8 +90,10 @@ class ReactiveStorageEngine {
     // 4. Server-side sync for multi-browser and multi-device local development
     const syncWithServer = async () => {
         try {
-          const res = await fetch('/api/sync');
-          if (res.ok) {
+          const res = await fetch(apiUrl('/api/sync'));
+          const contentType = res.headers?.get ? (res.headers.get('content-type') || '') : 'application/json';
+          const isNotHtml = !contentType.includes('text/html');
+          if (res.ok && isNotHtml) {
             const data = await res.json();
 
             // When server restarts, seed storageEngine notifications with the clean seed notifications
@@ -165,7 +168,7 @@ class ReactiveStorageEngine {
 
             // Push local projects and tasks to server sync store
             if (this.projects.length > 0 || this.tasks.length > 0) {
-              fetch('/api/sync', {
+              fetch(apiUrl('/api/sync'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -198,7 +201,7 @@ class ReactiveStorageEngine {
         if (this.eventSource) {
           this.eventSource.close();
         }
-        this.eventSource = new EventSource('/api/sync/events');
+        this.eventSource = new EventSource(apiUrl('/api/sync/events'));
 
         this.eventSource.addEventListener('connected', (event: MessageEvent) => {
           try {
@@ -404,7 +407,7 @@ class ReactiveStorageEngine {
     }
 
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      fetch('/api/clear-all-data', { method: 'POST' }).catch(() => {});
+      fetch(apiUrl('/api/clear-all-data'), { method: 'POST' }).catch(() => {});
     }
 
     this.notify();
@@ -765,7 +768,7 @@ class ReactiveStorageEngine {
       logs: this.logs,
       directMessages: this.directMessages,
     };
-    fetch('/api/sync', {
+    fetch(apiUrl('/api/sync'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -774,7 +777,7 @@ class ReactiveStorageEngine {
 
   public pushDeleteProjectToServer(projectId: string): void {
     if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
-    fetch('/api/sync/delete-project', {
+    fetch(apiUrl('/api/sync/delete-project'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId }),
@@ -783,7 +786,7 @@ class ReactiveStorageEngine {
 
   public pushDeleteTaskToServer(taskId: string): void {
     if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
-    fetch('/api/sync/delete-task', {
+    fetch(apiUrl('/api/sync/delete-task'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ taskId }),
@@ -1922,7 +1925,7 @@ class ReactiveStorageEngine {
         requireInteraction: true,
       };
 
-      fetch('/api/push/send', {
+      fetch(apiUrl('/api/push/send'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2111,7 +2114,7 @@ class ReactiveStorageEngine {
     // Real-time backend API synchronization
     try {
       if (typeof fetch !== 'undefined') {
-        fetch('/api/messages', {
+        fetch(apiUrl('/api/messages'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newMsg),
@@ -2154,8 +2157,10 @@ class ReactiveStorageEngine {
           page: String(page),
           pageSize: String(pageSize),
         });
-        const res = await fetch(`/api/messages?${queryParams.toString()}`);
-        if (res.ok) {
+        const res = await fetch(apiUrl(`/api/messages?${queryParams.toString()}`));
+        const contentType = res.headers?.get ? (res.headers.get('content-type') || '') : 'application/json';
+        const isNotHtml = !contentType.includes('text/html');
+        if (res.ok && isNotHtml) {
           const data = await res.json();
           if (Array.isArray(data.messages)) {
             fetchedFromBackend = true;

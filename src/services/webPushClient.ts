@@ -6,6 +6,7 @@
 
 import { UserProfile } from '../types/auth';
 import { StoredPushSubscription } from '../types/push';
+import { apiUrl } from './apiConfig';
 
 /**
  * Converts a URL-safe Base64 string to a Uint8Array for PushManager.subscribe applicationServerKey.
@@ -64,8 +65,9 @@ class WebPushClientService {
 
     // 2. Fetch from backend API
     try {
-      const res = await fetch('/api/push/vapid-public-key');
-      if (res.ok) {
+      const res = await fetch(apiUrl('/api/push/vapid-public-key'));
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         if (data.publicKey) {
           this.cachedPublicKey = data.publicKey;
@@ -157,7 +159,7 @@ class WebPushClientService {
         deviceLabel: this.detectDeviceLabel(),
       };
 
-      const res = await fetch('/api/push/subscribe', {
+      const res = await fetch(apiUrl('/api/push/subscribe'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -238,11 +240,19 @@ class WebPushClientService {
         deviceLabel: deviceLabel || this.detectDeviceLabel(),
       };
 
-      const res = await fetch('/api/push/subscribe', {
+      const res = await fetch(apiUrl('/api/push/subscribe'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        return {
+          success: false,
+          error: `Server returned non-JSON response (${res.status})`,
+        };
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -276,7 +286,7 @@ class WebPushClientService {
         await sub.unsubscribe();
 
         // Inform backend to remove subscription
-        await fetch('/api/push/unsubscribe', {
+        await fetch(apiUrl('/api/push/unsubscribe'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.uid, endpoint }),
@@ -298,7 +308,7 @@ class WebPushClientService {
     deviceLabel?: string
   ): Promise<{ success: boolean; count?: number; error?: string }> {
     try {
-      const res = await fetch('/api/push/test', {
+      const res = await fetch(apiUrl('/api/push/test'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -306,6 +316,11 @@ class WebPushClientService {
           deviceLabel: deviceLabel || this.detectDeviceLabel(),
         }),
       });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        return { success: false, error: `Server returned non-JSON response (${res.status})` };
+      }
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -325,8 +340,9 @@ class WebPushClientService {
    */
   public async fetchUserSubscriptions(user: UserProfile): Promise<StoredPushSubscription[]> {
     try {
-      const res = await fetch(`/api/push/subscriptions?userId=${encodeURIComponent(user.uid)}`);
-      if (res.ok) {
+      const res = await fetch(apiUrl(`/api/push/subscriptions?userId=${encodeURIComponent(user.uid)}`));
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         return data.subscriptions || [];
       }

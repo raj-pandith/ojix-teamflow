@@ -1,187 +1,102 @@
 /**
- * Standalone Node.js Web Push Server for OJIX TeamFlow
- * Can be run independently in production (e.g., node server/standaloneServer.ts)
- * or alongside Vite during local development.
+ * Standalone Node.js Production API Server for OJIX TeamFlow
+ * Serves authentication, RBAC, collaborative data sync, messages, SSE, and Web Push.
  */
 
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { handleApiRequest, sendJson } from './apiRouter';
 import { pushBackend } from './pushBackend';
+import { cloudPersistence } from './cloudPersistence';
 
-const PORT = process.env.PUSH_SERVER_PORT || process.env.PORT || 3001;
-
-function parseJsonBody<T>(req: http.IncomingMessage): Promise<T> {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => {
-      body += chunk;
-      if (body.length > 1024 * 64) reject(new Error('Body too large'));
-    });
-    req.on('end', () => {
-      try {
-        resolve(body ? JSON.parse(body) : ({} as T));
-      } catch (e) {
-        reject(e);
+// Load .env file in standalone mode if process.env is not already populated
+function loadLocalEnv() {
+  try {
+    const envPath = path.resolve(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx !== -1) {
+          const key = trimmed.slice(0, eqIdx).trim();
+          const val = trimmed.slice(eqIdx + 1).trim();
+          if (!process.env[key]) {
+            process.env[key] = val;
+          }
+        }
       }
-    });
-    req.on('error', reject);
-  });
+    }
+  } catch {
+    // Ignore in read-only or container environments
+  }
 }
 
-function sendJson(res: http.ServerResponse, status: number, data: unknown) {
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  });
-  res.end(JSON.stringify(data));
+loadLocalEnv();
+
+// Initialize push backend from environment
+pushBackend.initVapid();
+
+export const PORT = parseInt(process.env.PORT || process.env.PUSH_SERVER_PORT || '3001', 10);
+export const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || '*';
+
+export const appHandler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
+  try {
+    const handled = await handleApiRequest(req, res);
+    if (!handled) {
+      sendJson(req, res, 404, {
+        error: 'Endpoint not found',
+        path: req.url || '',
+        status: 404,
+      });
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
+    console.error('[StandaloneServer] Unhandled request error:', err);
+    sendJson(req, res, 500, {
+      error: message,
+      status: 500,
+    });
+  }
+};
+
+const server = http.createServer(appHandler);
+
+// Safe Startup Validation & Logging
+export function logStartupInfo() {
+  console.log('====================================================');
+  console.log('🚀 OJIX TeamFlow Standalone Backend Server');
+  console.log(`📡 Port:               ${PORT}`);
+  console.log(`🌐 Allowed CORS:       ${CLIENT_ORIGIN}`);
+  console.log(`💾 Persistence Engine: ${cloudPersistence.getStorageType()}`);
+  console.log(`🔔 Web Push (VAPID):   ${pushBackend.isReady() ? 'Ready' : 'Not configured (check VAPID keys)'}`);
+  console.log(`⏱️ Server Time:        ${new Date().toISOString()}`);
+  console.log('====================================================');
 }
-
-const server = http.createServer(async (req, res) => {
-  const url = req.url || '';
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    });
-    res.end();
-    return;
-  }
-
-  // Health check
-  if (req.method === 'GET' && (url === '/health' || url === '/api/health')) {
-    sendJson(res, 200, { status: 'ok', pushReady: pushBackend.isReady(), timestamp: new Date().toISOString() });
-    return;
-  }
-
-  // GET /api/push/vapid-public-key
-  if (req.method === 'GET' && url.startsWith('/api/push/vapid-public-key')) {
-    sendJson(res, 200, { publicKey: pushBackend.getPublicKey(), isReady: pushBackend.isReady() });
-    return;
-  }
-
-  // POST /api/push/subscribe
-  if (req.method === 'POST' && url === '/api/push/subscribe') {
-    try {
-      const body = await parseJsonBody<any>(req);
-      const sub = pushBackend.registerSubscription(body);
-      sendJson(res, 200, { success: true, subscription: sub });
-    } catch (err: any) {
-      sendJson(res, 400, { error: err.message || 'Registration failed' });
-    }
-    return;
-  }
-
-  // POST /api/push/unsubscribe
-  if (req.method === 'POST' && url === '/api/push/unsubscribe') {
-    try {
-      const body = await parseJsonBody<any>(req);
-      const removed = pushBackend.unregisterSubscription(body.endpoint, body.userId);
-      sendJson(res, 200, { success: removed });
-    } catch (err: any) {
-      sendJson(res, 400, { error: err.message || 'Unsubscribe failed' });
-    }
-    return;
-  }
-
-  // GET /api/push/subscriptions?userId=...
-  if (req.method === 'GET' && url.startsWith('/api/push/subscriptions')) {
-    const parsed = new URL(url, `http://localhost:${PORT}`);
-    const userId = parsed.searchParams.get('userId');
-    if (!userId) {
-      sendJson(res, 400, { error: 'userId is required' });
-      return;
-    }
-    sendJson(res, 200, { subscriptions: pushBackend.getSubscriptionsForUser(userId) });
-    return;
-  }
-
-  // POST /api/push/send
-  if (req.method === 'POST' && url === '/api/push/send') {
-    try {
-      const body = await parseJsonBody<any>(req);
-      const results = await pushBackend.sendPushToUser(body.recipientUserId, body.payload);
-      sendJson(res, 200, { success: true, count: results.length, results });
-    } catch (err: any) {
-      sendJson(res, 500, { error: err.message || 'Push delivery failed' });
-    }
-    return;
-  }
-
-  // GET /api/messages — with pagination metadata support
-  if (req.method === 'GET' && url.startsWith('/api/messages')) {
-    const parsedUrl = new URL(url, 'http://localhost');
-    const page = Math.max(1, parseInt(parsedUrl.searchParams.get('page') || '1', 10) || 1);
-    const pageSize = Math.max(1, parseInt(parsedUrl.searchParams.get('pageSize') || parsedUrl.searchParams.get('limit') || '20', 10) || 20);
-    sendJson(res, 200, {
-      success: true,
-      count: 0,
-      total: 0,
-      page,
-      pageSize,
-      totalPages: 1,
-      hasMore: false,
-      messages: [],
-    });
-    return;
-  }
-
-  // POST /api/messages
-  if (req.method === 'POST' && url === '/api/messages') {
-    try {
-      const body = await parseJsonBody<any>(req);
-      sendJson(res, 201, { success: true, message: body });
-    } catch (err: any) {
-      sendJson(res, 500, { error: err.message || 'Failed to send message' });
-    }
-    return;
-  }
-
-  // GET /api/sync
-  if (req.method === 'GET' && url.startsWith('/api/sync')) {
-    sendJson(res, 200, { notifications: [], logs: [], directMessages: [] });
-    return;
-  }
-
-  // POST /api/sync
-  if (req.method === 'POST' && url === '/api/sync') {
-    try {
-      const body = await parseJsonBody<any>(req);
-      sendJson(res, 200, { success: true, received: body });
-    } catch (err: any) {
-      sendJson(res, 500, { error: err.message || 'Sync failed' });
-    }
-    return;
-  }
-
-  // POST /api/push/test
-  if (req.method === 'POST' && url === '/api/push/test') {
-    try {
-      const body = await parseJsonBody<any>(req);
-      const payload = {
-        id: `test-${Date.now()}`,
-        title: body.title || 'OJIX TeamFlow — Web Push Verified',
-        body: body.body || 'Production Web Push notification delivered successfully via VAPID.',
-        tag: 'teamflow-test-push',
-        timestamp: Date.now(),
-      };
-      const results = await pushBackend.sendPushToUser(body.userId, payload);
-      sendJson(res, 200, { success: true, count: results.length, results });
-    } catch (err: any) {
-      sendJson(res, 500, { error: err.message || 'Test push delivery failed' });
-    }
-    return;
-  }
-
-  sendJson(res, 404, { error: 'Not found' });
-});
 
 if (process.env.NODE_ENV !== 'test') {
-  server.listen(PORT, () => {
-    console.log(`[OJIX Push Server] Listening on port ${PORT} (VAPID Ready: ${pushBackend.isReady()})`);
+  server.listen(PORT, '0.0.0.0', () => {
+    logStartupInfo();
   });
+
+  const handleShutdown = (signal: string) => {
+    console.log(`\n[StandaloneServer] Received ${signal}. Gracefully closing server...`);
+    server.close(() => {
+      console.log('[StandaloneServer] Server closed successfully.');
+      process.exit(0);
+    });
+    // Force close after 5s timeout
+    setTimeout(() => {
+      console.warn('[StandaloneServer] Force exit timed out.');
+      process.exit(1);
+    }, 5000).unref();
+  };
+
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
 }
 
 export { server };
+export default server;

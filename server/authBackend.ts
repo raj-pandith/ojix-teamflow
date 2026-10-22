@@ -98,14 +98,47 @@ const SEED_ACCOUNTS: StoredAccount[] = [
   },
 ];
 
+import { cloudPersistence } from './cloudPersistence';
+
 class AuthBackend {
   private data: ServerAuthStore = { accounts: [], invitations: [], sessions: {} };
 
   constructor() {
     this.load();
+    this.syncWithCloud().catch(() => {});
     const timer = setInterval(() => this.cleanExpiredSessions(), 60 * 60 * 1000);
     if (timer && typeof timer.unref === 'function') {
       timer.unref();
+    }
+  }
+
+  public async syncWithCloud(): Promise<void> {
+    if (!cloudPersistence.isCloudReady()) return;
+    try {
+      const cloudData = await cloudPersistence.loadAuthData();
+      if (cloudData && Array.isArray(cloudData.accounts) && cloudData.accounts.length > 0) {
+        // Merge cloud accounts into memory
+        for (const cAcc of cloudData.accounts) {
+          const idx = this.data.accounts.findIndex(a => a.uid === cAcc.uid || a.email.toLowerCase() === cAcc.email.toLowerCase());
+          if (idx === -1) {
+            this.data.accounts.push(cAcc);
+          } else {
+            this.data.accounts[idx] = { ...this.data.accounts[idx], ...cAcc };
+          }
+        }
+        if (Array.isArray(cloudData.invitations)) {
+          this.data.invitations = cloudData.invitations;
+        }
+        this.save(false);
+      } else {
+        // Initialize cloud with current memory accounts
+        await cloudPersistence.saveAuthData({
+          accounts: this.data.accounts,
+          invitations: this.data.invitations,
+        });
+      }
+    } catch (err) {
+      console.warn('[AuthBackend] Cloud auth sync notice:', err);
     }
   }
 
@@ -142,11 +175,18 @@ class AuthBackend {
     }
   }
 
-  private save(): void {
+  private save(syncToCloud = true): void {
     try {
       fs.writeFileSync(authFilePath, JSON.stringify(this.data, null, 2), 'utf8');
     } catch (err) {
       console.error('Failed to save .server-auth.json:', err);
+    }
+
+    if (syncToCloud && cloudPersistence.isCloudReady()) {
+      cloudPersistence.saveAuthData({
+        accounts: this.data.accounts,
+        invitations: this.data.invitations,
+      }).catch(() => {});
     }
   }
 

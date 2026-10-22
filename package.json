@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.app.json && vite build",
+    "build:server": "vite build --ssr server/standaloneServer.ts --outDir dist-server",
+    "start:server": "node dist-server/standaloneServer.js",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
