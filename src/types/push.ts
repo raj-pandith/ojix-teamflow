@@ -29,6 +29,9 @@ export interface PushPayload {
   readonly tag?: string;
   readonly url?: string;
   readonly type?: string;
+  readonly recipientUserId?: string | null;
+  readonly actorUserId?: string | null;
+  readonly actorDisplayName?: string | null;
   readonly projectId?: string | null;
   readonly projectName?: string | null;
   readonly taskId?: string | null;
