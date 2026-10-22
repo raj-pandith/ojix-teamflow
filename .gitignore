@@ -32,8 +32,16 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Push Subscriptions (Local cache)
+# Push Subscriptions & Local Sync Cache
 .push-subscriptions.json
 .server-sync.json
 .server-auth.json
+
+# Service Account Credentials & Secrets
+*service-account*.json
+*serviceAccount*.json
+*credentials*.json
+*firebase-key*.json
+*.pem
+*.key
 

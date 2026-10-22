@@ -53,5 +53,8 @@ export default defineConfig(({ mode, command }) => {
         },
       },
     },
+    ssr: {
+      external: ['firebase-admin', 'bcryptjs', 'web-push'],
+    },
   };
 });

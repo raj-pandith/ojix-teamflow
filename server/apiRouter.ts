@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import { pushBackend } from './pushBackend';
 import { authBackend } from './authBackend';
 import { cloudPersistence, SharedSyncData } from './cloudPersistence';
+import type { UserProfile } from '../src/types/auth';
 
 export const SERVER_BOOT_TIME = Date.now();
 export const SERVER_BOOT_ID = `server-boot-${SERVER_BOOT_TIME}`;
@@ -42,16 +43,19 @@ let sharedSyncData: SharedSyncData = {
 let syncInitialized = false;
 export async function initializeSyncData(): Promise<SharedSyncData> {
   if (!syncInitialized) {
-    sharedSyncData = await cloudPersistence.loadSyncData();
-    syncInitialized = true;
-    console.log(`[ApiRouter] Shared sync storage initialized (engine: ${cloudPersistence.getStorageType()})`);
+    try {
+      sharedSyncData = await cloudPersistence.loadSyncData();
+      syncInitialized = true;
+      console.log(`[ApiRouter] Shared sync storage initialized (engine: ${cloudPersistence.getStorageType()})`);
+    } catch (err: unknown) {
+      if (cloudPersistence.isStrictPersistence()) {
+        throw err;
+      }
+      console.warn('[ApiRouter] Initial sync load warning:', err);
+    }
   }
   return sharedSyncData;
 }
-// Trigger initial load
-initializeSyncData().catch(err => {
-  console.warn('[ApiRouter] Initial sync load warning:', err);
-});
 
 export function getSharedSyncData(): SharedSyncData {
   return sharedSyncData;
@@ -78,7 +82,7 @@ function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
   });
 }
 
-function extractAuthToken(req: IncomingMessage): string {
+export function extractAuthToken(req: IncomingMessage): string {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7).trim();
@@ -95,6 +99,24 @@ function extractAuthToken(req: IncomingMessage): string {
     }
   }
   return '';
+}
+
+export function getCallingUser(req: IncomingMessage): UserProfile | null {
+  const token = extractAuthToken(req);
+  if (!token) return null;
+  const account = authBackend.getSessionAccount(token);
+  if (!account) return null;
+  return {
+    uid: account.uid,
+    email: account.email,
+    displayName: account.displayName,
+    role: account.role,
+    status: account.status,
+    phone: account.phone,
+    avatarUrl: account.avatarUrl,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
+  };
 }
 
 function getCorsOrigin(req: IncomingMessage): string {
@@ -154,7 +176,15 @@ export async function handleApiRequest(
 
   // Ensure sync data is loaded
   if (!syncInitialized) {
-    await initializeSyncData();
+    try {
+      await initializeSyncData();
+    } catch (err: unknown) {
+      if (cloudPersistence.isStrictPersistence() && !url.startsWith('/health') && !url.startsWith('/ready') && !url.startsWith('/api/health') && !url.startsWith('/api/ready')) {
+        const message = err instanceof Error ? err.message : 'Database initialization failure';
+        sendJson(req, res, 503, { error: message, status: 503, ready: false });
+        return true;
+      }
+    }
   }
 
   // 1. CORS Preflight
@@ -162,6 +192,9 @@ export async function handleApiRequest(
     if (
       url === '/health' ||
       url === '/api/health' ||
+      url === '/ready' ||
+      url === '/api/ready' ||
+      url === '/api/health/ready' ||
       url.startsWith('/api/')
     ) {
       res.statusCode = 204;
@@ -171,16 +204,33 @@ export async function handleApiRequest(
     }
   }
 
-  // 2. Health Check Endpoints
+  // 2. Health & Readiness Check Endpoints
+  // Liveness Check (Is the process running?)
   if (method === 'GET' && (url === '/health' || url === '/api/health')) {
+    const isReady = cloudPersistence.isCloudReady();
     sendJson(req, res, 200, {
       status: 'ok',
       service: 'ojix-teamflow-backend',
       uptimeSeconds: Math.round(process.uptime()),
       pushReady: pushBackend.isReady(),
       storageType: cloudPersistence.getStorageType(),
+      databaseHealthy: isReady || !cloudPersistence.isStrictPersistence(),
       activeSseConnections: sseConnections.size,
       bootId: SERVER_BOOT_ID,
+      timestamp: new Date().toISOString(),
+    });
+    return true;
+  }
+
+  // Readiness Check (Is the database actually connected and responding?)
+  if (method === 'GET' && (url === '/ready' || url === '/api/ready' || url === '/api/health/ready')) {
+    const health = await cloudPersistence.checkHealth();
+    const statusCode = health.ready ? 200 : 503;
+    sendJson(req, res, statusCode, {
+      status: health.ready ? 'ready' : 'unready',
+      service: 'ojix-teamflow-backend',
+      uptimeSeconds: Math.round(process.uptime()),
+      ...health,
       timestamp: new Date().toISOString(),
     });
     return true;
@@ -591,6 +641,14 @@ export async function handleApiRequest(
 
   // GET /api/messages
   if (method === 'GET' && url.startsWith('/api/messages')) {
+    const caller = getCallingUser(req);
+    if (caller) {
+      if (caller.status === 'blocked' || caller.status === 'terminated') {
+        sendJson(req, res, 403, { error: `Permission denied: Account is ${caller.status}. Message access revoked.` });
+        return true;
+      }
+    }
+
     const parsedUrl = new URL(url, 'http://localhost');
     const conversationId = parsedUrl.searchParams.get('conversationId');
     const userId = parsedUrl.searchParams.get('userId');
@@ -603,6 +661,11 @@ export async function handleApiRequest(
     }
     if (userId) {
       list = list.filter(m => m.senderId === userId || m.recipientId === userId);
+    }
+
+    // Role-based privacy: non-admin callers can only access messages they are participant in
+    if (caller && caller.role !== 'workspace_admin') {
+      list = list.filter(m => m.senderId === caller.uid || m.recipientId === caller.uid);
     }
 
     list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -644,6 +707,18 @@ export async function handleApiRequest(
   // POST /api/messages
   if (method === 'POST' && url === '/api/messages') {
     try {
+      const caller = getCallingUser(req);
+      if (caller) {
+        if (caller.status === 'blocked' || caller.status === 'terminated') {
+          sendJson(req, res, 403, { error: `Permission denied: Account is ${caller.status}. Message sending revoked.` });
+          return true;
+        }
+        if (caller.role === 'viewer') {
+          sendJson(req, res, 403, { error: 'Permission denied: Viewers have read-only access and cannot send direct messages.' });
+          return true;
+        }
+      }
+
       const body = await parseJsonBody<{
         id?: string;
         senderId: string;
@@ -720,7 +795,7 @@ export async function handleApiRequest(
         sharedSyncData.notifications.unshift(notif);
       }
 
-      cloudPersistence.saveSyncData(sharedSyncData).catch(() => {});
+      await cloudPersistence.saveSyncData(sharedSyncData);
 
       broadcastRealtimeEvent('message', message);
       broadcastRealtimeEvent('sync', {
@@ -755,6 +830,19 @@ export async function handleApiRequest(
 
   // GET /api/sync
   if (method === 'GET' && url.startsWith('/api/sync')) {
+    const token = extractAuthToken(req);
+    const caller = getCallingUser(req);
+    if (token && !caller) {
+      sendJson(req, res, 401, { error: 'Unauthorized: Invalid, expired, or revoked session.' });
+      return true;
+    }
+    if (caller) {
+      if (caller.status === 'blocked' || caller.status === 'terminated') {
+        sendJson(req, res, 403, { error: `Permission denied: Account is ${caller.status}. Workspace access revoked.` });
+        return true;
+      }
+    }
+
     sendJson(req, res, 200, {
       bootId: SERVER_BOOT_ID,
       notifications: sharedSyncData.notifications,
@@ -770,6 +858,23 @@ export async function handleApiRequest(
   // POST /api/sync
   if (method === 'POST' && url === '/api/sync') {
     try {
+      const token = extractAuthToken(req);
+      const caller = getCallingUser(req);
+      if (token && !caller) {
+        sendJson(req, res, 401, { error: 'Unauthorized: Invalid, expired, or revoked session.' });
+        return true;
+      }
+      if (caller) {
+        if (caller.status === 'blocked' || caller.status === 'terminated') {
+          sendJson(req, res, 403, { error: `Permission denied: Account is ${caller.status}. Workspace access revoked.` });
+          return true;
+        }
+        if (caller.role === 'viewer') {
+          sendJson(req, res, 403, { error: 'Permission denied: Viewers have read-only access and cannot modify projects or tasks.' });
+          return true;
+        }
+      }
+
       const body = await parseJsonBody<{
         notifications?: any[];
         logs?: any[];
@@ -777,6 +882,62 @@ export async function handleApiRequest(
         projects?: any[];
         tasks?: any[];
       }>(req);
+
+      // Role check: Members cannot create brand-new projects
+      if (caller && caller.role === 'member' && Array.isArray(body.projects)) {
+        for (const p of body.projects) {
+          if (p && p.id && !sharedSyncData.projects.some(existing => existing.id === p.id)) {
+            sendJson(req, res, 403, { error: 'Permission denied: Members cannot create new projects. Only Project Leads and Workspace Admins can create projects.' });
+            return true;
+          }
+        }
+      }
+
+      // Validate task state machine & role assignments
+      if (Array.isArray(body.tasks)) {
+        const accounts = authBackend.getAccounts();
+        for (const t of body.tasks) {
+          if (!t || !t.id) continue;
+
+          // Check assignee eligibility: Workspace Admins and Viewers cannot be assigned tasks
+          if (t.assigneeId) {
+            const assignee = accounts.find(a => a.uid === t.assigneeId);
+            if (assignee && (assignee.role === 'workspace_admin' || assignee.role === 'viewer')) {
+              sendJson(req, res, 400, {
+                error: `Invalid task assignee: Users with role '${assignee.role}' cannot be assigned tasks. Assignee must be a Member or Project Lead.`,
+              });
+              return true;
+            }
+          }
+
+          // Check state machine transition: cannot jump directly from in_progress to done
+          const existing = sharedSyncData.tasks.find(existingTask => existingTask.id === t.id);
+          if (existing) {
+            if (existing.status === 'in_progress' && t.status === 'done') {
+              sendJson(req, res, 400, {
+                error: 'Invalid status transition: Task cannot jump directly from In Progress to Done. Must be submitted for In Review first.',
+              });
+              return true;
+            }
+
+            // Self-review policy: assigned member cannot approve their own task to done if reviewer is assigned
+            if (existing.status === 'in_review' && t.status === 'done') {
+              if (
+                caller &&
+                caller.uid === t.assigneeId &&
+                t.reviewerId &&
+                t.reviewerId !== t.assigneeId &&
+                caller.role !== 'workspace_admin'
+              ) {
+                sendJson(req, res, 403, {
+                  error: 'Self-review policy: The assigned member cannot approve their own task to Done. Reviewer approval required.',
+                });
+                return true;
+              }
+            }
+          }
+        }
+      }
 
       let changed = false;
 
@@ -869,7 +1030,7 @@ export async function handleApiRequest(
       }
 
       if (changed) {
-        cloudPersistence.saveSyncData(sharedSyncData).catch(() => {});
+        await cloudPersistence.saveSyncData(sharedSyncData);
         broadcastRealtimeEvent('sync', {
           notifications: body.notifications,
           logs: body.logs,
@@ -890,11 +1051,17 @@ export async function handleApiRequest(
   // POST /api/sync/delete-project
   if (method === 'POST' && url === '/api/sync/delete-project') {
     try {
+      const caller = getCallingUser(req);
+      if (caller && (caller.role === 'viewer' || caller.role === 'member')) {
+        sendJson(req, res, 403, { error: 'Permission denied: Only Workspace Admins and Project Leads can delete projects.' });
+        return true;
+      }
+
       const body = await parseJsonBody<{ projectId: string }>(req);
       if (body.projectId) {
         sharedSyncData.projects = sharedSyncData.projects.filter(p => p.id !== body.projectId);
         sharedSyncData.tasks = sharedSyncData.tasks.filter(t => t.projectId !== body.projectId);
-        cloudPersistence.saveSyncData(sharedSyncData).catch(() => {});
+        await cloudPersistence.saveSyncData(sharedSyncData);
         broadcastRealtimeEvent('sync', {
           projects: sharedSyncData.projects,
           tasks: sharedSyncData.tasks,
@@ -902,8 +1069,9 @@ export async function handleApiRequest(
         });
       }
       sendJson(req, res, 200, { success: true });
-    } catch {
-      sendJson(req, res, 500, { error: 'Delete project sync failed' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Delete project sync failed';
+      sendJson(req, res, 500, { error: message });
     }
     return true;
   }
@@ -911,31 +1079,46 @@ export async function handleApiRequest(
   // POST /api/sync/delete-task
   if (method === 'POST' && url === '/api/sync/delete-task') {
     try {
+      const caller = getCallingUser(req);
+      if (caller && caller.role === 'viewer') {
+        sendJson(req, res, 403, { error: 'Permission denied: Viewers cannot delete tasks.' });
+        return true;
+      }
+
       const body = await parseJsonBody<{ taskId: string }>(req);
       if (body.taskId) {
         sharedSyncData.tasks = sharedSyncData.tasks.filter(t => t.id !== body.taskId);
-        cloudPersistence.saveSyncData(sharedSyncData).catch(() => {});
+        await cloudPersistence.saveSyncData(sharedSyncData);
         broadcastRealtimeEvent('sync', {
           tasks: sharedSyncData.tasks,
           deletedTaskId: body.taskId,
         });
       }
       sendJson(req, res, 200, { success: true });
-    } catch {
-      sendJson(req, res, 500, { error: 'Delete task sync failed' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Delete task sync failed';
+      sendJson(req, res, 500, { error: message });
     }
     return true;
   }
 
-  // Clear all data
+  // Clear all data (Admin restricted)
   if ((method === 'POST' || method === 'GET') && (url === '/api/clear-all-data' || url === '/api/sync/clear')) {
     try {
+      const caller = getCallingUser(req);
+      if (cloudPersistence.isProduction() || caller) {
+        if (!caller || caller.role !== 'workspace_admin') {
+          sendJson(req, res, 403, { error: 'Forbidden: Only Workspace Admins can clear all workspace data.' });
+          return true;
+        }
+      }
+
       sharedSyncData.notifications = [];
       sharedSyncData.logs = [];
       sharedSyncData.directMessages = [];
       sharedSyncData.projects = [];
       sharedSyncData.tasks = [];
-      cloudPersistence.saveSyncData(sharedSyncData).catch(() => {});
+      await cloudPersistence.saveSyncData(sharedSyncData);
       authBackend.reset();
       pushBackend.clearAllSubscriptions();
       broadcastRealtimeEvent('sync', {

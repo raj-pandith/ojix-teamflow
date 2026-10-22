@@ -135,5 +135,10 @@ service cloud.firestore {
       allow update: if isAuthenticated() && request.auth.uid == resource.data.recipientId; // mark read
       allow delete: if false;
     }
+
+    // Internal Server-Managed System State (Deny all client SDK access; accessible only via Firebase Admin SDK)
+    match /system_state/{document=**} {
+      allow read, write: if false;
+    }
   }
 }

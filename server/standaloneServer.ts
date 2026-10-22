@@ -1,6 +1,7 @@
 /**
  * Standalone Node.js Production API Server for OJIX TeamFlow
  * Serves authentication, RBAC, collaborative data sync, messages, SSE, and Web Push.
+ * Integrated with Google Cloud Firestore via Firebase Admin SDK.
  */
 
 import http from 'http';
@@ -53,10 +54,11 @@ export const appHandler = async (req: http.IncomingMessage, res: http.ServerResp
       });
     }
   } catch (err: unknown) {
+    const isProd = process.env.NODE_ENV === 'production';
     const message = err instanceof Error ? err.message : 'Internal Server Error';
     console.error('[StandaloneServer] Unhandled request error:', err);
     sendJson(req, res, 500, {
-      error: message,
+      error: isProd ? 'Internal Server Error' : message,
       status: 500,
     });
   }
@@ -66,19 +68,38 @@ const server = http.createServer(appHandler);
 
 // Safe Startup Validation & Logging
 export function logStartupInfo() {
+  const isCloud = cloudPersistence.isCloudReady();
+  const projectId = cloudPersistence.getActiveProjectId();
+  const storageEngine = cloudPersistence.getStorageType();
+
   console.log('====================================================');
   console.log('🚀 OJIX TeamFlow Standalone Backend Server');
   console.log(`📡 Port:               ${PORT}`);
   console.log(`🌐 Allowed CORS:       ${CLIENT_ORIGIN}`);
-  console.log(`💾 Persistence Engine: ${cloudPersistence.getStorageType()}`);
+  console.log(`💾 Persistence Engine: ${storageEngine} ${isCloud ? `(Project: ${projectId})` : '(Local fallback)'}`);
   console.log(`🔔 Web Push (VAPID):   ${pushBackend.isReady() ? 'Ready' : 'Not configured (check VAPID keys)'}`);
+  console.log(`🛡️ Environment:        ${process.env.NODE_ENV || 'development'}`);
   console.log(`⏱️ Server Time:        ${new Date().toISOString()}`);
   console.log('====================================================');
+
+  if (process.env.NODE_ENV === 'production' && !isCloud) {
+    console.error('⚠️ [CRITICAL DEPLOYMENT NOTICE] Cloud Firestore is NOT connected in production!');
+    console.error('⚠️ Ensure FIREBASE_SERVICE_ACCOUNT (or GOOGLE_APPLICATION_CREDENTIALS) is set in Render environment variables.');
+  }
 }
 
 if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, '0.0.0.0', () => {
     logStartupInfo();
+
+    // Asynchronous database health probe after socket binding
+    cloudPersistence.checkHealth().then(health => {
+      if (health.healthy && health.database === 'firestore') {
+        console.log(`[StandaloneServer] ✅ Cloud Firestore verified (latency: ${health.latencyMs}ms)`);
+      } else if (!health.healthy) {
+        console.warn(`[StandaloneServer] ⚠️ Persistence health warning: ${health.error || 'Unavailable'}`);
+      }
+    });
   });
 
   const handleShutdown = (signal: string) => {

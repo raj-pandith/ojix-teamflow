@@ -129,12 +129,16 @@ class AuthBackend {
         if (Array.isArray(cloudData.invitations)) {
           this.data.invitations = cloudData.invitations;
         }
+        if (cloudData.sessions && typeof cloudData.sessions === 'object') {
+          this.data.sessions = { ...cloudData.sessions, ...this.data.sessions };
+        }
         this.save(false);
       } else {
         // Initialize cloud with current memory accounts
         await cloudPersistence.saveAuthData({
           accounts: this.data.accounts,
           invitations: this.data.invitations,
+          sessions: this.data.sessions,
         });
       }
     } catch (err) {
@@ -186,7 +190,10 @@ class AuthBackend {
       cloudPersistence.saveAuthData({
         accounts: this.data.accounts,
         invitations: this.data.invitations,
-      }).catch(() => {});
+        sessions: this.data.sessions,
+      }).catch(err => {
+        console.error('[AuthBackend] Error syncing auth data to Cloud Firestore:', err);
+      });
     }
   }
 
@@ -329,7 +336,7 @@ class AuthBackend {
     };
   }
 
-  public getSessionUser(token: string): UserProfile | null {
+  public getSessionAccount(token: string): StoredAccount | null {
     if (!token) return null;
     const session = this.data.sessions[token];
     if (!session) return null;
@@ -338,12 +345,15 @@ class AuthBackend {
       this.save();
       return null;
     }
+    return this.data.accounts.find(a => a.uid === session.uid) || null;
+  }
 
-    const account = this.data.accounts.find(a => a.uid === session.uid);
+  public getSessionUser(token: string): UserProfile | null {
+    if (!token) return null;
+    const account = this.getSessionAccount(token);
     if (!account || account.status === 'blocked' || account.status === 'terminated') {
       return null;
     }
-
     return this.sanitizeUser(account);
   }
 
