@@ -13,10 +13,10 @@ export function getEffectiveApiBase(): string {
       return '';
     }
   }
-  return (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  return (import.meta.env.VITE_API_URL || 'https://ojix-teamflow.onrender.com').replace(/\/+$/, '');
 }
 
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+export const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://ojix-teamflow.onrender.com').replace(/\/+$/, '');
 
 export function apiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
