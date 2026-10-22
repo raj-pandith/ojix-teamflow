@@ -59,6 +59,19 @@ class AuthService {
     this.currentUser = null;
   }
 
+  private async safeParseJson(res: Response): Promise<{ isJson: boolean; data: any }> {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return { isJson: false, data: null };
+    }
+    try {
+      const data = await res.json();
+      return { isJson: true, data };
+    } catch {
+      return { isJson: false, data: null };
+    }
+  }
+
   public async validateServerSession(): Promise<UserProfile | null> {
     const token = this.getToken();
     if (!token) return null;
@@ -68,14 +81,12 @@ class AuthService {
         headers: this.getAuthHeaders(),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          this.currentUser = data.user;
-          localStorage.setItem(AUTH_STORAGE_KEY, data.user.uid);
-          this.notify();
-          return data.user;
-        }
+      const { isJson, data } = await this.safeParseJson(res);
+      if (res.ok && isJson && data?.user) {
+        this.currentUser = data.user;
+        localStorage.setItem(AUTH_STORAGE_KEY, data.user.uid);
+        this.notify();
+        return data.user;
       } else if (res.status === 401) {
         // Session expired or invalidated on server
         this.clearSessionLocally();
@@ -124,34 +135,43 @@ class AuthService {
         body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
-      const data = await res.json();
+      const { isJson, data } = await this.safeParseJson(res);
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed. Please check your credentials.');
-      }
-
-      if (data.session) {
-        const session = data.session;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(AUTH_TOKEN_KEY, session.token);
-          localStorage.setItem(AUTH_STORAGE_KEY, session.user.uid);
+      if (isJson && data) {
+        if (!res.ok) {
+          throw new Error(data.error || 'Authentication failed. Please check your credentials.');
         }
-        this.currentUser = session.user;
 
-        // Ensure user account and authoritative active status is synchronized in storageEngine
-        storageEngine.syncAccountsWithServer([session.user]);
+        if (data.session) {
+          const session = data.session;
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(AUTH_TOKEN_KEY, session.token);
+            localStorage.setItem(AUTH_STORAGE_KEY, session.user.uid);
+          }
+          this.currentUser = session.user;
 
-        this.notify();
-        return session.user;
+          // Ensure user account and authoritative active status is synchronized in storageEngine
+          storageEngine.syncAccountsWithServer([session.user]);
+
+          this.notify();
+          return session.user;
+        }
       }
-      throw new Error('Unexpected authentication response.');
+
+      // If server returned non-JSON (e.g. static host returning index.html) or no session, trigger fallback
+      throw new Error('SERVER_OFFLINE_STATIC');
     } catch (err: unknown) {
-      // If network failed (e.g., test environment where fetch is mocked or offline)
-      if (err instanceof Error && !err.message.includes('fetch') && !err.message.includes('NetworkError') && !err.message.includes('Failed to fetch')) {
+      // If error is explicit user authentication failure from a real server, rethrow it
+      if (err instanceof Error && err.message.includes('Authentication failed')) {
+        throw err;
+      }
+      if (err instanceof Error && (err.message.includes('Account Suspended') || err.message.includes('Account Terminated') || err.message.includes('Account pending activation'))) {
         throw err;
       }
 
-      // Offline / unit-test fallback
+      // Offline / Static deployment fallback (DEC-008):
+      // When /api/auth/login is not available (e.g. Cloudflare Pages or network offline),
+      // authenticate using the reactive storage engine.
       const user = storageEngine.getUsers().find(u => u.email.toLowerCase() === normalizedEmail);
       if (!user) {
         throw new Error('Invalid email or password.');
@@ -164,6 +184,11 @@ class AuthService {
       }
       if (user.status === 'pending_activation') {
         throw new Error('Account pending activation. Please use your activation link to set your password.');
+      }
+
+      // In client-side storage engine mode, verify standard demo password
+      if (password !== 'Password123!' && password !== 'admin123' && password !== 'password' && password !== 'demo') {
+        throw new Error('Invalid email or password. Use demo password: Password123!');
       }
 
       this.currentUser = user;
@@ -344,12 +369,10 @@ class AuthService {
       const res = await fetch('/api/auth/admin/users', {
         headers: this.getAuthHeaders(),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.users)) {
-          storageEngine.syncAccountsWithServer(data.users);
-          return storageEngine.getUsers();
-        }
+      const { isJson, data } = await this.safeParseJson(res);
+      if (res.ok && isJson && Array.isArray(data?.users)) {
+        storageEngine.syncAccountsWithServer(data.users);
+        return storageEngine.getUsers();
       }
     } catch {
       // Offline fallback
