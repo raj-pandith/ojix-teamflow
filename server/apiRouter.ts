@@ -83,11 +83,11 @@ function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
 }
 
 export function extractAuthToken(req: IncomingMessage): string {
-  const authHeader = req.headers.authorization;
+  const authHeader = (req.headers.authorization || (req.headers as any)['Authorization'] || '') as string;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7).trim();
   }
-  const xAuthToken = req.headers['x-auth-token'];
+  const xAuthToken = (req.headers['x-auth-token'] || (req.headers as any)['X-Auth-Token'] || '') as string;
   if (typeof xAuthToken === 'string' && xAuthToken.trim()) {
     return xAuthToken.trim();
   }
@@ -1136,6 +1136,228 @@ export async function handleApiRequest(
       sendJson(req, res, 500, { error: message });
     }
     return true;
+  }
+
+  // =========================================================================
+  // 8. CRM INTEGRATION API (/api/crm)
+  // =========================================================================
+
+  // GET /api/crm/projects — Fetch available won deals from OJIX ClientFlow CRM
+  if (method === 'GET' && url.startsWith('/api/crm/projects')) {
+    const token = extractAuthToken(req);
+    const caller = getCallingUser(req);
+    if (!token || !caller) {
+      sendJson(req, res, 401, { error: 'Unauthorized: Authentication required to fetch CRM projects.' });
+      return true;
+    }
+    if (caller.status === 'blocked' || caller.status === 'terminated') {
+      sendJson(req, res, 403, { error: `Permission denied: Account is ${caller.status}. Workspace access revoked.` });
+      return true;
+    }
+    if (caller.role !== 'workspace_admin') {
+      sendJson(req, res, 403, { error: 'Permission denied: Only Workspace Admins are authorized to fetch CRM projects.' });
+      return true;
+    }
+
+    const apiKey = process.env.CLIENTFLOW_CRM_API_KEY || 'ojix-teamflow-clientflow-2026';
+    const baseUrl = process.env.CLIENTFLOW_CRM_API_URL || 'https://client-flow-5xb8.vercel.app/api/projects?stage=WON';
+    const targetUrl = baseUrl.includes('api_key=')
+      ? baseUrl
+      : `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(apiKey)}`;
+
+    try {
+      const crmRes = await fetch(targetUrl);
+      if (!crmRes.ok) {
+        sendJson(req, res, crmRes.status, {
+          error: `OJIX ClientFlow CRM server returned HTTP status ${crmRes.status}.`,
+          status: crmRes.status,
+        });
+        return true;
+      }
+      const crmData = await crmRes.json();
+      if (!crmData || typeof crmData !== 'object' || !Array.isArray(crmData.projects)) {
+        sendJson(req, res, 502, {
+          error: 'Invalid response format received from OJIX ClientFlow CRM.',
+        });
+        return true;
+      }
+
+      // Annotate projects with alreadyImported & validation status
+      const enrichedProjects = crmData.projects.map((proj: any) => {
+        const extId = proj.id;
+        const dealId = proj.dealId;
+        const isAlreadyImported = sharedSyncData.projects.some(
+          p => (p.crmMetadata?.externalId && p.crmMetadata.externalId === extId) ||
+               (dealId && p.crmMetadata?.dealId && p.crmMetadata.dealId === dealId)
+        );
+        const isValidDateRange = !proj.startDate || !proj.dueDate || proj.startDate <= proj.dueDate;
+        const validationError = !isValidDateRange
+          ? `Target completion date (${proj.dueDate}) must be on or after start date (${proj.startDate}).`
+          : undefined;
+
+        return {
+          ...proj,
+          isAlreadyImported,
+          isValidDateRange,
+          validationError,
+        };
+      });
+
+      sendJson(req, res, 200, {
+        success: true,
+        message: crmData.message || 'Projects successfully fetched from OJIX ClientFlow CRM',
+        sourceApp: crmData.sourceApp || 'OJIX ClientFlow (CRM)',
+        targetApp: crmData.targetApp || 'OJIX TeamFlow (Project OS)',
+        totalCount: enrichedProjects.length,
+        projects: enrichedProjects,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to connect to OJIX ClientFlow CRM';
+      sendJson(req, res, 502, { error: message });
+    }
+    return true;
+  }
+
+  // POST /api/crm/import — Import selected projects into TeamFlow with server-side validation & atomicity
+  if (method === 'POST' && url === '/api/crm/import') {
+    const token = extractAuthToken(req);
+    const caller = getCallingUser(req);
+    if (!token || !caller) {
+      sendJson(req, res, 401, { error: 'Unauthorized: Authentication required to import projects.' });
+      return true;
+    }
+    if (caller.status === 'blocked' || caller.status === 'terminated') {
+      sendJson(req, res, 403, { error: `Permission denied: Account is ${caller.status}. Workspace access revoked.` });
+      return true;
+    }
+    if (caller.role !== 'workspace_admin') {
+      sendJson(req, res, 403, { error: 'Permission denied: Only Workspace Admins can import projects from ClientFlow CRM.' });
+      return true;
+    }
+
+    try {
+      const body = await parseJsonBody<{ projects: any[] }>(req);
+      if (!Array.isArray(body.projects) || body.projects.length === 0) {
+        sendJson(req, res, 400, { error: 'No projects provided for import.' });
+        return true;
+      }
+
+      const accounts = authBackend.getAccounts();
+      const adminUsers = accounts.filter(
+        u => u.role === 'workspace_admin' && u.status !== 'blocked' && u.status !== 'terminated'
+      );
+      const adminIds = adminUsers.map(u => u.uid);
+
+      const importedProjects: any[] = [];
+      const failedProjects: Array<{ id: string; name: string; reason: string }> = [];
+
+      for (const crmProj of body.projects) {
+        const projName = (crmProj.name || crmProj.title || '').trim();
+        const projObjective = (crmProj.objective || '').trim();
+        const crmId = crmProj.id || crmProj.dealId || '';
+
+        if (!crmId) {
+          failedProjects.push({
+            id: crmId || 'unknown',
+            name: projName || 'Unnamed CRM Project',
+            reason: 'Missing external project identifier.',
+          });
+          continue;
+        }
+
+        if (!projName) {
+          failedProjects.push({
+            id: crmId,
+            name: crmId,
+            reason: 'Project name is required.',
+          });
+          continue;
+        }
+
+        // Duplicate check
+        const already = sharedSyncData.projects.some(
+          p => (p.crmMetadata?.externalId && p.crmMetadata.externalId === crmId) ||
+               (crmProj.dealId && p.crmMetadata?.dealId && p.crmMetadata.dealId === crmProj.dealId)
+        );
+        if (already) {
+          failedProjects.push({
+            id: crmId,
+            name: projName,
+            reason: 'This project has already been imported into TeamFlow.',
+          });
+          continue;
+        }
+
+        // Date validation: dueDate must not be earlier than startDate
+        if (crmProj.startDate && crmProj.dueDate && crmProj.startDate > crmProj.dueDate) {
+          failedProjects.push({
+            id: crmId,
+            name: projName,
+            reason: `Target completion date (${crmProj.dueDate}) must be on or after start date (${crmProj.startDate}).`,
+          });
+          continue;
+        }
+
+        const now = new Date().toISOString();
+        const newProject = {
+          id: `proj-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+          workspaceId: 'ws-ojix-main',
+          name: projName,
+          objective: projObjective || `Imported from OJIX ClientFlow CRM (Deal ID: ${crmProj.dealId || crmId}).`,
+          ownerId: caller.uid,
+          status: (crmProj.status === 'active' || crmProj.status === 'planning' || crmProj.status === 'on_hold')
+            ? crmProj.status
+            : 'active',
+          startDate: crmProj.startDate || now.split('T')[0],
+          dueDate: crmProj.dueDate || now.split('T')[0],
+          memberIds: Array.from(new Set([caller.uid, ...adminIds])),
+          createdAt: now,
+          updatedAt: now,
+          crmMetadata: {
+            source: 'clientflow_crm',
+            externalId: crmProj.id,
+            dealId: crmProj.dealId,
+            clientName: crmProj.client?.name,
+            clientEmail: crmProj.client?.email,
+            clientPhone: crmProj.client?.phone,
+            dealValue: crmProj.dealValue,
+            dealStage: crmProj.dealStage,
+            temperature: crmProj.temperature,
+            sourceStatus: crmProj.status,
+            isReadyForExecution: crmProj.isReadyForExecution,
+            crmWorkspaceId: crmProj.workspaceId,
+            crmWorkspaceName: crmProj.workspaceName,
+            sourceCreatedAt: crmProj.createdAt,
+            lastActivityAt: crmProj.lastActivityAt,
+            importedAt: now,
+            importedByUid: caller.uid,
+          },
+        };
+
+        sharedSyncData.projects.push(newProject);
+        importedProjects.push(newProject);
+      }
+
+      if (importedProjects.length > 0) {
+        await cloudPersistence.saveSyncData(sharedSyncData);
+        broadcastRealtimeEvent('sync', { projects: importedProjects });
+        broadcastRealtimeEvent('project_created', importedProjects);
+      }
+
+      sendJson(req, res, 200, {
+        success: failedProjects.length === 0,
+        totalRequested: body.projects.length,
+        importedCount: importedProjects.length,
+        failedCount: failedProjects.length,
+        importedProjects,
+        failedProjects,
+      });
+      return true;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Import failed';
+      sendJson(req, res, 500, { error: message });
+      return true;
+    }
   }
 
   return false;

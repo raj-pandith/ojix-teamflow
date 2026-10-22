@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
 import { ProjectFormData, ProjectStatus } from '../../types/project';
+import { UserProfile } from '../../types/auth';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { storageEngine } from '../../services/storageEngine';
 import { getLocalTodayDateString } from '../../domain/timezone';
+import { CloudDownload } from 'lucide-react';
 
 interface ProjectCreateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateProject: (data: ProjectFormData) => Promise<unknown>;
+  onOpenFetchCrm?: () => void;
+  currentUser?: UserProfile | null;
 }
 
 export const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
   isOpen,
   onClose,
   onCreateProject,
+  onOpenFetchCrm,
+  currentUser,
 }) => {
   const today = getLocalTodayDateString();
   const [name, setName] = useState('');
@@ -79,9 +85,36 @@ export const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
     }
   };
 
+  const canFetchCrm = onOpenFetchCrm && (!currentUser || currentUser.role === 'workspace_admin');
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Project" maxWidth="600px">
       <form onSubmit={handleSubmit} className="project-create-form">
+        {canFetchCrm && (
+          <div className="crm-fetch-banner" id="crm-fetch-banner">
+            <div className="crm-fetch-banner-text">
+              <span className="crm-fetch-title">OJIX ClientFlow CRM</span>
+              <span className="crm-fetch-subtitle">
+                Import won deals and approved customer scopes automatically.
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                onClose();
+                onOpenFetchCrm();
+              }}
+              id="fetch-available-projects-btn"
+              style={{ flexShrink: 0 }}
+            >
+              <CloudDownload size={14} />
+              <span>Fetch Available Projects</span>
+            </Button>
+          </div>
+        )}
+
         {error && <div className="form-alert-error">{error}</div>}
 
         <Input

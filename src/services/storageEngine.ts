@@ -1533,10 +1533,33 @@ class ReactiveStorageEngine {
     throw new Error('Permission denied: You do not have access to this project.');
   }
 
+  public isCrmProjectImported(externalId: string): boolean {
+    if (!externalId) return false;
+    const clean = externalId.trim().toLowerCase();
+    return this.projects.some(p => {
+      const pExt = p.crmMetadata?.externalId?.trim().toLowerCase();
+      const pDeal = p.crmMetadata?.dealId?.trim().toLowerCase();
+      return pExt === clean || pDeal === clean;
+    });
+  }
+
   public saveProject(project: Project, user: UserProfile): void {
     if (user.role !== 'workspace_admin' && user.role !== 'project_lead') {
       throw new Error('Permission denied: Only Workspace Admins and Project Leads can create projects.');
     }
+
+    if (project.crmMetadata?.externalId) {
+      const already = this.projects.some(
+        p => p.id !== project.id && (
+          p.crmMetadata?.externalId === project.crmMetadata?.externalId ||
+          (project.crmMetadata?.dealId && p.crmMetadata?.dealId === project.crmMetadata?.dealId)
+        )
+      );
+      if (already) {
+        throw new Error(`Project "${project.name}" (CRM ID: ${project.crmMetadata.externalId}) has already been imported.`);
+      }
+    }
+
     const index = this.projects.findIndex(p => p.id === project.id);
     if (index >= 0) {
       if (user.role !== 'workspace_admin' && this.projects[index].ownerId !== user.uid) {

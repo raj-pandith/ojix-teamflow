@@ -4,11 +4,24 @@
  * - In production: prepends the configured backend origin (e.g., https://api.ojix.dev).
  */
 
+export function getEffectiveApiBase(): string {
+  // If running in browser on localhost or 127.0.0.1, always use local relative URLs
+  // so requests hit Vite dev server's built-in API proxy directly without CORS or timeout issues
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return '';
+    }
+  }
+  return (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+}
+
 export const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 
 export function apiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  return `${API_BASE_URL}${cleanPath}`;
+  const base = getEffectiveApiBase();
+  return base ? `${base}${cleanPath}` : cleanPath;
 }
 
 export interface SafeFetchResult<T> {

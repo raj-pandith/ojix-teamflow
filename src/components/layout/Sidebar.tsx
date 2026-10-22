@@ -13,6 +13,7 @@ import {
   Plus,
   LogOut,
   X,
+  CloudDownload,
 } from 'lucide-react';
 
 export type ActiveNavTab = 'kanban' | 'list' | 'dashboard' | 'my-tasks' | 'messages' | 'security' | 'projects' | 'users';
@@ -29,6 +30,7 @@ interface SidebarProps {
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
   onOpenProfile?: () => void;
+  onOpenFetchCrm?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -43,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen = false,
   onCloseMobile,
   onOpenProfile,
+  onOpenFetchCrm,
 }) => {
   const handleLogout = () => {
     authService.logout();
@@ -183,16 +186,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-projects-section">
         <div className="projects-header">
           <span className="nav-section-title">Projects ({projects.length})</span>
-          {canCreateProject && (
-            <button
-              className="btn-add-project"
-              onClick={handleOpenNewProject}
-              title="Add new project"
-              id="create-project-sidebar-btn"
-            >
-              <Plus size={14} />
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {currentUser?.role === 'workspace_admin' && onOpenFetchCrm && (
+              <button
+                className="btn-fetch-crm-projects"
+                onClick={() => {
+                  onOpenFetchCrm();
+                  onCloseMobile?.();
+                }}
+                title="Fetch Available Projects from ClientFlow CRM"
+                id="fetch-available-projects-sidebar-btn"
+                aria-label="Fetch Available Projects"
+              >
+                <CloudDownload size={14} />
+              </button>
+            )}
+            {canCreateProject && (
+              <button
+                className="btn-add-project"
+                onClick={handleOpenNewProject}
+                title="Add new project"
+                id="create-project-sidebar-btn"
+              >
+                <Plus size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="project-list-scroll">

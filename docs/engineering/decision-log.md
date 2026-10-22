@@ -274,3 +274,30 @@ Evaluators testing dashboards, overdue metrics, and blocker workflows should not
 - Proves domain logic execution live in front of evaluators.
 - Fully grounds the required skills in the functional product experience.
 
+---
+
+## DEC-013 — Secure CRM Project Ingestion & Selective Import Architecture
+
+**Date:** 2026-10-22  
+**Status:** Finalized  
+
+### Context
+TeamFlow needed an automated, secure integration allowing Workspace Admins to review and selectively import won customer deals from OJIX ClientFlow CRM (`/api/projects?stage=WON`). The CRM API key (`ojix-teamflow-clientflow-2026`) must not be exposed in client-side bundles or network calls, non-admins must be strictly forbidden from accessing the gateway, duplicate projects must never be imported twice, and date validation rules must be upheld.
+
+### Decision
+1. **Server-Side Gateway (`GET /api/crm/projects`, `POST /api/crm/import`):**
+   - The private CRM API key is maintained strictly server-side in `CLIENTFLOW_CRM_API_KEY`.
+   - The backend validates that caller has role `workspace_admin` and active status.
+   - The gateway dynamically checks each project against `sharedSyncData.projects` using `externalId` and `dealId` to annotate `isAlreadyImported`.
+   - Projects with invalid date ranges (`dueDate < startDate`) are detected, marked with validation errors, and prohibited from creating invalid project records.
+2. **Selective Review Modal (`CrmProjectImportModal.tsx`):**
+   - Renders a project review dialog displaying name, objective, client contact, formatted deal value, stage, and readiness badges.
+   - Initial state starts with 0 selections.
+   - Includes tri-state "Select All Projects" checkbox that selects all eligible projects and unchecks cleanly.
+   - Dynamically updates action button: `Accept Projects (N)`.
+   - Already imported projects and projects with invalid date ranges display distinct badges and have checkboxes disabled.
+3. **Automatic Import & Real-Time Sync:**
+   - Converts CRM schema into TeamFlow `Project` instances, generating internal `proj-...` IDs, assigning `ws-ojix-main`, and preserving integration metadata in `crmMetadata`.
+   - Atomically updates storage, emits SSE broadcast events (`sync`, `project_created`), updates client `storageEngine`, and displays actionable import reporting on partial failures.
+
+

@@ -25,6 +25,7 @@ import {
   Mail,
   ChevronRight,
   MoreVertical,
+  CloudDownload,
 } from 'lucide-react';
 
 interface ProjectDashboardProps {
@@ -42,6 +43,7 @@ interface ProjectDashboardProps {
     view?: 'list' | 'kanban';
   }) => void;
   onOpenDirectMessage?: (memberId: string) => void;
+  onOpenFetchCrm?: () => void;
 }
 
 export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
@@ -55,6 +57,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
   currentUser,
   onNavigateToTasks,
   onOpenDirectMessage,
+  onOpenFetchCrm,
 }) => {
   const [isManageTeamOpen, setIsManageTeamOpen] = useState(false);
   const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
@@ -115,6 +118,19 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
     return (
       <div className="empty-panel-state">
         <p>Select a project from the sidebar to inspect progress and workload.</p>
+        {currentUser?.role === 'workspace_admin' && onOpenFetchCrm && (
+          <div style={{ marginTop: '16px' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={onOpenFetchCrm}
+              id="fetch-available-projects-empty-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <CloudDownload size={14} />
+              <span>Fetch Available Projects</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -182,6 +198,18 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({
               <PanelsTopLeft size={14} />
               <span>Open Board</span>
             </button>
+            {currentUser?.role === 'workspace_admin' && onOpenFetchCrm && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onOpenFetchCrm}
+                id="fetch-available-projects-dashboard-btn"
+                title="Fetch Available Projects from OJIX ClientFlow CRM"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <CloudDownload size={13} />
+                <span>Fetch Available Projects</span>
+              </button>
+            )}
             {canManageTeam && onUpdateProject && (
               <button
                 className="btn btn-secondary btn-sm"

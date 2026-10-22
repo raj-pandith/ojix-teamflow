@@ -14,6 +14,7 @@ import { UserManagementView } from './components/users/UserManagementView';
 import { WorkTriageDrawer } from './features/triage/WorkTriageDrawer';
 import { TaskCreateModal } from './components/tasks/TaskCreateModal';
 import { ProjectCreateModal } from './components/projects/ProjectCreateModal';
+import { CrmProjectImportModal } from './components/projects/CrmProjectImportModal';
 import { ProjectDeleteModal } from './components/projects/ProjectDeleteModal';
 import { UserInviteModal } from './components/users/UserInviteModal';
 import { MessageCenterView } from './features/messages/MessageCenterView';
@@ -61,6 +62,7 @@ const MainApp: React.FC = () => {
   const [isTriageOpen, setIsTriageOpen] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [isCrmImportOpen, setIsCrmImportOpen] = useState(false);
   const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -167,6 +169,7 @@ const MainApp: React.FC = () => {
         isMobileOpen={isMobileNavOpen}
         onCloseMobile={() => setIsMobileNavOpen(false)}
         onOpenProfile={() => setIsPersonaModalOpen(true)}
+        onOpenFetchCrm={() => setIsCrmImportOpen(true)}
       />
 
       {/* Main Shell */}
@@ -289,6 +292,7 @@ const MainApp: React.FC = () => {
               currentUser={currentUser}
               onNavigateToTasks={handleNavigateToTasks}
               onOpenDirectMessage={handleOpenDirectMessage}
+              onOpenFetchCrm={() => setIsCrmImportOpen(true)}
             />
           )}
 
@@ -365,6 +369,27 @@ const MainApp: React.FC = () => {
           isOpen={isCreateProjectOpen}
           onClose={() => setIsCreateProjectOpen(false)}
           onCreateProject={createProject}
+          onOpenFetchCrm={() => setIsCrmImportOpen(true)}
+          currentUser={currentUser}
+        />
+      )}
+
+      {/* CRM Project Import Modal (Workspace Admin only) */}
+      {currentUser && currentUser.role === 'workspace_admin' && (
+        <CrmProjectImportModal
+          isOpen={isCrmImportOpen}
+          onClose={() => setIsCrmImportOpen(false)}
+          currentUser={currentUser}
+          onProjectsImported={importedList => {
+            if (importedList.length > 0) {
+              setActiveProjectId(importedList[0].id);
+              showToast(
+                'success',
+                'Projects Imported',
+                `Successfully imported ${importedList.length} project${importedList.length === 1 ? '' : 's'} from OJIX ClientFlow CRM.`
+              );
+            }
+          }}
         />
       )}
 
